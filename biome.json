@@ -7,7 +7,19 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/target", "!**/.junius-cache"]
+    "includes": [
+      "biome.json",
+      "package.json",
+      "tsconfig.base.json",
+      "platform/frontend/**",
+      "packages/**",
+      "plugins/*/frontend/**",
+      "!**/node_modules",
+      "!**/.pnpm",
+      "!**/dist",
+      "!**/target",
+      "!**/*.css"
+    ]
   },
   "formatter": {
     "enabled": true,

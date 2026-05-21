@@ -14,7 +14,7 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M01** | ✅ | [`junius` bootstrap](02-M01-junius-bootstrap.md) | CLI shell, manifest parser, `junius check` on a fixture | `junius check --manifest fixture.toml` rejects bad input |
 | **M02** | ✅ | [Platform core](03-M02-platform-core.md) | `Plugin` trait, `plugin_metadata!`, Axum binary booting with zero plugins | `cargo run -p platform` serves 200 on `/` |
 | **M03** | ✅ | [First plugin](04-M03-first-plugin.md) | Hello plugin (Rust only) + `junius sync` wires it in | `curl /h/hello/ping` returns `200 pong` |
-| **M04** | 🚧 | [Frontend shell](05-M04-frontend-shell.md) | React/TanStack shell, `buildRoutes`, Vite, `rust-embed`, `junius dev` | `junius dev` renders `/p/hello` in a browser |
+| **M04** | ✅ | [Frontend shell](05-M04-frontend-shell.md) | React/TanStack shell, `buildRoutes`, Vite, `rust-embed`, `junius dev` | `junius dev` renders `/p/hello` in a browser |
 | **M05** | 🚧 | [Connect-RPC](06-M05-connect-rpc.md) | proto + buf + connect-rs + connect-query end-to-end | `/p/hello` shows server response via `useQuery` |
 | **M06** | 🚧 | [DB + auth](07-M06-db-auth.md) | Postgres, host migrations, per-plugin roles, OIDC, sessions | Log in via Authentik; `GET /api/me` returns user |
 | **M07** | 🚧 | [Repos + permissions](08-M07-repos-permissions.md) | `#[derive(Repository)]`, `Has<X>`, `#[derive(PluginCtx)]`, RPC `requires` enforcement | Compile-fail test rejects writes without the permission |

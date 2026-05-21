@@ -27,3 +27,6 @@ Thumbs.db
 
 # Local junius cache (populated by the CLI from M01 onward)
 .junius-cache/
+
+# direnv local cache (nix flake materialisations)
+.direnv/

@@ -7,3 +7,6 @@ pub mod boot;
 pub mod config;
 pub mod plugin_registry;
 pub mod server;
+
+#[cfg(feature = "embed-frontend")]
+mod static_assets;

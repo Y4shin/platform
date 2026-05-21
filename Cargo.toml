@@ -58,6 +58,10 @@ junius-sdk-macros  = { path = "crates/junius-sdk-macros" }
 # HTTP testing (used by platform's integration tests)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
+# FE asset embedding (platform host, gated by the `embed-frontend` feature)
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
+mime_guess = "2"
+
 # CLI
 clap   = { version = "4", features = ["derive", "env"] }
 regex  = "1"

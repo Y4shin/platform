@@ -26,8 +26,8 @@ fn main() -> ExitCode {
     let code = match args.command {
         cli::Command::Check(a) => commands::check::run(&a, args.format),
         cli::Command::Sync(a) => commands::sync::run(&a, args.format),
-        cli::Command::Build(_) => commands::build::run(),
-        cli::Command::Dev(_) => commands::dev::run(),
+        cli::Command::Build(a) => commands::build::run(&a),
+        cli::Command::Dev(a) => commands::dev::run(&a),
         cli::Command::Migrate { subcommand } => commands::migrate::run(&subcommand),
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
         cli::Command::New { subcommand } => commands::new::run(&subcommand, args.format),

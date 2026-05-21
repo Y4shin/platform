@@ -1,0 +1,31 @@
+/* @junius/design — shared Tailwind v4 theme tokens.
+ *
+ * Plugin frontends do not import this directly; the platform shell imports
+ * it (alongside @import "tailwindcss"), and plugin code references the
+ * tokens via Tailwind class names (`bg-surface-1`, `text-primary`, …).
+ *
+ * Tokens are deliberately conservative at M04 — enough for the shell + a
+ * single hello page. Real palette work happens after first usage.
+ */
+
+@theme {
+  /* Colour tokens (semantic, not raw colours) */
+  --color-surface-0: oklch(99% 0 0);     /* page background */
+  --color-surface-1: oklch(97% 0 0);     /* cards, dialogs */
+  --color-surface-2: oklch(93% 0 0);     /* hovered card / pressed surface */
+  --color-border:    oklch(88% 0 0);
+  --color-fg-1:      oklch(20% 0 0);     /* primary text */
+  --color-fg-2:      oklch(45% 0 0);     /* secondary text */
+  --color-primary:   oklch(55% 0.18 250); /* brand accent */
+  --color-primary-fg: oklch(99% 0 0);    /* text on --color-primary */
+  --color-danger:    oklch(55% 0.21 25);
+
+  /* Radii */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  /* Typography scale (kept default Tailwind sizes) */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}

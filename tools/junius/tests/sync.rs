@@ -28,6 +28,17 @@ fn sync_with_hello_writes_expected_files() {
 
     let workspace_cargo = fs::read_to_string(tmp.path().join("Cargo.toml")).unwrap();
     assert!(workspace_cargo.contains("    \"plugins/hello\","));
+
+    let routes_ts =
+        fs::read_to_string(tmp.path().join("platform/frontend/src/generated/routes.ts")).unwrap();
+    insta::assert_snapshot!("routes_ts_hello", routes_ts);
+
+    let registry_ts = fs::read_to_string(
+        tmp.path()
+            .join("platform/frontend/src/generated/component-registry.ts"),
+    )
+    .unwrap();
+    insta::assert_snapshot!("registry_ts_empty", registry_ts);
 }
 
 #[test]
@@ -89,6 +100,12 @@ fn sync_orders_plugins_by_enabled_list() {
     let alpha_pos = plugins_rs.find("alpha_plugin").expect("alpha line");
     let bravo_pos = plugins_rs.find("bravo_plugin").expect("bravo line");
     assert!(alpha_pos < bravo_pos, "expected alpha before bravo");
+
+    let routes_ts =
+        fs::read_to_string(tmp.path().join("platform/frontend/src/generated/routes.ts")).unwrap();
+    let alpha_pos = routes_ts.find("buildAlpha").expect("buildAlpha import");
+    let bravo_pos = routes_ts.find("buildBravo").expect("buildBravo import");
+    assert!(alpha_pos < bravo_pos, "expected alpha route ahead of bravo");
 }
 
 // --- error paths -------------------------------------------------------------

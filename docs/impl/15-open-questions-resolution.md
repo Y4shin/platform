@@ -11,8 +11,8 @@ When you confirm a direction below, also:
 | # | Open question | Gated milestone | Recommended direction | Status |
 |---|---|---|---|---|
 | 1 | Testing strategy | **Before M03** | Three layers, concrete tooling — see §15.1 | ✅ locked in M03 (see §15.1) |
-| 2 | Asset handling | **Before M04** | Per-plugin assets, Vite-bundled — see §15.2 | proposed |
-| 3 | Hot reload across plugin boundaries | **Validated during M04** | Expect pnpm symlinks + Vite to give clean HMR; fallback documented — see §15.3 | proposed, validate empirically |
+| 2 | Asset handling | **Before M04** | Per-plugin assets, Vite-bundled — see §15.2 | ✅ locked in M04 (Vite picks up `plugins/*/frontend/src/assets/` via workspace symlinks; bundled into `platform/frontend/dist/` and embedded by `rust-embed`) |
+| 3 | Hot reload across plugin boundaries | **Validated during M04** | Expect pnpm symlinks + Vite to give clean HMR; fallback documented — see §15.3 | ✅ validated in M04 (pnpm workspace symlinks + Vite default HMR work without extra config) |
 | 4 | Multi-tenancy | **Before M06** | Single-tenant locked for v1 — see §15.4 | proposed |
 | 5 | Audit logging | **Before M06** | Host-wide `platform.audit_event`, 365-day default retention — see §15.5 | proposed |
 | 6 | Trust model & threat model | **Before M07** | First-party plugins only in v1 — see §15.6 | proposed |

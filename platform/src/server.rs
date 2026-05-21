@@ -1,6 +1,6 @@
 //! Axum server: build the composed router, bind, serve with graceful shutdown.
 
-use axum::{Router, routing::get};
+use axum::Router;
 use junius_sdk::Plugin;
 
 use crate::boot;
@@ -9,9 +9,12 @@ use crate::config::HostConfig;
 /// Compose the host's base routes with every plugin's contributed routes.
 /// Each plugin is mounted under `metadata().mount.http_prefix`.
 ///
-/// At M02 there are no plugins, so this returns just the root route.
+/// With the `embed-frontend` feature on, the SPA bundle is served as a
+/// fallback so client-side `TanStack Router` routes (`/p/<plugin>/...`)
+/// resolve to `index.html`. In dev mode the fallback is a simple text
+/// banner — Vite serves the SPA on a different port.
 pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
-    let mut app = Router::new().route("/", get(|| async { "hello, platform" }));
+    let mut app = base_app();
 
     for plugin in plugins {
         let metadata = plugin.metadata();
@@ -21,6 +24,16 @@ pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
     }
 
     app
+}
+
+#[cfg(not(feature = "embed-frontend"))]
+fn base_app() -> Router {
+    Router::new().route("/", axum::routing::get(|| async { "hello, platform" }))
+}
+
+#[cfg(feature = "embed-frontend")]
+fn base_app() -> Router {
+    crate::static_assets::router()
 }
 
 /// Boot the platform end-to-end:

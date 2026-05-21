@@ -2,3 +2,12 @@ packages:
   - "platform/frontend"
   - "packages/*"
   - "plugins/*/frontend"
+
+allowBuilds:
+  esbuild: true
+
+# pnpm 11+ requires explicit approval before running install scripts of
+# packages. esbuild's postinstall just selects the platform-specific binary
+# from the package — safe and needed for Vite to work.
+onlyBuiltDependencies:
+  - esbuild

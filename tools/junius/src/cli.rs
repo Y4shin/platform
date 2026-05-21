@@ -95,6 +95,10 @@ pub struct BuildArgs {
     /// Build with optimisations enabled.
     #[arg(long)]
     pub release: bool,
+
+    /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
+    #[arg(long)]
+    pub config: Option<PathBuf>,
 }
 
 #[derive(clap::Args, Debug)]

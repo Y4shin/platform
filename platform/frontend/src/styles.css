@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@junius/design/theme.css";
+
+/* Tailwind v4 scans the importing project's sources automatically but skips
+ * node_modules. Plugins are workspace packages symlinked into node_modules,
+ * so we add explicit @source globs for them and for the shared design
+ * package. Adding new plugins requires no edit here — the glob picks them up.
+ */
+@source "../../../packages/sdk/src/**/*.{ts,tsx}";
+@source "../../../packages/design/src/**/*.{ts,tsx}";
+@source "../../../plugins/*/frontend/src/**/*.{ts,tsx}";
+
+/* Default page chrome. Plugin pages provide their own typographic detail. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-surface-0);
+  color: var(--color-fg-1);
+  font-family: var(--font-sans);
+}

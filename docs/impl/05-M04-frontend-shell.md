@@ -1,6 +1,6 @@
 # M04 — Frontend Shell + `buildRoutes` + Vite + `rust-embed`
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Implemented — see commit `M04: frontend shell + Vite + rust-embed + junius dev/build` in `git log`.
 
 ## Goal
 
