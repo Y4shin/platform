@@ -1,5 +1,7 @@
 # M13 — First Real Domain Plugin: Speakers
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 `plugins/speakers/` ships as the first real domain plugin: permissions `speakers:read`/`write`/`book`, tables `speaker` + `booking`, exposes `SpeakerCard` + `SpeakerPicker`, full RPC surface (`GetSpeaker`, `ListSpeakers`, `CreateSpeaker`, `UpdateSpeaker`, `BookSpeaker`, `ShareSpeaker`), resource kind `speakers:speaker` owned per-instance. A second minimal `events` plugin scaffolds enough to demonstrate that another plugin can reuse `SpeakerPicker`. This milestone also doubles as the worked example for the plugin authoring guide.

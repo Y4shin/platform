@@ -38,13 +38,15 @@ pub enum OutputFormat {
 pub enum Command {
     /// Validate manifests against the schema and semantic rules.
     Check(CheckArgs),
-    /// Bring derived files in line with manifests. (Stub — lands in M03.)
+    /// Rewrite derived files (`platform/src/generated/plugins.rs` and the
+    /// `junius managed` regions of `Cargo.toml`s) so they match the
+    /// deployment config.
     Sync(SyncArgs),
     /// Build a deployment binary. (Stub — lands in M04.)
     Build(BuildArgs),
     /// One-command developer loop. (Stub — lands in M04.)
     Dev(DevArgs),
-    /// Database migrations.
+    /// Database migrations. (Stub — lands in M06.)
     Migrate {
         #[command(subcommand)]
         subcommand: MigrateCmd,
@@ -74,30 +76,41 @@ pub struct CheckArgs {
 
 #[derive(clap::Args, Debug)]
 pub struct SyncArgs {
+    /// Scope to a single plugin. (Not yet implemented — planned for M09.)
     #[arg(long)]
     pub plugin: Option<String>,
+
+    /// Report pending changes without writing. Exits 1 if anything would
+    /// change, 0 if everything is already in sync. Useful as a CI drift check.
     #[arg(long)]
     pub dry_run: bool,
+
+    /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
     #[arg(long)]
     pub config: Option<PathBuf>,
 }
 
 #[derive(clap::Args, Debug)]
 pub struct BuildArgs {
+    /// Build with optimisations enabled.
     #[arg(long)]
     pub release: bool,
 }
 
 #[derive(clap::Args, Debug)]
 pub struct DevArgs {
+    /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
     #[arg(long)]
     pub config: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum MigrateCmd {
+    /// Apply all pending migrations.
     Up,
+    /// Roll back the most recently applied migration.
     Down,
+    /// Show applied and pending migrations.
     Status,
 }
 
@@ -119,9 +132,17 @@ pub enum PluginCmd {
 
 #[derive(Subcommand, Debug)]
 pub enum NewCmd {
-    Plugin { name: String },
+    /// Scaffold a new plugin under `plugins/<NAME>/` and run `junius sync`.
+    Plugin {
+        /// Plugin name (must match `^[a-z][a-z0-9_-]*$`).
+        name: String,
+    },
+    /// Add a new component to a plugin's frontend lib. (Stub — lands in M07.)
     Component { plugin: String, name: String },
+    /// Add a new RPC service to a plugin's proto. (Stub — lands in M05.)
     Rpc { plugin: String, service: String },
+    /// Create a new migration under `plugins/<PLUGIN>/migrations/`. (Stub — lands in M06.)
     Migration { plugin: String, name: String },
+    /// Add a permission entry to a plugin's manifest. (Stub — lands in M07.)
     Permission { plugin: String, perm: String },
 }

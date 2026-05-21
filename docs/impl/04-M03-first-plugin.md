@@ -1,5 +1,7 @@
 # M03 — First Plugin (`hello`) + `junius sync` Wiring
 
+> **Status:** ✅ Implemented — see commit `M03: first plugin (hello) + junius sync` in `git log`.
+
 ## Goal
 
 A trivial `hello` plugin lives under `plugins/hello/`. `junius sync` reads `dev/platform.toml`, generates `platform/src/generated/plugins.rs` listing every enabled plugin, and a rebuild produces a binary that serves `/h/hello/ping` returning `"pong"`. The end-to-end Rust-only path works.

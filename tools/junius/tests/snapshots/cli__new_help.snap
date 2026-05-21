@@ -1,0 +1,20 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Scaffold new plugins, components, RPC services, migrations, permissions
+
+Usage: junius new [OPTIONS] <COMMAND>
+
+Commands:
+  plugin      Scaffold a new plugin under `plugins/<NAME>/` and run `junius sync`
+  component   Add a new component to a plugin's frontend lib. (Stub — lands in M07.)
+  rpc         Add a new RPC service to a plugin's proto. (Stub — lands in M05.)
+  migration   Create a new migration under `plugins/<PLUGIN>/migrations/`. (Stub — lands in M06.)
+  permission  Add a permission entry to a plugin's manifest. (Stub — lands in M07.)
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --cwd <CWD>        Run as if junius were started in <CWD>
+  -h, --help             Print help

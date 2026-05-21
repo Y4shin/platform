@@ -1,0 +1,18 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Database migrations. (Stub — lands in M06.)
+
+Usage: junius migrate [OPTIONS] <COMMAND>
+
+Commands:
+  up      Apply all pending migrations
+  down    Roll back the most recently applied migration
+  status  Show applied and pending migrations
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --cwd <CWD>        Run as if junius were started in <CWD>
+  -h, --help             Print help

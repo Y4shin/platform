@@ -1,5 +1,7 @@
 # M02 — Platform Core (Host) Bootstrap
 
+> **Status:** ✅ Implemented — see commit `M02: platform host bootstrap + plugin_metadata! macro` in `git log`.
+
 ## Goal
 
 The platform host binary boots Axum, holds an (empty) plugin registry, and serves `200 OK` on `/`. The `Plugin` trait and the `plugin_metadata!` proc-macro exist in `junius-sdk`, ready for M03's first plugin to implement.

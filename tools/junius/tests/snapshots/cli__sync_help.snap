@@ -1,0 +1,16 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config
+
+Usage: junius sync [OPTIONS]
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+      --plugin <PLUGIN>  Scope to a single plugin. (Not yet implemented — planned for M09.)
+      --dry-run          Report pending changes without writing. Exits 1 if anything would change, 0 if everything is already in sync. Useful as a CI drift check
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --config <CONFIG>  Path to the deployment's `platform.toml`. Defaults to `./platform.toml`
+      --cwd <CWD>        Run as if junius were started in <CWD>
+  -h, --help             Print help

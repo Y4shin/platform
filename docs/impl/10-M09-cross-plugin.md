@@ -1,5 +1,7 @@
 # M09 — Cross-Plugin Composition (2-Plugin Demo)
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Two new plugins exercise every cross-plugin mechanism: `greetings` declares a **required** dep on `hello` (uses its `greeting_template` table, calls its `Greet` RPC, imports its `GreeterCard` component); `widgets` exposes a `VenuePicker` that `greetings` uses as an **optional** dep via the typed component registry. Per-plugin narrow `rpc` namespaces are generated; cross-plugin Postgres grants applied; every `junius check` cross-plugin rule enforced.

@@ -1,5 +1,7 @@
 # M07 — Repository Pattern + Typed Permissions + `PluginCtx` Derive
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Plugins query the DB through `#[derive(Repository)]` types whose methods are gated by `Has<X>` permission bounds. `plugin_metadata!()` emits one zero-sized marker type per declared permission. `#[derive(PluginCtx)]` generates the Axum extractor that verifies permissions and instantiates the plugin's repos per request. RPC method permissions declared via `option (platform.requires) = "..."` are enforced server-side by a `connect-rs` interceptor and reflected in handler signatures.

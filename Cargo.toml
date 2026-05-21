@@ -6,7 +6,8 @@ members = [
     "crates/junius-sdk",
     "crates/junius-sdk-macros",
     "crates/manifest",
-    # >>> junius managed start (populated by `junius sync` from M03)
+    # >>> junius managed start
+    "plugins/hello",
     # <<< junius managed end
 ]
 

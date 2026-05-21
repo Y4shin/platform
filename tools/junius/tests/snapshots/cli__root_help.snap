@@ -8,10 +8,10 @@ Usage: junius [OPTIONS] <COMMAND>
 
 Commands:
   check    Validate manifests against the schema and semantic rules
-  sync     Bring derived files in line with manifests. (Stub — lands in M03.)
+  sync     Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config
   build    Build a deployment binary. (Stub — lands in M04.)
   dev      One-command developer loop. (Stub — lands in M04.)
-  migrate  Database migrations
+  migrate  Database migrations. (Stub — lands in M06.)
   plugin   Plugin inspection and lifecycle
   new      Scaffold new plugins, components, RPC services, migrations, permissions
 

@@ -1,5 +1,7 @@
 # M08 — Resource Ownership + Per-Resource Access + `viewerCanX`
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Plugins record per-instance ownership via `PluginResources.authz.record_owner(...)`. Repo list/get queries join through `platform.user_can_access(...)` so users see only resources they can access. Responses include `viewerCanEdit` / `viewerCanShare` flags computed server-side. Sharing API exists; only owners can share.

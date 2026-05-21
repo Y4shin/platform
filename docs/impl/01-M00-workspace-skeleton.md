@@ -1,5 +1,7 @@
 # M00 — Workspace Skeleton
 
+> **Status:** ✅ Implemented — see commit `M00: workspace skeleton, project rename to Junius` in `git log`.
+
 ## Goal
 
 A repo a developer can `git clone`, `nix develop`, and then `cargo build` + `pnpm install` successfully — with nothing actually running. Pure scaffolding, with the full toolchain provided by a Nix flake.

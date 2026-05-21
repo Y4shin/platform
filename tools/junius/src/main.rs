@@ -3,6 +3,7 @@
 mod cli;
 mod commands;
 mod exit;
+mod markers;
 mod output;
 
 use std::path::PathBuf;
@@ -24,12 +25,12 @@ fn main() -> ExitCode {
 
     let code = match args.command {
         cli::Command::Check(a) => commands::check::run(&a, args.format),
-        cli::Command::Sync(_) => commands::sync::run(),
+        cli::Command::Sync(a) => commands::sync::run(&a, args.format),
         cli::Command::Build(_) => commands::build::run(),
         cli::Command::Dev(_) => commands::dev::run(),
         cli::Command::Migrate { subcommand } => commands::migrate::run(&subcommand),
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
-        cli::Command::New { subcommand } => commands::new::run(&subcommand),
+        cli::Command::New { subcommand } => commands::new::run(&subcommand, args.format),
     };
 
     ExitCode::from(u8::try_from(code).unwrap_or(1))

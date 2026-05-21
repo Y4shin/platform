@@ -1,5 +1,7 @@
 # M06 — Postgres + Migrations + Roles + OIDC + Sessions
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Postgres becomes the platform's persistence layer. Host migrations create `platform.*` (users, sessions, groups, roles, memberships, resource_principal, resource_share, `user_can_access`) and `meta.migrations`. Each plugin gets a Postgres role with grants derived from its manifest. OIDC login against Authentik produces server-side sessions; `GET /api/me` returns the authenticated user. `junius migrate up` applies host + plugin migrations in topo order with `-- @requires` edges.

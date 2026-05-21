@@ -24,6 +24,10 @@ thiserror          = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# >>> junius managed start
+hello-plugin = { path = "../plugins/hello" }
+# <<< junius managed end
+
 [dev-dependencies]
 http    = { workspace = true }
 reqwest = { workspace = true }

@@ -1,5 +1,7 @@
 # M12 — Hardening: Full `junius check` Ruleset + CI Schema Test + Schema Evolution
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Every static safety rule the design promises is implemented and enforced in CI. Schema-evolution Layer 1 (`junius check` static rules) and Layer 2 (CI integration test) both run. Every "the platform refuses to compile/deploy a broken state" claim becomes a literal test.

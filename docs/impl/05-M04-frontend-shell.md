@@ -1,5 +1,7 @@
 # M04 — Frontend Shell + `buildRoutes` + Vite + `rust-embed`
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 A React+TanStack frontend shell composed from the `hello` plugin's `buildRoutes`. `junius dev` runs Vite + the Axum host concurrently with `/h/*` proxied through. `junius build` produces a single binary embedding the FE bundle via `rust-embed`. Visiting `/p/hello` in a browser renders the plugin's page.

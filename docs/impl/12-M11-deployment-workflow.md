@@ -1,5 +1,7 @@
 # M11 — Deployment Workflow + `[source]` Resolution
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 A deployment lives in its **own directory**, outside the source monorepo, holding only `platform.toml`, `platform.lock`, and `secrets/`. `junius build` run from a deployment dir resolves `[source]` (git URL+rev or local path), generates composition glue against that source revision, builds, and outputs a self-contained binary. `platform.lock` pins the resolved revision; rebuilds fail unless the lock matches.

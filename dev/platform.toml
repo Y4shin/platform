@@ -1,0 +1,8 @@
+# Dev sandbox deployment config. `junius sync` consumes this to compose the
+# host with the listed plugins. Not a real deployment — see design §5.5.
+
+[source]
+path = "."
+
+[plugins]
+enabled = ["hello"]

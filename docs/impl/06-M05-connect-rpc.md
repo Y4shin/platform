@@ -1,5 +1,7 @@
 # M05 — Connect-RPC End-to-End
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 Plugins define services in `.proto` files. `buf generate` produces Rust server stubs (`connect-rs`) and a TypeScript client (`@bufbuild/protoc-gen-es` + `@connectrpc/protoc-gen-connect-es`) per plugin. The `hello` plugin gets a `HelloService.Greet` RPC; its frontend page calls it via `@connectrpc/connect-query`. This is the **v0 cut** — beyond this point we're hardening, not building new capability shapes.

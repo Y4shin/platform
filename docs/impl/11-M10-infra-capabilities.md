@@ -1,5 +1,7 @@
 # M10 — Other Infra Capabilities (Jobs, Storage, Email, Telemetry)
 
+> **Status:** 🚧 Planned.
+
 ## Goal
 
 The remaining infra handles from [../design/10-infrastructure-and-data.md](../design/10-infrastructure-and-data.md) §10.1 land as fields on `PluginResources` with concrete backings: a Postgres-backed job queue (`apalis`), S3-compatible object storage (`aws-sdk-s3`), pluggable email (`lettre` + `Transport` trait), and tracing+OTel telemetry. Runtime capability gating enforces that plugins only use what their manifest declares.

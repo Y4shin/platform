@@ -1,0 +1,5 @@
+[plugin]
+name = "hello"
+display_name = "Hello"
+description = "Smoke-test plugin exercising the platform shape."
+manifest_schema = 1

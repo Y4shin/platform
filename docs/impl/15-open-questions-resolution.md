@@ -10,25 +10,26 @@ When you confirm a direction below, also:
 
 | # | Open question | Gated milestone | Recommended direction | Status |
 |---|---|---|---|---|
-| 1 | Testing strategy | **Before M03** | Three layers, concrete tooling — see §15.1 | proposed |
+| 1 | Testing strategy | **Before M03** | Three layers, concrete tooling — see §15.1 | ✅ locked in M03 (see §15.1) |
 | 2 | Asset handling | **Before M04** | Per-plugin assets, Vite-bundled — see §15.2 | proposed |
 | 3 | Hot reload across plugin boundaries | **Validated during M04** | Expect pnpm symlinks + Vite to give clean HMR; fallback documented — see §15.3 | proposed, validate empirically |
 | 4 | Multi-tenancy | **Before M06** | Single-tenant locked for v1 — see §15.4 | proposed |
 | 5 | Audit logging | **Before M06** | Host-wide `platform.audit_event`, 365-day default retention — see §15.5 | proposed |
 | 6 | Trust model & threat model | **Before M07** | First-party plugins only in v1 — see §15.6 | proposed |
 | 7 | Internationalization | **Before M13** | Defer; English-only with a `t()` shim — see §15.7 | proposed |
-| 8 | Worked example & plugin authoring guide | **Emerges M03–M05, finalised at M13** | Use Speakers (M13) as the worked example — see §15.8 | proposed, executes through implementation |
+| 8 | Worked example & plugin authoring guide | **Emerges M03–M05, finalised at M13** | Use Speakers (M13) as the worked example — see §15.8 | partially in progress (hello demonstrates the shape via M03) |
 | 9 | v0 milestone definition | **Defined by this plan** | M05 is the v0 cut — see §15.9 | locked by this plan |
 
-## §15.1 Testing strategy (gated before M03)
+## §15.1 Testing strategy ✅ locked at M03
 
-**Recommended:** three layers.
+Three layers, as proposed, with concrete tooling adopted in M03:
 
-- **Unit** — `cargo test -p <crate>` for Rust, `vitest` + `@testing-library/react` for TS. Each plugin owns its own unit tests.
-- **Integration** — `cargo test --workspace` driving the full bound platform binary via `reqwest`; ephemeral Postgres via `testcontainers-modules` for DB-touching tests.
-- **End-to-end** — `playwright` running against `junius dev` in CI.
+- **Unit** — `cargo test -p <crate>` for Rust. Plugin unit tests use `tower::ServiceExt::oneshot` against the plugin's `Router` (see [plugins/hello/tests/hello.rs](../../plugins/hello/tests/hello.rs)). FE side (`vitest` + `@testing-library/react`) ratified but not yet exercised — lands at M04.
+- **Integration** — `cargo test --workspace` driving the full bound platform binary via `reqwest` (see [platform/tests/boot_with_hello.rs](../../platform/tests/boot_with_hello.rs) and [platform/tests/boot.rs](../../platform/tests/boot.rs)). Ephemeral Postgres via `testcontainers-modules` enters at M06.
+- **End-to-end** — `playwright` running against `junius dev` in CI — adopted at M04 when there's a frontend to drive.
+- **CLI tests** — `assert_cmd` + `predicates` + `insta` snapshots for shape regressions ([tools/junius/tests/cli.rs](../../tools/junius/tests/cli.rs), [tools/junius/tests/sync.rs](../../tools/junius/tests/sync.rs)).
 
-**Locked in:** M03 establishes these as the conventions. Every later milestone's verification step uses them.
+A small shared helper for tempdir-backed end-to-end tests lives at [tools/junius/tests/common/mod.rs](../../tools/junius/tests/common/mod.rs); copy the same `mod common;` pattern for other test crates.
 
 **If you'd rather:** use `wiremock` for HTTP-level mocking instead of real `reqwest` round-trips, or pick `cypress` over playwright — change M03's "Library choices" section and propagate to every later milestone's verification step.
 

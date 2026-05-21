@@ -4,8 +4,12 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+mod common;
+
 use assert_cmd::Command;
 use predicates::prelude::*;
+
+use common::{cmd_in, make_repo, tempdir, write_basic_plugin};
 
 fn cmd() -> Command {
     let mut c = Command::cargo_bin("junius").expect("junius binary not built");
@@ -44,6 +48,42 @@ fn plugin_help_snapshot() {
         .clone();
     let stdout = String::from_utf8(output.stdout).unwrap();
     insta::assert_snapshot!("plugin_help", stdout);
+}
+
+#[test]
+fn sync_help_snapshot() {
+    let output = cmd()
+        .args(["sync", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    insta::assert_snapshot!("sync_help", stdout);
+}
+
+#[test]
+fn new_help_snapshot() {
+    let output = cmd()
+        .args(["new", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    insta::assert_snapshot!("new_help", stdout);
+}
+
+#[test]
+fn migrate_help_snapshot() {
+    let output = cmd()
+        .args(["migrate", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    insta::assert_snapshot!("migrate_help", stdout);
 }
 
 // --- check --------------------------------------------------------------------
@@ -146,6 +186,32 @@ fn check_no_args_is_noop() {
     cmd().arg("check").assert().success();
 }
 
+#[test]
+fn check_via_plugin_arg_resolves_manifest() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+    write_basic_plugin(tmp.path(), "demo");
+
+    cmd_in(tmp.path())
+        .args(["check", "--plugin", "demo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("OK"));
+}
+
+#[test]
+fn check_via_plugin_arg_missing_plugin_errors() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+
+    cmd_in(tmp.path())
+        .args(["check", "--plugin", "ghost"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("no manifest found"));
+}
+
 // --- plugin list / info -------------------------------------------------------
 
 #[test]
@@ -189,32 +255,85 @@ fn plugin_list_json_shape() {
     assert_eq!(enabled, vec!["hello", "speakers"]);
 }
 
-// --- stub subcommands ---------------------------------------------------------
+#[test]
+fn plugin_info_outputs_summary() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+    write_basic_plugin(tmp.path(), "demo");
+
+    cmd_in(tmp.path())
+        .args(["plugin", "info", "demo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Plugin: demo (Demo)"))
+        .stdout(predicate::str::contains("route_prefix = /p/demo"))
+        .stdout(predicate::str::contains("rpc_prefix   = /rpc/demo"))
+        .stdout(predicate::str::contains("http_prefix  = /h/demo"));
+}
 
 #[test]
-fn sync_stub_exits_64() {
-    cmd()
-        .arg("sync")
+fn plugin_info_json_shape() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+    write_basic_plugin(tmp.path(), "demo");
+
+    let output = cmd_in(tmp.path())
+        .args(["--format", "json", "plugin", "info", "demo"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let v: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("stdout was not valid JSON");
+    assert_eq!(v["name"], "demo");
+    assert_eq!(v["display_name"], "Demo");
+    assert_eq!(v["mount"]["http_prefix"], "/h/demo");
+    assert_eq!(v["mount"]["rpc_prefix"], "/rpc/demo");
+    assert_eq!(v["mount"]["route_prefix"], "/p/demo");
+}
+
+#[test]
+fn plugin_info_missing_plugin_errors() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+
+    cmd_in(tmp.path())
+        .args(["plugin", "info", "ghost"])
         .assert()
         .failure()
-        .code(64)
-        .stderr(predicate::str::contains("not yet implemented"));
+        .code(1)
+        .stderr(predicate::str::contains("cannot read"));
 }
+
+// --- --cwd global flag -------------------------------------------------------
+
+#[test]
+fn cwd_flag_resolves_relative_paths_against_target_dir() {
+    // Drive `junius` from the test crate root (assert_cmd default) but tell
+    // it to operate in a tempdir via --cwd; relative paths in args should
+    // resolve there.
+    let tmp = tempdir();
+    make_repo(tmp.path(), &[]);
+    write_basic_plugin(tmp.path(), "demo");
+
+    cmd()
+        .arg("--cwd")
+        .arg(tmp.path())
+        .args(["plugin", "info", "demo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Plugin: demo"));
+}
+
+// --- stub subcommands ---------------------------------------------------------
+// (sync and `new plugin` were stubs in M01 and are implemented in M03 — their
+// real behaviour is covered by tests/sync.rs. The remaining stubs are still
+// stubs.)
 
 #[test]
 fn migrate_up_stub_exits_64() {
     cmd()
         .args(["migrate", "up"])
-        .assert()
-        .failure()
-        .code(64)
-        .stderr(predicate::str::contains("not yet implemented"));
-}
-
-#[test]
-fn new_plugin_stub_exits_64() {
-    cmd()
-        .args(["new", "plugin", "demo"])
         .assert()
         .failure()
         .code(64)

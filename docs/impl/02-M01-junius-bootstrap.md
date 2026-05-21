@@ -1,5 +1,7 @@
 # M01 — `junius` Bootstrap
 
+> **Status:** ✅ Implemented — see commit `M01: junius CLI bootstrap + crates/manifest` in `git log`.
+
 ## Goal
 
 A working `junius` CLI binary that parses `plugin.toml` and `platform.toml` against typed schemas, validates them with `junius check`, and stubs every other subcommand. No code generation yet — there's nothing to generate for.
