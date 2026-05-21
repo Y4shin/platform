@@ -1,21 +1,21 @@
 # 12. Frontend Plugin Interface
 
-This section defines the TypeScript/React surface a frontend plugin author writes against. It mirrors [11-backend-plugin-interface.md](11-backend-plugin-interface.md)'s structure for the backend, but is meaningfully lighter — TypeScript lacks proc macros, React's component model already handles per-component lifecycle, and most of the contract is "export a fixed shape and `platctl` composes."
+This section defines the TypeScript/React surface a frontend plugin author writes against. It mirrors [11-backend-plugin-interface.md](11-backend-plugin-interface.md)'s structure for the backend, but is meaningfully lighter — TypeScript lacks proc macros, React's component model already handles per-component lifecycle, and most of the contract is "export a fixed shape and `junius` composes."
 
 ## 12.1 Overview & philosophy
 
-A frontend plugin is a pnpm workspace package `@platform/plugin-<name>` that exports a fixed surface from `src/index.ts`. There is no `Plugin` interface to implement — the contract is the named exports.
+A frontend plugin is a pnpm workspace package `@junius/plugin-<name>` that exports a fixed surface from `src/index.ts`. There is no `Plugin` interface to implement — the contract is the named exports.
 
-All generated TypeScript code lives in a separate `@platform/generated` package (§12.2). Plugin source trees contain **no generated files** — analogous to the backend's macro-based approach where nothing generated lives inside `plugins/<name>/`.
+All generated TypeScript code lives in a separate `@junius/generated` package (§12.2). Plugin source trees contain **no generated files** — analogous to the backend's macro-based approach where nothing generated lives inside `plugins/<name>/`.
 
-The shell app (`platform/frontend/`) composes plugins into one React/TanStack Router application. Composition happens at build time via `platctl`-generated aggregators that import from each plugin's package.
+The shell app (`platform/frontend/`) composes plugins into one React/TanStack Router application. Composition happens at build time via `junius`-generated aggregators that import from each plugin's package.
 
-## 12.2 The `@platform/generated` package
+## 12.2 The `@junius/generated` package
 
 All TS codegen lives in one workspace package with subpath exports per plugin:
 
 ```
-packages/generated/                 # managed by platctl; "do not edit" header
+packages/generated/                 # managed by junius; "do not edit" header
 ├── package.json                    # subpath exports per plugin (see below)
 ├── shared/
 │   └── proto-types.ts              # cross-plugin proto-generated TS types
@@ -32,7 +32,7 @@ Subpath exports in `package.json`:
 
 ```json
 {
-  "name": "@platform/generated",
+  "name": "@junius/generated",
   "exports": {
     "./shared/proto": "./dist/shared/proto-types.js",
     "./speakers":     "./dist/plugins/speakers/index.js",
@@ -46,24 +46,24 @@ Subpath exports in `package.json`:
 Plugin code imports:
 
 ```ts
-import { rpc, METADATA }   from '@platform/generated/events';
-import type { Permission } from '@platform/generated/events';
-import type { Speaker }    from '@platform/generated/shared/proto';
+import { rpc, METADATA }   from '@junius/generated/events';
+import type { Permission } from '@junius/generated/events';
+import type { Speaker }    from '@junius/generated/shared/proto';
 ```
 
-`platctl sync` regenerates this package from every plugin's `plugin.toml`. `platctl check` validates:
-- Every `@platform/generated/<other-plugin>/*` import in a plugin's source is justified by a manifest dep on that other plugin.
+`junius sync` regenerates this package from every plugin's `plugin.toml`. `junius check` validates:
+- Every `@junius/generated/<other-plugin>/*` import in a plugin's source is justified by a manifest dep on that other plugin.
 - The package's `exports` field matches the plugin set in the source.
 
 **Why a single generated package**: keeps generated content out of plugin source trees (matching backend's macro approach), reduces sync surface (one package to regenerate), and avoids per-plugin `src/generated/` mixing with hand-written code.
 
-**Note**: there is no `@platform/permissions` aggregate package. The source monorepo doesn't know which plugins are enabled in any deployment ([05-repository-and-deployment-layout.md](05-repository-and-deployment-layout.md) §5.5), so deployment-bound aggregates can't live in the source. Each plugin's `Permission` type is locally scoped.
+**Note**: there is no `@junius/permissions` aggregate package. The source monorepo doesn't know which plugins are enabled in any deployment ([05-repository-and-deployment-layout.md](05-repository-and-deployment-layout.md) §5.5), so deployment-bound aggregates can't live in the source. Each plugin's `Permission` type is locally scoped.
 
 ## 12.3 Plugin source tree & public exports
 
 ```
 plugins/speakers/frontend/
-├── package.json                # @platform/plugin-speakers; depends on @platform/generated, @platform/sdk, @platform/design
+├── package.json                # @junius/plugin-speakers; depends on @junius/generated, @junius/sdk, @junius/design
 ├── tsconfig.json
 ├── src/
 │   ├── index.ts                # public exports — all hand-written
@@ -89,11 +89,11 @@ export { SpeakerPicker } from './lib/SpeakerPicker';
 // Domain types other plugins may want
 export type { Speaker, SpeakerId } from './types';
 
-// No `rpc` export — consumers import from @platform/generated/<this-plugin>/rpc.
+// No `rpc` export — consumers import from @junius/generated/<this-plugin>/rpc.
 // No `permissions` export — same reason.
 ```
 
-`platctl check` verifies that the named component exports match `plugin.toml`'s `[exposes.components]` declarations.
+`junius check` verifies that the named component exports match `plugin.toml`'s `[exposes.components]` declarations.
 
 ## 12.4 Routes composition
 
@@ -102,8 +102,8 @@ Each plugin exports a `buildRoutes(parent)` function that takes its mount point 
 ```ts
 // plugins/speakers/frontend/src/routes/index.ts
 import { Route, type AnyRoute } from '@tanstack/react-router';
-import { requirePermissions } from '@platform/sdk';
-import type { Permission } from '@platform/generated/speakers';
+import { requirePermissions } from '@junius/sdk';
+import type { Permission } from '@junius/generated/speakers';
 import { SpeakersListPage, SpeakerDetailPage, SpeakerEditPage } from './pages';
 
 export function buildRoutes(parent: AnyRoute) {
@@ -131,13 +131,13 @@ export function buildRoutes(parent: AnyRoute) {
 }
 ```
 
-`platctl` generates the shell's composed router:
+`junius` generates the shell's composed router:
 
 ```ts
 // platform/frontend/src/generated/routes.ts — generated
 import { rootRoute } from '../router/root';
-import { buildRoutes as buildSpeakers } from '@platform/plugin-speakers';
-import { buildRoutes as buildEvents   } from '@platform/plugin-events';
+import { buildRoutes as buildSpeakers } from '@junius/plugin-speakers';
+import { buildRoutes as buildEvents   } from '@junius/plugin-events';
 
 const speakersParent = new Route({ getParentRoute: () => rootRoute, path: '/p/speakers' });
 speakersParent.addChildren(buildSpeakers(speakersParent));
@@ -150,17 +150,17 @@ export const routeTree = rootRoute.addChildren([speakersParent, eventsParent]);
 
 ## 12.5 Permissions
 
-Each plugin's typed `Permission` union lives in `@platform/generated/<plugin>`:
+Each plugin's typed `Permission` union lives in `@junius/generated/<plugin>`:
 
 ```ts
-// @platform/generated/speakers/permissions.ts (generated)
+// @junius/generated/speakers/permissions.ts (generated)
 export type Permission =
   | 'speakers:read'
   | 'speakers:write'
   | 'speakers:book';
 ```
 
-`@platform/sdk` hooks are generic over the permission union:
+`@junius/sdk` hooks are generic over the permission union:
 
 ```ts
 export function useHasPermission<P extends string>(p: P): boolean;
@@ -172,8 +172,8 @@ export function requirePermissions<P extends string>(ctx: RouterContext, perms: 
 In plugin code, the caller parameterizes with its own union (or with an imported dep's union for cross-plugin checks):
 
 ```ts
-import { useHasPermission } from '@platform/sdk';
-import type { Permission as MyPerm } from '@platform/generated/speakers';
+import { useHasPermission } from '@junius/sdk';
+import type { Permission as MyPerm } from '@junius/generated/speakers';
 
 const canEdit = useHasPermission<MyPerm>('speakers:write');   // ✓
 const typo    = useHasPermission<MyPerm>('spekers:write');     // ✗ TS error
@@ -183,11 +183,11 @@ For cross-plugin permission checks (rare — typically each plugin guards its ow
 
 ```ts
 // In plugin events, which declared a dep on speakers:
-import type { Permission as SpeakersPerm } from '@platform/generated/speakers';
+import type { Permission as SpeakersPerm } from '@junius/generated/speakers';
 const canBook = useHasPermission<SpeakersPerm>('speakers:book');
 ```
 
-`platctl check` enforces that any `@platform/generated/<other-plugin>` import has a corresponding `[dependencies.<other-plugin>]` declaration in the importer's manifest.
+`junius check` enforces that any `@junius/generated/<other-plugin>` import has a corresponding `[dependencies.<other-plugin>]` declaration in the importer's manifest.
 
 Three places permissions are checked, mirroring the backend's three (extractor / repo / RPC):
 
@@ -214,11 +214,11 @@ rpc_methods  = ["SpeakerService.GetSpeaker", "SpeakerService.ListSpeakers"]
 Generated narrow namespace:
 
 ```ts
-// @platform/generated/events/rpc.ts (generated)
+// @junius/generated/events/rpc.ts (generated)
 import {
   EventService_GetEvent, EventService_CreateEvent,
   SpeakerService_GetSpeaker, SpeakerService_ListSpeakers,
-} from '@platform/generated/shared/proto';
+} from '@junius/generated/shared/proto';
 
 export const rpc = {
   EventService: {
@@ -236,7 +236,7 @@ export const rpc = {
 Plugin code via Connect-Query:
 
 ```ts
-import { rpc } from '@platform/generated/events';
+import { rpc } from '@junius/generated/events';
 import { useQuery } from '@connectrpc/connect-query';
 
 function VenueSpeakersList({ venueId }: { venueId: VenueId }) {
@@ -249,7 +249,7 @@ The shell sets up the Connect transport once. Plugins don't see or construct it 
 
 This mirrors the backend's repository pattern ([11-backend-plugin-interface.md](11-backend-plugin-interface.md) §11.5): a single source of truth (shell transport + shared proto schemas), with each plugin's compile-time surface narrowed to its declared usage.
 
-**v1 enforcement** of the cross-plugin import allowlist is via `platctl check` (convention) scanning imports against each plugin's manifest. Per-plugin `tsconfig.json` `paths` allowlists are an option to upgrade to if drift becomes a problem.
+**v1 enforcement** of the cross-plugin import allowlist is via `junius check` (convention) scanning imports against each plugin's manifest. Per-plugin `tsconfig.json` `paths` allowlists are an option to upgrade to if drift becomes a problem.
 
 ## 12.7 Cross-plugin components
 
@@ -258,22 +258,22 @@ See [08-cross-plugin-composition.md](08-cross-plugin-composition.md) for the ful
 **Required deps**: regular ES imports.
 
 ```ts
-import { SpeakerPicker } from '@platform/plugin-speakers';
-import type { SpeakerId } from '@platform/plugin-speakers';
+import { SpeakerPicker } from '@junius/plugin-speakers';
+import type { SpeakerId } from '@junius/plugin-speakers';
 ```
 
-**Optional deps**: typed registry from `@platform/sdk`.
+**Optional deps**: typed registry from `@junius/sdk`.
 
 ```ts
-import { getComponent } from '@platform/sdk';
+import { getComponent } from '@junius/sdk';
 const VenuePicker = getComponent('venues.VenuePicker'); // typed; `undefined` if disabled
 ```
 
-The registry is populated by `platctl`-generated code in the shell.
+The registry is populated by `junius`-generated code in the shell.
 
 ## 12.8 Auth & user context
 
-`@platform/sdk` provides:
+`@junius/sdk` provides:
 
 ```ts
 interface User {
@@ -292,14 +292,14 @@ The shell wraps the app in an `AuthProvider` that fetches/refreshes the session 
 
 ## 12.9 Design system
 
-`@platform/design` package, built on **Tailwind + Radix UI primitives**:
+`@junius/design` package, built on **Tailwind + Radix UI primitives**:
 
-- **Tailwind** for utility-class styling. One `tailwind.config.ts` at the workspace root applied to all plugin source files. `platctl sync` maintains the `content` paths to include `plugins/*/frontend/src/**/*.{ts,tsx}`.
+- **Tailwind** for utility-class styling. One `tailwind.config.ts` at the workspace root applied to all plugin source files. `junius sync` maintains the `content` paths to include `plugins/*/frontend/src/**/*.{ts,tsx}`.
 - **Radix UI** primitives (`@radix-ui/react-*`) for unstyled accessible behavior (Dialog, Dropdown, Tooltip, Popover, etc.).
-- **`@platform/design` wrappers** combine the two into the platform's vocabulary: `Button`, `Input`, `Card`, `Stack`, `Grid`, `Modal`, `Form`. Plugins import from here for any visual component; never write raw `<button>` or HTML form elements directly.
+- **`@junius/design` wrappers** combine the two into the platform's vocabulary: `Button`, `Input`, `Card`, `Stack`, `Grid`, `Modal`, `Form`. Plugins import from here for any visual component; never write raw `<button>` or HTML form elements directly.
 
 ```ts
-import { Button, Card, Stack } from '@platform/design';
+import { Button, Card, Stack } from '@junius/design';
 
 function SpeakerCard({ speaker }: { speaker: Speaker }) {
   return (
@@ -317,7 +317,7 @@ Tokens (colors, spacing, typography, radii) are Tailwind theme extensions in the
 
 ## 12.10 Host shell composition
 
-`platctl` generates a thin shell entry point with all the providers:
+`junius` generates a thin shell entry point with all the providers:
 
 ```tsx
 // platform/frontend/src/main.tsx (mostly generated)
@@ -328,7 +328,7 @@ import { createConnectTransport } from '@connectrpc/connect-web';
 
 import { routeTree } from './generated/routes';
 import { componentRegistry } from './generated/component-registry';
-import { ComponentRegistryProvider, AuthProvider } from '@platform/sdk';
+import { ComponentRegistryProvider, AuthProvider } from '@junius/sdk';
 
 const transport = createConnectTransport({ baseUrl: '/' });
 const queryClient = new QueryClient();
@@ -355,10 +355,10 @@ The shell is intentionally tiny — ~50 LoC of bootstrapping. Everything else li
 
 These don't block the design.
 
-- Exact codegen pipeline for `@platform/generated` (when to regenerate, gitignored vs. committed, hot-reload story in dev).
-- pnpm `exports` field templating for many plugins (`platctl sync` writes this).
+- Exact codegen pipeline for `@junius/generated` (when to regenerate, gitignored vs. committed, hot-reload story in dev).
+- pnpm `exports` field templating for many plugins (`junius sync` writes this).
 - TypeScript-side enforcement of the cross-plugin import allowlist via per-plugin `tsconfig.json` `paths` — adopt if convention drift becomes a problem.
-- Connect-Query method descriptor codegen consistency in `@platform/generated/shared/proto`.
+- Connect-Query method descriptor codegen consistency in `@junius/generated/shared/proto`.
 - `AuthProvider` session refresh strategy (cookies, OAuth flows, etc.) — depends on the auth open question ([13-open-questions.md](13-open-questions.md)).
 - Component registry type shape for required vs. optional dep keys.
 - Tailwind config composition: workspace-root vs. per-plugin theme extensions.

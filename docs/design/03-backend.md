@@ -10,7 +10,7 @@
 
 Each plugin crate implements the `Plugin` trait on a top-level struct. The trait exposes a `routes(&self, resources: PluginResources) -> Router` method that builds an Axum router scoped to the plugin's resources, plus lifecycle and job hooks. Full interface specification in [11-backend-plugin-interface.md](11-backend-plugin-interface.md).
 
-`platctl` ([07-platctl.md](07-platctl.md)) generates a `plugins.rs` that constructs and registers each enabled plugin in order. Plugin dependency order is resolved from manifests (see [06-plugin-shape.md](06-plugin-shape.md)).
+`junius` ([07-junius.md](07-junius.md)) generates a `plugins.rs` that constructs and registers each enabled plugin in order. Plugin dependency order is resolved from manifests (see [06-plugin-shape.md](06-plugin-shape.md)).
 
 ## 3.3 API contract: Connect-RPC
 

@@ -1,6 +1,6 @@
 # 10. Infrastructure & Data
 
-The host (`platform/`) provides a small set of shared infrastructure capabilities. Plugins consume them through typed handles on `PluginContext` (exposed via `platform-sdk`), gated by `[requires.capabilities]` in the plugin's manifest.
+The host (`platform/`) provides a small set of shared infrastructure capabilities. Plugins consume them through typed handles on `PluginContext` (exposed via `junius-sdk`), gated by `[requires.capabilities]` in the plugin's manifest.
 
 ## 10.1 Provided infrastructure
 
@@ -19,7 +19,7 @@ The host (`platform/`) provides a small set of shared infrastructure capabilitie
 
 - **PostgreSQL**, single instance per deployment.
 - **sqlx** for access: compile-time-checked queries (`query!` / `query_as!`), async, native connection pool. No ORM — plain SQL is the contract.
-- Each plugin commits its `.sqlx/` prepared-query cache; `cargo sqlx prepare --check` runs in `platctl check`.
+- Each plugin commits its `.sqlx/` prepared-query cache; `cargo sqlx prepare --check` runs in `junius check`.
 - **One Postgres schema per plugin**, named after the plugin (`speakers.*`, `events.*`). The host owns `platform.*` (users, sessions, RBAC) and `meta.*` (migration bookkeeping).
 - **Connection pools owned by the host.** Plugins never instantiate `PgPool` directly. The host runs one pool per Postgres role (§10.4); `PluginContext.db()` returns the plugin's scoped pool.
 - Capability gates: `db.read` grants a read-only handle; `db.write` grants a full handle.
@@ -48,11 +48,11 @@ tables = ["speaker"]
 
 **FKs**:
 - Across required deps: `NOT NULL` permitted.
-- Across optional deps: **must be nullable** — the dep's code may not be running and won't be creating rows to reference. `platctl check` rejects `NOT NULL` FKs targeting an optional-dep schema.
+- Across optional deps: **must be nullable** — the dep's code may not be running and won't be creating rows to reference. `junius check` rejects `NOT NULL` FKs targeting an optional-dep schema.
 
 **Forbidden**:
-- `ON DELETE CASCADE` / `ON UPDATE CASCADE` on cross-plugin FKs — silently mutates other plugins' tables and bypasses coordination. `platctl check` rejects them.
-- Any SQL reference to a non-public table in another plugin's schema. Enforced at runtime by Postgres roles (§10.4) and at PR time by `platctl check`.
+- `ON DELETE CASCADE` / `ON UPDATE CASCADE` on cross-plugin FKs — silently mutates other plugins' tables and bypasses coordination. `junius check` rejects them.
+- Any SQL reference to a non-public table in another plugin's schema. Enforced at runtime by Postgres roles (§10.4) and at PR time by `junius check`.
 
 ## 10.4 Postgres role enforcement
 
@@ -79,7 +79,7 @@ GRANT SELECT ON platform.user TO role_events;
 
 The host maintains one `PgPool` per role; `PluginContext.db()` returns the plugin's pool. A plugin trying to query outside its grants gets a Postgres permission error.
 
-**Migration runner role**: a privileged role (e.g. `platform_migrator`) that owns all schemas and can issue GRANT statements. The only role with broad schema-modification rights. Used exclusively by `platctl migrate`.
+**Migration runner role**: a privileged role (e.g. `platform_migrator`) that owns all schemas and can issue GRANT statements. The only role with broad schema-modification rights. Used exclusively by `junius migrate`.
 
 ## 10.5 Migrations
 
@@ -100,7 +100,7 @@ CREATE TABLE meta.migrations (
 );
 ```
 
-`id BIGSERIAL` gives true apply-order; `checksum` lets `platctl` detect post-apply file edits.
+`id BIGSERIAL` gives true apply-order; `checksum` lets `junius` detect post-apply file edits.
 
 **Always-apply**: every deployment runs the full migration set from its pinned source revision regardless of which plugins are *enabled*. A disabled plugin still has its schema and Postgres role; only its router / RPC / code paths are absent. Enable/disable is purely a code concern.
 
@@ -127,7 +127,7 @@ CREATE TABLE events.event (
 );
 ```
 
-Format: `-- @requires <plugin>:<migration_name>` where `<migration_name>` is the filename without `.up.sql`. The `@` prefix is reserved for `platctl` directives; future additions (`@breaking-change`, etc.) go here.
+Format: `-- @requires <plugin>:<migration_name>` where `<migration_name>` is the filename without `.up.sql`. The `@` prefix is reserved for `junius` directives; future additions (`@breaking-change`, etc.) go here.
 
 **Edges flow in either direction.** Cleanup migrations naturally reverse the dep arrow:
 
@@ -144,7 +144,7 @@ ALTER TABLE speakers.speaker DROP COLUMN email;
 
 Topo sort puts `events:0050` before `speakers:0051`. This is exactly why we don't infer ordering from manifest deps — cleanup flows against them.
 
-**`platctl check` enforces**:
+**`junius check` enforces**:
 - Every `@requires` reference resolves to a real migration.
 - The DAG has no cycles.
 - Every cross-plugin SQL reference (FK or schema-qualified table reference) has a matching `@requires` for the target migration.
@@ -176,18 +176,18 @@ Private tables (anything not in `[exposes.tables]`) can change freely — no con
 
 **Enforcement in v1** uses two layers:
 
-**Layer 1 — `platctl check` (static, fast)**:
+**Layer 1 — `junius check` (static, fast)**:
 - Parses migrations; flags `ALTER` / `DROP` / `RENAME` on tables listed in any plugin's `[exposes.tables]` as "touches public schema."
 - For known-breaking patterns (`DROP COLUMN`, `RENAME COLUMN`, `DROP TABLE`): verifies that every consumer plugin (declared via `[dependencies.b].tables`) either drops the table from its declared deps or has a matching migration in this PR.
 - Rejects `CASCADE` on cross-plugin FKs.
 
 **Layer 2 — CI integration test**:
 - Ephemeral Postgres (testcontainers).
-- `platctl migrate up` against a representative deployment configuration.
+- `junius migrate up` against a representative deployment configuration.
 - Run all plugin test suites against the migrated DB.
 - Catches anything Layer 1 missed: actual FK violations on apply, query failures, type errors, runtime test failures.
 
-**Layer 3 — schema snapshot diff (deferred)**: per-plugin `exposed-schema.sql` snapshot diffed by `platctl`, with breaking changes requiring an `@breaking-change` annotation. Adopt when manual coordination starts missing things at scale.
+**Layer 3 — schema snapshot diff (deferred)**: per-plugin `exposed-schema.sql` snapshot diffed by `junius`, with breaking changes requiring an `@breaking-change` annotation. Adopt when manual coordination starts missing things at scale.
 
 ## 10.7 Authentication & Authorization
 
@@ -451,7 +451,7 @@ A `#[owned_by(user)]` / `#[owned_by(group_from = "...")]` attribute on the repo 
 
 ### 10.7.8 Frontend `User` and per-resource flags
 
-The frontend `User` object (from `@platform/sdk`) carries memberships and their capability permissions:
+The frontend `User` object (from `@junius/sdk`) carries memberships and their capability permissions:
 
 ```ts
 interface User {

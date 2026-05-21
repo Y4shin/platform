@@ -1,0 +1,412 @@
+# M10 — Other Infra Capabilities (Jobs, Storage, Email, Telemetry)
+
+## Goal
+
+The remaining infra handles from [../design/10-infrastructure-and-data.md](../design/10-infrastructure-and-data.md) §10.1 land as fields on `PluginResources` with concrete backings: a Postgres-backed job queue (`apalis`), S3-compatible object storage (`aws-sdk-s3`), pluggable email (`lettre` + `Transport` trait), and tracing+OTel telemetry. Runtime capability gating enforces that plugins only use what their manifest declares.
+
+## Why now
+
+After M09, every architectural capability is real except for the four infra primitives. Adding them now means M13's first real plugin (Speakers) can use them as designed (e.g. confirmation emails for bookings). It also closes the "platform infra (v1)" decision-log entry.
+
+## Scope (in)
+
+### Capability gating
+
+`PluginResources`'s handles return `Err(PluginError::CapabilityNotDeclared(...))` if the plugin's manifest doesn't list the corresponding `[requires.capabilities]` entry. Implemented as a runtime check on every handle method:
+
+```rust
+impl Email {
+    pub async fn send(&self, msg: EmailMessage) -> Result<(), PluginError> {
+        if !self.plugin_capabilities.contains("email.send") {
+            return Err(PluginError::CapabilityNotDeclared("email.send"));
+        }
+        self.transport.send(msg).await
+    }
+}
+```
+
+`junius plugin info <name>` already shows `[requires.capabilities]`; M10 makes it operational at runtime. Compile-time enforcement is deferred until/unless third-party plugins enter the picture.
+
+### Jobs — `apalis` with Postgres backend
+
+`PluginResources.jobs: Jobs`:
+
+```rust
+#[derive(Clone)]
+pub struct Jobs { /* opaque; holds apalis::Storage<PgStorage> + a Sender */ }
+
+impl Jobs {
+    pub async fn enqueue<J: Job>(&self, payload: J) -> Result<JobId, PluginError>;
+}
+
+pub trait Job: Serialize + DeserializeOwned + Send + 'static {
+    const NAME: &'static str;                          // '<plugin>.<job_name>'
+}
+```
+
+Plugins register jobs via `Plugin::jobs()`:
+
+```rust
+pub struct JobHandler { /* opaque */ }
+
+impl JobHandler {
+    pub fn new<J: Job, F, Fut>(handler: F) -> Self
+    where
+        F: Fn(J, PluginResources) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), PluginError>> + Send + 'static;
+}
+
+#[async_trait]
+impl Plugin for HelloPlugin {
+    fn jobs(&self) -> Vec<JobHandler> {
+        vec![
+            JobHandler::new::<SendGreeting, _, _>(send_greeting_handler),
+        ]
+    }
+}
+```
+
+Schema: `apalis` manages its own tables under a `jobs` schema (or `meta.jobs_*` — config decision below).
+
+`system_context::<S>(resources)` helper constructs a privileged `<PluginName>Ctx<P>` with all permissions granted, for jobs that need to call permission-gated repos:
+
+```rust
+async fn send_greeting_handler(payload: SendGreeting, resources: PluginResources) -> Result<(), PluginError> {
+    let ctx = system_context::<HelloState<permissions!(HelloRead & HelloWrite)>>(&resources);
+    let greeting = ctx.state.greetings.get(payload.greeting_id).await?;
+    // ... send email, etc.
+    Ok(())
+}
+```
+
+Job names are namespaced `<plugin>.<job_name>` to prevent collisions across plugins.
+
+The host runs the apalis worker in-process alongside the HTTP server, with a configurable concurrency (`[config].job_workers`, default 4).
+
+### Storage — `aws-sdk-s3` over `Bucket` derive
+
+`PluginResources.storage: PluginStorage` (opaque — like `PluginDb`). The only path to file access is `#[derive(Bucket)]`:
+
+```rust
+#[derive(Bucket, Clone)]
+pub struct Attachments {
+    // generated:
+    //   inner: ScopedBucket,
+    //   pub fn new(storage: &PluginStorage) -> Self;
+    //   sealed pub(crate) fn client(&self) -> &aws_sdk_s3::Client;
+}
+
+#[impl_bucket(Attachments)]
+impl Attachments {
+    pub async fn put(&self, key: &str, body: Bytes) -> Result<(), StorageError> {
+        self.client()
+            .put_object()
+            .bucket(self.bucket_name())
+            .key(self.scoped_key(key))                // prepends "<plugin>/"
+            .body(body.into())
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get(&self, key: &str) -> Result<Bytes, StorageError> { ... }
+    pub async fn delete(&self, key: &str) -> Result<(), StorageError> { ... }
+    pub async fn presigned_url(&self, key: &str, ttl: Duration) -> Result<String, StorageError> { ... }
+}
+```
+
+`scoped_key` enforces per-plugin prefix isolation. Cross-bucket access (one plugin reading another's files) is not supported in v1.
+
+Configuration: a single S3 bucket per deployment, with per-plugin key prefixes. MinIO in dev (added to `docker-compose.yml`); AWS/R2/etc. in prod via `[config].storage = { endpoint = "...", region = "...", bucket = "...", access_key = "env:S3_KEY", secret_key = "env:S3_SECRET" }`.
+
+### Email — `lettre` + per-deployment `Transport` impl
+
+`PluginResources.email: Email`:
+
+```rust
+#[derive(Clone)]
+pub struct Email { /* opaque */ }
+
+pub struct EmailMessage {
+    pub to: Vec<String>,
+    pub from: String,                         // restricted to deployment-configured sender domains
+    pub reply_to: Option<String>,
+    pub subject: String,
+    pub body_text: String,
+    pub body_html: Option<String>,
+    pub attachments: Vec<Attachment>,
+}
+
+impl Email {
+    pub async fn send(&self, msg: EmailMessage) -> Result<(), PluginError>;
+}
+
+pub trait Transport: Send + Sync {
+    async fn send(&self, msg: EmailMessage) -> Result<(), TransportError>;
+}
+```
+
+Built-in `Transport` impls:
+- `LogTransport` — writes to stdout (dev default).
+- `MailpitTransport` — talks to dev mailpit on `localhost:1025` (dev opt-in).
+- `SmtpTransport` (wraps `lettre`) — for arbitrary SMTP.
+- `ResendTransport` — HTTP API client for Resend (prod default).
+
+Selection in `[config].email`:
+
+```toml
+[config.email]
+transport = "resend"             # or "smtp", "mailpit", "log"
+from_default = "no-reply@platform.example"
+allowed_sender_domains = ["platform.example", "another.example"]
+
+[config.email.resend]
+api_key = "env:RESEND_API_KEY"
+
+[config.email.smtp]
+host = "smtp.example"
+port = 587
+username = "env:SMTP_USER"
+password = "env:SMTP_PASS"
+```
+
+The host validates `from` against `allowed_sender_domains` before delegating to the transport (prevents plugins from impersonating arbitrary domains).
+
+### Telemetry — `tracing` + OTel
+
+`PluginResources.telemetry: Telemetry` (already present from M02, expanded here):
+
+```rust
+#[derive(Clone)]
+pub struct Telemetry {
+    plugin_name: &'static str,
+    /* opaque tracer + meter handles */
+}
+
+impl Telemetry {
+    pub fn span(&self, name: &'static str) -> Span;
+    pub fn counter(&self, name: &str, value: u64);
+    pub fn histogram(&self, name: &str, value: f64);
+    pub fn log_info(&self, msg: &str, fields: &[(&str, &str)]);
+}
+```
+
+All metric/span emission is pre-tagged with `plugin = "<name>"`.
+
+Setup in `platform/main.rs`:
+
+```rust
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
+use opentelemetry_otlp::WithExportConfig;
+
+let otel = if config.otel.enabled {
+    Some(opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint(&config.otel.endpoint))
+        .install_batch(opentelemetry_sdk::runtime::Tokio)?)
+} else { None };
+
+let subscriber = tracing_subscriber::registry()
+    .with(EnvFilter::from_default_env())
+    .with(tracing_subscriber::fmt::layer())
+    .with(otel.map(tracing_opentelemetry::layer));
+
+tracing::subscriber::set_global_default(subscriber)?;
+```
+
+OTel exporter is optional — controlled by `[config.otel] enabled = false` (default off) + `endpoint = "..."`.
+
+### Hello plugin updates — exercise every new capability
+
+```toml
+# plugin.toml
+[requires]
+capabilities = ["db.read", "db.write", "storage.write", "email.send", "audit.emit"]
+```
+
+Add a `SendGreeting` job + a `note_attachment` storage usage:
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct SendGreeting {
+    pub greeting_id: GreetingId,
+    pub recipient_email: String,
+}
+impl Job for SendGreeting {
+    const NAME: &'static str = "hello.send_greeting";
+}
+
+// RPC handler dispatches a job
+async fn create_greeting(
+    ctx: HelloCtx<permissions!(HelloRead & HelloWrite)>,
+    req: CreateGreetingRequest,
+) -> Result<CreateGreetingResponse, ConnectError> {
+    let g = ctx.state.greetings.create(req.into()).await?;
+    ctx.resources.jobs.enqueue(SendGreeting {
+        greeting_id: g.id,
+        recipient_email: req.recipient_email,
+    }).await?;
+    Ok(g.into())
+}
+
+// Job handler sends an email
+async fn send_greeting_handler(payload: SendGreeting, resources: PluginResources) -> Result<(), PluginError> {
+    let ctx = system_context::<HelloState<permissions!(HelloRead)>>(&resources);
+    let g = ctx.state.greetings.get(payload.greeting_id).await?.unwrap();
+    resources.email.send(EmailMessage {
+        to: vec![payload.recipient_email],
+        from: "no-reply@platform.example".into(),
+        subject: format!("Greeting from {}", g.name),
+        body_text: g.body.clone(),
+        ..Default::default()
+    }).await?;
+    Ok(())
+}
+```
+
+Plus attach-an-image-to-a-note:
+
+```rust
+// new RPC: AttachToNote(note_id, image_bytes) → stores in S3, returns presigned URL
+let attachments = Attachments::new(&ctx.resources.storage);
+attachments.put(&format!("notes/{}/{}", note_id, image_filename), image_bytes).await?;
+```
+
+### Audit-retention nightly job
+
+A built-in host job runs daily and prunes `platform.audit_event` rows older than `[config].audit.retention_days` (default 365). Implemented as `platform.audit_prune` (under the `platform` namespace; not a plugin job).
+
+### Dev infrastructure updates
+
+`dev/docker-compose.yml` gains:
+
+```yaml
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio-data:/data]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+
+  jaeger:                                   # optional, for trace visualisation
+    image: jaegertracing/all-in-one:latest
+    ports: ["16686:16686", "4317:4317"]
+```
+
+`dev/platform.toml` extended:
+
+```toml
+[config.storage]
+endpoint = "http://localhost:9000"
+region = "us-east-1"
+bucket = "platform-dev"
+access_key = "env:MINIO_USER"
+secret_key = "env:MINIO_PASS"
+use_path_style = true                       # required for MinIO
+
+[config.email]
+transport = "mailpit"
+from_default = "no-reply@local"
+allowed_sender_domains = ["local", "platform.example"]
+
+[config.email.mailpit]
+host = "localhost"
+port = 1025
+
+[config.otel]
+enabled = true
+endpoint = "http://localhost:4317"
+
+[config.audit]
+retention_days = 365
+
+[config]
+job_workers = 4
+```
+
+## Scope (out)
+
+- No cache (Redis) — deferred per design §10.1.
+- No search (Meilisearch/Elasticsearch) — deferred per design §10.1.
+- No realtime/WebSockets — deferred per design §10.1.
+- No formal outbound-HTTP capability — plugins make outbound HTTP via `reqwest` directly (no capability gate). Adding `http.request` is deferred until trust model changes.
+- No file deduplication or virus scanning — out of scope for v1.
+- No cron-scheduled jobs from plugins. The audit prune is host-scheduled; plugin jobs only run when enqueued. Plugin cron requires a scheduler upgrade; deferred.
+
+## Library choices — confirm with user before starting
+
+| Choice | Proposed default | Rationale | Downstream milestones to update if changed |
+|---|---|---|---|
+| **Job queue** | `apalis` with Postgres backend | Postgres-native; no Redis dep; design hints at this | M13 (Speakers may use jobs) |
+| **Job queue alternative** | Handroll a small queue over advisory locks | Lower dep surface; more bespoke | Not chosen unless apalis surprises us |
+| **Job storage schema** | `meta.jobs_*` (under the existing `meta` schema) | Keeps queue tables grouped with other host bookkeeping | — |
+| **S3 SDK** | `aws-sdk-s3` | Works against MinIO + S3 + R2 with one interface | M13 |
+| **S3 alternative** | `rust-s3` | Lighter compile time | Not chosen unless `aws-sdk-s3` becomes a bottleneck |
+| **Email library** | `lettre` for the SMTP/transport contract | Mature, async-supporting | M13 |
+| **Default prod email transport** | Resend | Clean DX, modern HTTP API | If costs or compliance require alternative |
+| **Telemetry** | `tracing` + `tracing-subscriber` + `tracing-opentelemetry` + `opentelemetry-otlp` | Standard Rust stack; design intent | — |
+| **Dev mail capture** | `mailpit` | Lightweight, web UI for inspecting outbound mail | If team prefers `mailhog` |
+| **Trace visualisation (dev)** | Jaeger all-in-one | Free, easy to run | — |
+| **Outbound HTTP for plugins** | `reqwest` (no platform-level wrapper in v1) | Avoid premature abstraction; revisit when capability gating arrives | — |
+
+## Open questions resolved
+
+None new — audit retention default formalised (365 days), but the broader "audit logging" question was answered at M06.
+
+## Verification
+
+```bash
+# Bring up the extended dev stack
+docker compose -f dev/docker-compose.yml up -d minio mailpit jaeger
+# (postgres + authentik already running from M06)
+
+# Apply migrations (apalis schema lands)
+target/release/junius migrate up --config dev/platform.toml
+
+# Boot
+target/release/junius dev --config dev/platform.toml &
+
+# Job + email end-to-end
+ALICE_COOKIE=$(./scripts/login.sh alice)
+curl -fsS -b "$ALICE_COOKIE" -X POST \
+  http://127.0.0.1:8080/rpc/hello.v1.HelloService/CreateGreeting \
+  -d '{"name":"Hannah","body":"hi","recipient_email":"alice@local"}'
+# → 200, returns greeting id
+
+# Job is recorded
+psql platform -c "SELECT job_name, status FROM meta.jobs ORDER BY created_at DESC LIMIT 5;"
+# → hello.send_greeting, completed (within a second or two)
+
+# Email visible in mailpit web UI at http://localhost:8025
+# → 1 message to alice@local
+
+# Storage: upload an attachment
+curl -fsS -b "$ALICE_COOKIE" -X POST \
+  http://127.0.0.1:8080/rpc/hello.v1.NoteService/AttachToNote \
+  -F "note_id=$NOTE_ID" -F "image=@/tmp/test.png"
+# → 200, returns presigned URL
+
+# MinIO console at http://localhost:9001 shows the object under platform-dev/hello/notes/<id>/<file>
+
+# Capability gating
+# Edit plugins/hello/plugin.toml: remove "email.send" from [requires].capabilities.
+# Re-sync and re-build.
+# Re-call CreateGreeting → handler returns 500; logs show CapabilityNotDeclared("email.send").
+# Restore the capability.
+
+# Telemetry
+# Open Jaeger UI at http://localhost:16686 → service "platform" shows traces with
+# spans tagged plugin="hello", plugin="greetings", etc.
+
+# Tests
+cargo test --workspace
+pnpm exec playwright test
+```
+
+After M10, every infra primitive named in the design is wired up with a default backing and an enforcement path. M11 introduces the deployment workflow.

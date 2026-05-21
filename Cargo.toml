@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = [
+    "platform",
+    "tools/junius",
+    "crates/junius-sdk",
+    "crates/junius-sdk-macros",
+    # >>> junius managed start (populated by `junius sync` from M03)
+    # <<< junius managed end
+]
+
+[workspace.package]
+edition      = "2024"
+license      = "AGPL-3.0-only"
+rust-version = "1.87"
+
+[workspace.dependencies]
+# Serialization
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml       = "0.8"
+
+# Async runtime + HTTP
+tokio       = { version = "1", features = ["full"] }
+async-trait = "0.1"
+axum        = "0.7"
+tower       = "0.5"
+tower-http  = "0.5"
+http        = "1"
+
+# Errors
+anyhow    = "1"
+thiserror = "2"
+
+# Observability
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Common domain types
+uuid   = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+
+# Macros
+syn         = { version = "2", features = ["full", "extra-traits"] }
+quote       = "1"
+proc-macro2 = "1"
+
+# Database (used heavily from M06)
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic                = { level = "warn", priority = -1 }
+unwrap_used             = "warn"
+expect_used             = "warn"
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"

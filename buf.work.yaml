@@ -1,0 +1,4 @@
+version: v1
+directories:
+  - proto
+  # Plugin proto modules will be added under plugins/*/proto starting in M05.

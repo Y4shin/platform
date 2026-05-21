@@ -10,7 +10,7 @@
 
 ## 4.2 Why this stack over SvelteKit / Next.js / Leptos
 
-- **Code-based routing fits plugin composition natively.** Routes are data; each plugin exports a route subtree that `platctl` concatenates. File-based routers (SvelteKit, Next App Router, Nuxt, Remix) require build-time codegen shims to compose plugins.
+- **Code-based routing fits plugin composition natively.** Routes are data; each plugin exports a route subtree that `junius` concatenates. File-based routers (SvelteKit, Next App Router, Nuxt, Remix) require build-time codegen shims to compose plugins.
 - **Best-in-class ecosystem for SPA-heavy UI.** Rich text editors, data grids, drag-and-drop, complex forms — all most mature on React.
 - **Largest hiring pool.**
 - **Connect-RPC integration is first-party** via `connect-query`.
@@ -19,7 +19,7 @@
 
 ## 4.3 Plugin contract (frontend side)
 
-Each plugin is also a pnpm workspace package (`@platform/plugin-<name>`) that exports:
+Each plugin is also a pnpm workspace package (`@junius/plugin-<name>`) that exports:
 
 ```ts
 // plugins/speakers/frontend/index.ts

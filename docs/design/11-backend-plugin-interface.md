@@ -1,6 +1,6 @@
 # 11. Backend Plugin Interface
 
-This section defines the Rust API surface a plugin author writes against. It lives in the `platform-sdk` crate ([05-repository-and-deployment-layout.md](05-repository-and-deployment-layout.md) §5.1) and is consumed by every plugin crate. Cross-references: capabilities and DB access in [10-infrastructure-and-data.md](10-infrastructure-and-data.md); manifest schema in [06-plugin-shape.md](06-plugin-shape.md); cross-plugin composition in [08-cross-plugin-composition.md](08-cross-plugin-composition.md).
+This section defines the Rust API surface a plugin author writes against. It lives in the `junius-sdk` crate ([05-repository-and-deployment-layout.md](05-repository-and-deployment-layout.md) §5.1) and is consumed by every plugin crate. Cross-references: capabilities and DB access in [10-infrastructure-and-data.md](10-infrastructure-and-data.md); manifest schema in [06-plugin-shape.md](06-plugin-shape.md); cross-plugin composition in [08-cross-plugin-composition.md](08-cross-plugin-composition.md).
 
 ## 11.1 The `Plugin` trait
 
@@ -38,7 +38,7 @@ pub trait Plugin: Send + Sync + 'static {
 }
 ```
 
-**Convention**: every plugin exposes `pub fn new(...) -> Self`. The constructor may take arguments (eager state, host-injected configuration); `platctl`-generated glue calls it. Object-safe via `async_trait` so the host can hold `Vec<Box<dyn Plugin>>` — the per-plugin context type is not on the trait, so generics over it don't break object safety.
+**Convention**: every plugin exposes `pub fn new(...) -> Self`. The constructor may take arguments (eager state, host-injected configuration); `junius`-generated glue calls it. Object-safe via `async_trait` so the host can hold `Vec<Box<dyn Plugin>>` — the per-plugin context type is not on the trait, so generics over it don't break object safety.
 
 ## 11.2 Metadata via macro (not source-tree codegen)
 
@@ -47,7 +47,7 @@ The plugin's `lib.rs` invokes a proc-macro that reads the crate's `plugin.toml` 
 ```rust
 // plugins/speakers/src/lib.rs
 
-platform_sdk::plugin_metadata!();
+junius_sdk::plugin_metadata!();
 // expands to (conceptually):
 //   pub static METADATA: PluginMetadata = PluginMetadata { name: "speakers", ... };
 //   pub mod permissions {
@@ -72,18 +72,18 @@ impl Plugin for SpeakersPlugin {
 **Why a macro, not codegen into source:**
 - No generated `.rs` files in plugin source trees.
 - `plugin.toml` edits propagate at the next `cargo build` automatically.
-- The macro is the single mapping from manifest → type system: permission types declared in the manifest **are exactly** the types available in code. Referencing an undeclared permission is a compile error — no separate `platctl check` pass for permission name validity.
+- The macro is the single mapping from manifest → type system: permission types declared in the manifest **are exactly** the types available in code. Referencing an undeclared permission is a compile error — no separate `junius check` pass for permission name validity.
 
-The macro lives in a `platform-sdk-macros` proc-macro crate.
+The macro lives in a `junius-sdk-macros` proc-macro crate.
 
-**`platctl check` enforcement**: scans every plugin's crate root and verifies that `plugin_metadata!()` is invoked exactly once. Missing or duplicate invocations fail with a clear error.
+**`junius check` enforcement**: scans every plugin's crate root and verifies that `plugin_metadata!()` is invoked exactly once. Missing or duplicate invocations fail with a clear error.
 
 ## 11.3 `PluginResources` and `PluginContext<S, P>`
 
-The host hands every plugin a `PluginResources` bundle — the raw, pre-scoped primitives it needs. `PluginContext<S, P>` is a generic type in `platform-sdk` that plugins parameterize with their own per-request state `S` (typically a struct of typed repositories) and a permission witness `P`.
+The host hands every plugin a `PluginResources` bundle — the raw, pre-scoped primitives it needs. `PluginContext<S, P>` is a generic type in `junius-sdk` that plugins parameterize with their own per-request state `S` (typically a struct of typed repositories) and a permission witness `P`.
 
 ```rust
-// In platform-sdk:
+// In junius-sdk:
 
 /// Raw, pre-scoped resources. The DB pool is configured for the plugin's
 /// Postgres role; storage for its bucket prefix; telemetry pre-tagged with
@@ -117,7 +117,7 @@ where
 ```
 
 Note what's still hidden:
-- **`PluginDb` is opaque** — not in the public API of `platform-sdk` in a queryable form. The only way to use it is via a `#[derive(Repository)]` type that internally owns a `ScopedDb` derived from it (§11.5).
+- **`PluginDb` is opaque** — not in the public API of `junius-sdk` in a queryable form. The only way to use it is via a `#[derive(Repository)]` type that internally owns a `ScopedDb` derived from it (§11.5).
 - **`PluginStorage` is opaque** the same way — only usable via a `#[derive(Bucket)]` type.
 
 This means the repository pattern enforcement from §11.5 survives unchanged: `sqlx::query!()` cannot compile outside a repository, regardless of how the plugin constructs its context.
@@ -142,7 +142,7 @@ Examples:
 ## 11.4 Typed permission system
 
 ```rust
-// In platform-sdk:
+// In junius-sdk:
 
 pub trait Permission: Send + Sync + 'static {
     const NAME: &'static str;
@@ -182,14 +182,14 @@ Permission markers come from each plugin's `plugin_metadata!()` expansion (§11.
 
 OR-style combinators (`Or<A, B>` + `HasAny<X>`) deferred until a real handler needs them.
 
-## 11.5 Repositories — `platform-sdk`-enforced, permission-gated
+## 11.5 Repositories — `junius-sdk`-enforced, permission-gated
 
-Data access **must** go through a repository. `platform-sdk` enforces this by hiding the raw `sqlx::PgPool` type — it's not in `platform-sdk`'s public API, so `sqlx::query!()` etc. cannot compile outside a repository's impl.
+Data access **must** go through a repository. `junius-sdk` enforces this by hiding the raw `sqlx::PgPool` type — it's not in `junius-sdk`'s public API, so `sqlx::query!()` etc. cannot compile outside a repository's impl.
 
 ```rust
 // plugins/speakers/src/repo.rs
 
-use platform_sdk::Repository;
+use junius_sdk::Repository;
 
 #[derive(Repository, Clone)]
 pub struct SpeakerRepo<P = ()> {
@@ -247,7 +247,7 @@ async fn get_speaker(
 - **Platform-sdk supplies the primitives** (`PluginDb`, `ScopedDb`, `Repository` derive, `#[impl_repository(...)]`, `Has<X>`, `Permission`); plugins compose them. The derive + attribute macros are the only authorized path to a `sqlx` executor.
 - **Cross-plugin reads** ([10-infrastructure-and-data.md](10-infrastructure-and-data.md) §10.3) still go through a repository — typically a consumer plugin defines a read-only view repo wrapping the dep's tables, with its own permission gates.
 
-**`platctl check` additionally verifies**:
+**`junius check` additionally verifies**:
 - Every plugin crate declaring `db.read` or `db.write` capability has at least one `#[derive(Repository)]` struct.
 - No `use sqlx::PgPool` or `use sqlx::query` outside `#[impl_repository(...)]` blocks (regex-scan; redundant with the type-hiding but produces clearer errors).
 
@@ -260,7 +260,7 @@ Each plugin defines its own state type — typically a bundle of its typed repos
 ```rust
 // plugins/speakers/src/lib.rs
 
-use platform_sdk::PluginCtx;
+use junius_sdk::PluginCtx;
 
 /// Per-request state for the speakers plugin. The PluginCtx derive generates
 /// the Axum extractor for SpeakersCtx<P> (= PluginContext<SpeakersState<P>, P>).
@@ -272,7 +272,7 @@ pub struct SpeakersState<P = ()> {
     // leaves non-#[repo] fields to be constructed via a #[from_request] hook.
 }
 
-pub type SpeakersCtx<P = ()> = platform_sdk::PluginContext<SpeakersState<P>, P>;
+pub type SpeakersCtx<P = ()> = junius_sdk::PluginContext<SpeakersState<P>, P>;
 ```
 
 The derive expands (conceptually) to:
@@ -382,7 +382,7 @@ What this delivers:
 - **Server-side enforcement**: a `connect_rs` interceptor wired by the host reads each method's annotations and rejects requests whose user lacks the listed permissions, before the handler runs. Plugin authors write no Rust permission code for RPC.
 - **Type-safe handler bodies**: codegen produces method signatures taking the plugin's own `<PluginName>Ctx<P>` (per §11.6) where `P` is the type-level expansion of the annotated permission list. Repository gates from §11.5 apply transparently inside RPC handlers — the plugin name is known from the proto's enclosing manifest, so codegen synthesizes the right context type.
 - **Frontend awareness**: the same annotations are surfaced in the TS client, letting the FE gate UI elements (hide a "Create" button if the user lacks `speakers:write`).
-- **Manifest cross-check**: `platctl check` parses proto annotations and verifies every referenced permission appears in the relevant plugin's manifest `[permissions]` block. (Rust gets this for free via the type system; proto needs an explicit check because strings aren't types yet.)
+- **Manifest cross-check**: `junius check` parses proto annotations and verifies every referenced permission appears in the relevant plugin's manifest `[permissions]` block. (Rust gets this for free via the type system; proto needs an explicit check because strings aren't types yet.)
 
 ## 11.9 Background jobs
 
@@ -423,7 +423,7 @@ Plugin authors typically use `anyhow::Result` internally and convert at the boun
 
 ## 11.11 Host startup / shutdown sequence
 
-1. **Migrations** — `platctl migrate up` applies host + all plugin migrations ([10-infrastructure-and-data.md](10-infrastructure-and-data.md) §10.5).
+1. **Migrations** — `junius migrate up` applies host + all plugin migrations ([10-infrastructure-and-data.md](10-infrastructure-and-data.md) §10.5).
 2. **Resources construction** — host builds one `PluginResources` per plugin (scoped DB pool, storage prefix, telemetry pre-tagged with `plugin = "<name>"`, etc.). Per-request `PluginContext<S, P>` instances are built later by each plugin's `#[derive(PluginCtx)]` extractor.
 3. **`on_startup`** — for each plugin in `plugins_generated` order: `plugin.on_startup(&resources).await?`. Fail-fast on error; host aborts.
 4. **Job registration** — for each plugin: register `plugin.jobs()` with the queue, supplying the plugin's `PluginResources` so handlers can construct `system_context()` contexts when invoked.

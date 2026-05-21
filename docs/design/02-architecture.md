@@ -2,7 +2,7 @@
 
 ```
   deployment dir                ┌────────────────────────┐
-  platform.toml ─────────────▶ │   platctl (mgmt tool)  │
+  platform.toml ─────────────▶ │   junius (mgmt tool)  │
   (which plugins, config)      │   reads config + src,  │
                                │   composes + builds    │
                                 └────────────────────────┘
