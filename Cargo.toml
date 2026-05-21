@@ -50,7 +50,12 @@ proc-macro2 = "1"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
 
 # Workspace crates
-junius-manifest = { path = "crates/manifest" }
+junius-manifest    = { path = "crates/manifest" }
+junius-sdk         = { path = "crates/junius-sdk" }
+junius-sdk-macros  = { path = "crates/junius-sdk-macros" }
+
+# HTTP testing (used by platform's integration tests)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # CLI
 clap   = { version = "4", features = ["derive", "env"] }
@@ -73,3 +78,9 @@ module_name_repetitions = "allow"
 must_use_candidate      = "allow"
 missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
+
+# Banned APIs are listed in clippy.toml at the workspace root. Bumping the
+# lint to `deny` makes any new direct env read (or other banned call) a CI
+# failure unless the call site adds a narrow, justified
+# `#[allow(clippy::disallowed_methods, reason = "...")]`.
+disallowed_methods      = "deny"

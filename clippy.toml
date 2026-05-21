@@ -1,0 +1,16 @@
+# Workspace-wide clippy configuration.
+#
+# Banned APIs. Each entry must include a `reason` explaining the policy so
+# anyone hitting the lint can understand the exception path.
+#
+# To use a banned API anyway, add at the *narrowest* possible scope:
+#   #[allow(clippy::disallowed_methods, reason = "<why this exception is OK>")]
+
+disallowed-methods = [
+    { path = "std::env::var",        reason = "deployment config must go through platform::config::HostConfig (single declarative source)" },
+    { path = "std::env::var_os",     reason = "deployment config must go through platform::config::HostConfig" },
+    { path = "std::env::vars",       reason = "deployment config must go through platform::config::HostConfig" },
+    { path = "std::env::vars_os",    reason = "deployment config must go through platform::config::HostConfig" },
+    { path = "std::env::set_var",    reason = "mutating the environment is forbidden; config is declarative" },
+    { path = "std::env::remove_var", reason = "mutating the environment is forbidden; config is declarative" },
+]

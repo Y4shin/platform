@@ -1,2 +1,25 @@
-// junius-sdk — public API surface for plugin authors.
-// Real exports land in M02 (Plugin trait + PluginMetadata) and later milestones.
+//! Public API surface that every Junius plugin imports.
+//!
+//! At M02 this is the smallest possible surface that lets a plugin compile:
+//! the `Plugin` trait, plugin metadata, a stub `PluginResources`, and the
+//! `plugin_metadata!()` macro re-export. DB, storage, jobs, email, and auth
+//! handles land in later milestones (M06–M10) as fields on `PluginResources`.
+
+pub mod config;
+pub mod error;
+pub mod metadata;
+pub mod plugin;
+pub mod resources;
+pub mod telemetry;
+
+pub use junius_sdk_macros::plugin_metadata;
+
+pub use config::PluginConfig;
+pub use error::PluginError;
+pub use metadata::{
+    DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,
+    PluginMetadata,
+};
+pub use plugin::Plugin;
+pub use resources::PluginResources;
+pub use telemetry::Telemetry;
