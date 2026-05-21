@@ -1,0 +1,40 @@
+[plugin]
+name = "speakers"
+display_name = "Speakers"
+description = "Manage public speakers and their booking history."
+manifest_schema = 1
+
+[mount]
+route_prefix = "/p/speakers"
+rpc_prefix   = "/rpc/speakers"
+http_prefix  = "/h/speakers"
+
+[dependencies.identity]
+optional = false
+
+[dependencies.venues]
+optional = true
+
+[dependencies.events]
+optional = false
+tables = ["event"]
+rpc_methods = ["EventService.GetEvent", "EventService.ListEvents"]
+
+[exposes.components.SpeakerCard]
+module = "./frontend/lib/SpeakerCard"
+description = "Compact speaker summary card."
+
+[exposes.components.SpeakerPicker]
+module = "./frontend/lib/SpeakerPicker"
+
+[exposes.tables.speaker]
+schema = "speakers"
+description = "Public speaker records."
+
+[permissions]
+"speakers:read"  = "View speakers and their booking history."
+"speakers:write" = "Create, edit, and delete speakers."
+"speakers:book"  = "Book a speaker for an event."
+
+[requires]
+capabilities = ["db.read", "db.write", "storage.write", "email.send"]

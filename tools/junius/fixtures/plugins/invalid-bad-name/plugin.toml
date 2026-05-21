@@ -1,0 +1,4 @@
+[plugin]
+name = "Speakers"
+display_name = "Speakers"
+manifest_schema = 1

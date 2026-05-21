@@ -1,0 +1,15 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Validate manifests against the schema and semantic rules
+
+Usage: junius check [OPTIONS]
+
+Options:
+      --format <FORMAT>      Output format for command results [default: plain] [possible values: plain, json]
+      --manifest <MANIFEST>  Validate a single manifest at this path
+      --plugin <PLUGIN>      Validate the manifest at plugins/<NAME>/plugin.toml
+  -v, --verbose...           Increase verbosity (repeat for more)
+      --cwd <CWD>            Run as if junius were started in <CWD>
+  -h, --help                 Print help

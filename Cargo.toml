@@ -5,6 +5,7 @@ members = [
     "tools/junius",
     "crates/junius-sdk",
     "crates/junius-sdk-macros",
+    "crates/manifest",
     # >>> junius managed start (populated by `junius sync` from M03)
     # <<< junius managed end
 ]
@@ -48,6 +49,19 @@ proc-macro2 = "1"
 # Database (used heavily from M06)
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
 
+# Workspace crates
+junius-manifest = { path = "crates/manifest" }
+
+# CLI
+clap   = { version = "4", features = ["derive", "env"] }
+regex  = "1"
+miette = { version = "7", features = ["fancy"] }
+
+# Test deps
+insta      = { version = "1", features = ["yaml"] }
+assert_cmd = "2"
+predicates = "3"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
@@ -57,3 +71,5 @@ unwrap_used             = "warn"
 expect_used             = "warn"
 module_name_repetitions = "allow"
 must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"

@@ -1,0 +1,4 @@
+[plugin]
+name = "hello"
+display_name = "Hello"
+manifest_schema = 1

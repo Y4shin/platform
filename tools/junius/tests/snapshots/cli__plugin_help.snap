@@ -1,0 +1,19 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Plugin inspection and lifecycle
+
+Usage: junius plugin [OPTIONS] <COMMAND>
+
+Commands:
+  list     List enabled plugins in a deployment config
+  info     Show a plugin's manifest summary
+  enable   Add a plugin to platform.toml. (Stub — lands in M11.)
+  disable  Remove a plugin from platform.toml. (Stub — lands in M11.)
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --cwd <CWD>        Run as if junius were started in <CWD>
+  -h, --help             Print help

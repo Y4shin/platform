@@ -1,0 +1,5 @@
+[source]
+repo = "git+https://example.invalid/junius.git"
+
+[plugins]
+enabled = ["hello", "hello"]

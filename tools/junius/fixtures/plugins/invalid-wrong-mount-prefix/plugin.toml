@@ -1,0 +1,7 @@
+[plugin]
+name = "speakers"
+display_name = "Speakers"
+manifest_schema = 1
+
+[mount]
+route_prefix = "/speakers"

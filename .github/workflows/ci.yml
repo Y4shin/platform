@@ -42,6 +42,11 @@ jobs:
       - name: Rust — build
         run: nix develop --command cargo build --workspace
 
+      - name: Rust — tests
+        run: nix develop --command cargo test --workspace
+        env:
+          INSTA_UPDATE: "no"
+
       - name: JS — install
         run: nix develop --command pnpm install --frozen-lockfile
 

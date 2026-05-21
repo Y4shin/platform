@@ -1,0 +1,23 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Junius management CLI
+
+Usage: junius [OPTIONS] <COMMAND>
+
+Commands:
+  check    Validate manifests against the schema and semantic rules
+  sync     Bring derived files in line with manifests. (Stub — lands in M03.)
+  build    Build a deployment binary. (Stub — lands in M04.)
+  dev      One-command developer loop. (Stub — lands in M04.)
+  migrate  Database migrations
+  plugin   Plugin inspection and lifecycle
+  new      Scaffold new plugins, components, RPC services, migrations, permissions
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --cwd <CWD>        Run as if junius were started in <CWD>
+  -h, --help             Print help
+  -V, --version          Print version

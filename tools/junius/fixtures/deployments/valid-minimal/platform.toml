@@ -1,0 +1,8 @@
+[source]
+path = "."
+
+[plugins]
+enabled = ["hello", "speakers"]
+
+[config]
+database_url = "env:DATABASE_URL"
