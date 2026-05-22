@@ -37,6 +37,10 @@
               # mode (M05+) doesn't need to vendor it on developer machines.
               pkgs.biome
               pkgs.buf
+              # protoc is invoked by prost-build during `cargo build` of any
+              # crate that depends on .proto-generated message types
+              # (every plugin from M05 onward).
+              pkgs.protobuf
 
               # Native dev tools — needed for git workflows, sqlx, etc.
               pkgs.git
@@ -51,6 +55,7 @@
               echo "  pnpm  : $(pnpm --version)"
               echo "  biome : $(biome --version 2>&1 | head -n1)"
               echo "  buf   : $(buf --version)"
+              echo "  protoc: $(protoc --version)"
             '';
           };
         });

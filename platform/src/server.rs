@@ -15,15 +15,17 @@ use crate::config::HostConfig;
 /// banner — Vite serves the SPA on a different port.
 pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
     let mut app = base_app();
+    let mut rpc_root = Router::new();
 
     for plugin in plugins {
         let metadata = plugin.metadata();
         let resources = boot::build_resources_for(metadata.name);
-        let router = plugin.routes(resources);
-        app = app.nest(metadata.mount.http_prefix, router);
+
+        app = app.nest(metadata.mount.http_prefix, plugin.routes(resources.clone()));
+        rpc_root = rpc_root.merge(plugin.rpc_routes(resources));
     }
 
-    app
+    app.nest("/rpc", rpc_root)
 }
 
 #[cfg(not(feature = "embed-frontend"))]

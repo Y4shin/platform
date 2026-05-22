@@ -16,6 +16,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
+    "@bufbuild/buf": "^1.50.0",
+    "@bufbuild/protoc-gen-es": "^2.5.0",
     "typescript": "5.6.3"
   }
 }

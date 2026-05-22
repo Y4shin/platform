@@ -15,10 +15,20 @@ pub trait Plugin: Send + Sync + 'static {
     /// `plugin_metadata!()` macro.
     fn metadata(&self) -> &'static PluginMetadata;
 
-    /// Build the plugin's routes against its host-provided resources. The
-    /// returned router is unprefixed; the host nests it under
-    /// `metadata().mount.{http,rpc}_prefix`.
+    /// Build the plugin's plain-HTTP routes against its host-provided
+    /// resources. The returned router is unprefixed; the host nests it under
+    /// `metadata().mount.http_prefix` (`/h/<plugin>`).
     fn routes(&self, resources: PluginResources) -> Router;
+
+    /// Build the plugin's Connect-RPC routes. Default returns an empty router
+    /// for plugins that don't expose RPCs. The host merges every plugin's RPC
+    /// router under `/rpc` (a flat namespace — the proto package name is
+    /// what scopes services by plugin). Use
+    /// [`junius_sdk::rpc::ServiceBuilder`](crate::rpc::ServiceBuilder) to
+    /// construct the router.
+    fn rpc_routes(&self, _resources: PluginResources) -> Router {
+        Router::new()
+    }
 
     /// Called once per plugin after migrations and before the server starts
     /// accepting traffic. Default no-op.

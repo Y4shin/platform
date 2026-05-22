@@ -1,0 +1,13 @@
+version: v2
+# No `inputs:` block — `buf generate` defaults to every module declared
+# in the workspace buf.yaml, which is exactly what we want.
+plugins:
+  # TypeScript message + service codegen. @bufbuild/protoc-gen-es v2 emits
+  # everything Connect-Web needs (DescService + DescMessage descriptors)
+  # in one pass; the historical `@connectrpc/protoc-gen-connect-es` is
+  # no longer required.
+  - local: ["pnpm", "exec", "protoc-gen-es"]
+    out: packages/generated/src/proto
+    opt:
+      - target=ts
+      - import_extension=js

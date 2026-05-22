@@ -39,6 +39,13 @@ fn sync_with_hello_writes_expected_files() {
     )
     .unwrap();
     insta::assert_snapshot!("registry_ts_empty", registry_ts);
+
+    let rpc_barrel = fs::read_to_string(
+        tmp.path()
+            .join("packages/generated/src/plugins/hello/rpc.ts"),
+    )
+    .unwrap();
+    insta::assert_snapshot!("rpc_barrel_hello", rpc_barrel);
 }
 
 #[test]

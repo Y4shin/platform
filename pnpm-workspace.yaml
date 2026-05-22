@@ -4,6 +4,7 @@ packages:
   - "plugins/*/frontend"
 
 allowBuilds:
+  '@bufbuild/buf': true
   esbuild: true
 
 # pnpm 11+ requires explicit approval before running install scripts of

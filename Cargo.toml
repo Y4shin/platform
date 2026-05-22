@@ -47,6 +47,11 @@ syn         = { version = "2", features = ["full", "extra-traits"] }
 quote       = "1"
 proc-macro2 = "1"
 
+# Protocol buffers + Connect
+prost       = "0.14"
+prost-build = "0.14"
+bytes       = "1"
+
 # Database (used heavily from M06)
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
 

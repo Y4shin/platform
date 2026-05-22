@@ -1,0 +1,19 @@
+// Hello plugin RPC surface. M05's smoke-test contract: one unary method
+// that echoes a name back into a greeting string. No permissions yet —
+// `option (platform.requires)` arrives once M07 lands the permission
+// system.
+syntax = "proto3";
+
+package hello.v1;
+
+service HelloService {
+  rpc Greet(GreetRequest) returns (GreetResponse);
+}
+
+message GreetRequest {
+  string name = 1;
+}
+
+message GreetResponse {
+  string message = 1;
+}

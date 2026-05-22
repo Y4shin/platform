@@ -1,0 +1,18 @@
+// Junius platform-level proto extensions. Declared in M05; enforced from
+// M07 onward by the host's Connect interceptor + the typed permission
+// system (see docs/impl/08-M07-repos-permissions.md).
+syntax = "proto3";
+
+package platform.v1;
+
+import "google/protobuf/descriptor.proto";
+
+// Comma-separated permission keys (`<plugin>:<segment>`, e.g.
+// `"speakers:read,speakers:write"`) the caller must hold to invoke the
+// annotated RPC method. The field number (60001) is in the user-defined
+// range reserved by the protobuf spec.
+extend google.protobuf.MethodOptions {
+  // buf:lint:ignore FIELD_LOWER_SNAKE_CASE — extension names follow the
+  // option-name convention, not the field-name convention.
+  optional string requires = 60001;
+}

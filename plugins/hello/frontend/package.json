@@ -10,7 +10,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.5.0",
+    "@connectrpc/connect-query": "^2.0.0",
     "@junius/design": "workspace:*",
+    "@junius/generated": "workspace:*",
     "@junius/sdk": "workspace:*"
   },
   "peerDependencies": {

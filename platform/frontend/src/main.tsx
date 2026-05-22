@@ -1,3 +1,5 @@
+import { createConnectTransport } from '@connectrpc/connect-web';
+import { TransportProvider } from '@connectrpc/connect-query';
 import { AuthProvider, ComponentRegistryProvider } from '@junius/sdk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
@@ -10,6 +12,12 @@ import './styles.css';
 
 const queryClient = new QueryClient();
 const router = createRouter({ routeTree });
+
+// Single Connect-Web transport for the whole app. Backend RPC routes are
+// mounted under /rpc (see platform/src/server.rs); Connect-Web computes
+// `<baseUrl>/<service.typeName>/<method>`, so the proto package name
+// (e.g. `hello.v1.HelloService`) does the plugin scoping.
+const transport = createConnectTransport({ baseUrl: '/rpc' });
 
 declare module '@tanstack/react-router' {
   interface Register {
@@ -26,9 +34,11 @@ createRoot(container).render(
   <StrictMode>
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <ComponentRegistryProvider registry={componentRegistry}>
-          <RouterProvider router={router} />
-        </ComponentRegistryProvider>
+        <TransportProvider transport={transport}>
+          <ComponentRegistryProvider registry={componentRegistry}>
+            <RouterProvider router={router} />
+          </ComponentRegistryProvider>
+        </TransportProvider>
       </QueryClientProvider>
     </AuthProvider>
   </StrictMode>,

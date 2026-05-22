@@ -10,6 +10,7 @@ pub mod error;
 pub mod metadata;
 pub mod plugin;
 pub mod resources;
+pub mod rpc;
 pub mod telemetry;
 
 pub use junius_sdk_macros::plugin_metadata;
