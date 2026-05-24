@@ -79,6 +79,7 @@ fn config(database_url: String) -> ResolvedConfig {
         session_encryption_key: "unused".into(),
         role_password_secret: ROLE_SECRET.into(),
         bind_addr: None,
+        oidc_redirect_url: None,
     }
 }
 

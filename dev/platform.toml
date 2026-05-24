@@ -17,6 +17,11 @@ oidc_client_id         = "platform"
 oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
 session_encryption_key = "env:SESSION_KEY"
 role_password_secret   = "env:ROLE_PW_SECRET"
+# Browser-facing OIDC callback. Pointed at the Vite dev origin (:5173) so
+# `junius dev` logins round-trip through the single dev origin Vite proxies;
+# Vite forwards /api → juniusd (:18080). Must match a redirect_uri registered in
+# dev/authentik/blueprints/junius.yaml. Omit in prod to derive it from bind_addr.
+oidc_redirect_url      = "http://localhost:5173/api/auth/callback"
 
 # Per-plugin config/secrets. hello's `greeting` uses its declared default; the
 # api_key secret uses a literal dev value (prod would use env: indirection).

@@ -64,6 +64,11 @@ pub struct ResolvedConfig {
     pub role_password_secret: String,
     /// Optional `bind_addr` override; the host falls back to its default.
     pub bind_addr: Option<String>,
+    /// Optional browser-facing OIDC callback URL. When set, the host registers
+    /// this as the `redirect_uri` instead of deriving one from `bind_addr`. In
+    /// `junius dev` it points at the Vite origin (`:5173`) so the whole login
+    /// round-trip — including the callback — flows through the single dev origin.
+    pub oidc_redirect_url: Option<String>,
 }
 
 fn required(
@@ -110,6 +115,7 @@ pub fn resolve_config(
         session_encryption_key: required(raw, "session_encryption_key", lookup)?,
         role_password_secret: required(raw, "role_password_secret", lookup)?,
         bind_addr: optional(raw, "bind_addr", lookup)?,
+        oidc_redirect_url: optional(raw, "oidc_redirect_url", lookup)?,
     })
 }
 
@@ -185,5 +191,6 @@ mod tests {
         assert_eq!(cfg.oidc_client_secret, "shh");
         assert_eq!(cfg.database_url, "postgres://x");
         assert_eq!(cfg.bind_addr, None);
+        assert_eq!(cfg.oidc_redirect_url, None);
     }
 }

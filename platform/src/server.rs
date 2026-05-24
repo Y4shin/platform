@@ -104,11 +104,16 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
 
     boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins).await?;
 
-    // Dev redirect target; prod overrides via config in a later milestone.
-    let redirect_uri = format!(
-        "http://localhost:{}/api/auth/callback",
-        config.bind_addr.port()
-    );
+    // Browser-facing OIDC callback. When `oidc_redirect_url` is configured (e.g.
+    // the Vite `:5173` origin under `junius dev`, so the callback flows through
+    // the single dev origin), use it verbatim; otherwise derive it from the
+    // bind address. This URL must also be registered with the IdP.
+    let redirect_uri = resolved.oidc_redirect_url.clone().unwrap_or_else(|| {
+        format!(
+            "http://localhost:{}/api/auth/callback",
+            config.bind_addr.port()
+        )
+    });
     let auth_state =
         AuthState::from_config(platform_pool.clone(), resolved, &redirect_uri, false).await;
 

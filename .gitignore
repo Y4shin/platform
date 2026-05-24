@@ -11,6 +11,8 @@ build/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+# Stray `docker compose logs > logs` dumps at the repo root.
+/logs
 
 # Env files
 .env
