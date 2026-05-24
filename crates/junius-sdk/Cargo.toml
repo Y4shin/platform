@@ -21,6 +21,11 @@ prost       = { workspace = true }
 bytes       = { workspace = true }
 http        = { workspace = true }
 
+# DB-backed resources (M06): PluginDb, Auth, Users, AuditEmitter.
+sqlx   = { workspace = true }
+uuid   = { workspace = true }
+chrono = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true }
 tower = { workspace = true }

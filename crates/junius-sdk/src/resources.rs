@@ -1,19 +1,109 @@
-//! `PluginResources` — the bundle of host-provided handles passed to a plugin
-//! at `routes()` time and during lifecycle hooks. M02 ships only `config` and
-//! `telemetry`; later milestones add `db`, `storage`, `jobs`, `email`, `auth`,
-//! `audit`.
+//! `PluginResources` — the bundle of host-provided handles a plugin uses.
+//!
+//! From M06, `PluginResources` is **request-scoped**: it is produced per request
+//! via the [`FromRequestParts`] extractor (so handlers get the DB handle *and*
+//! the current caller in one value), and also built once at boot for the
+//! `on_startup`/`on_shutdown` lifecycle hooks (with no caller).
+//!
+//! The request-independent parts (config, telemetry, db pool, directory, audit)
+//! are assembled once by the host into a [`PluginResourceCtx`] and attached to
+//! each plugin's router subtree as an `Extension`. The extractor combines that
+//! with the session-resolved [`User`] in request extensions.
 
+use axum::extract::FromRequestParts;
+use axum::http::StatusCode;
+use axum::http::request::Parts;
+use axum::response::{IntoResponse, Response};
+
+use crate::auth::{AuditEmitter, Auth, User, Users};
 use crate::config::PluginConfig;
+use crate::db::PluginDb;
 use crate::telemetry::Telemetry;
 
+/// Everything a plugin handler is handed for the current request.
 #[derive(Clone)]
 pub struct PluginResources {
     pub config: PluginConfig,
     pub telemetry: Telemetry,
+    /// Opaque DB handle; the query API arrives in M07.
+    pub(crate) db: PluginDb,
+    /// Caller identity + user-directory lookups (caller filled per request).
+    pub auth: Auth,
+    /// User-directory handle.
+    pub users: Users,
+    /// Audit-log writer.
+    pub audit: AuditEmitter,
 }
 
 impl PluginResources {
-    pub fn new(config: PluginConfig, telemetry: Telemetry) -> Self {
-        Self { config, telemetry }
+    /// Build a request-scoped `PluginResources` from the per-plugin context and
+    /// the (optional) current caller.
+    #[must_use]
+    pub fn from_ctx(ctx: &PluginResourceCtx, user: Option<User>) -> Self {
+        Self {
+            config: ctx.config.clone(),
+            telemetry: ctx.telemetry.clone(),
+            db: ctx.db.clone(),
+            auth: ctx.auth.clone().with_user(user),
+            users: ctx.users.clone(),
+            audit: ctx.audit.clone(),
+        }
+    }
+
+    /// The plugin's opaque DB handle (M07 unlocks queries through it).
+    #[must_use]
+    pub fn db(&self) -> &PluginDb {
+        &self.db
+    }
+}
+
+/// Request-independent per-plugin handles, assembled once by the host and
+/// attached to the plugin's router as an `Extension`. The `auth` handle here is
+/// caller-less; the extractor attaches the current user.
+#[derive(Clone)]
+pub struct PluginResourceCtx {
+    config: PluginConfig,
+    telemetry: Telemetry,
+    db: PluginDb,
+    auth: Auth,
+    users: Users,
+    audit: AuditEmitter,
+}
+
+impl PluginResourceCtx {
+    #[must_use]
+    pub fn new(
+        config: PluginConfig,
+        telemetry: Telemetry,
+        db: PluginDb,
+        auth: Auth,
+        users: Users,
+        audit: AuditEmitter,
+    ) -> Self {
+        Self {
+            config,
+            telemetry,
+            db,
+            auth,
+            users,
+            audit,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl<S: Send + Sync> FromRequestParts<S> for PluginResources {
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let ctx = parts.extensions.get::<PluginResourceCtx>().ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "plugin resources not configured for this route",
+            )
+                .into_response()
+        })?;
+        let user = parts.extensions.get::<User>().cloned();
+        Ok(PluginResources::from_ctx(ctx, user))
     }
 }

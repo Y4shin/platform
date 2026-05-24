@@ -5,7 +5,9 @@
 //! `plugin_metadata!()` macro re-export. DB, storage, jobs, email, and auth
 //! handles land in later milestones (M06–M10) as fields on `PluginResources`.
 
+pub mod auth;
 pub mod config;
+pub mod db;
 pub mod error;
 pub mod metadata;
 pub mod plugin;
@@ -15,12 +17,17 @@ pub mod telemetry;
 
 pub use junius_sdk_macros::plugin_metadata;
 
+pub use auth::{
+    AuditEmitter, Auth, CurrentUser, GroupId, MaybeUser, Membership, Role, RoleId, User,
+    UserDisplay, UserId, Users,
+};
 pub use config::PluginConfig;
+pub use db::PluginDb;
 pub use error::PluginError;
 pub use metadata::{
     DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,
     PluginMetadata,
 };
 pub use plugin::Plugin;
-pub use resources::PluginResources;
+pub use resources::{PluginResourceCtx, PluginResources};
 pub use telemetry::Telemetry;

@@ -12,6 +12,11 @@ pub enum PluginError {
     #[error("config error: {0}")]
     Config(String),
 
+    /// A database operation failed (host-provided handles: `Auth`, `Users`,
+    /// `AuditEmitter`).
+    #[error("database error: {0}")]
+    Db(#[from] sqlx::Error),
+
     /// Escape hatch for anything a plugin's own code wants to bubble up.
     #[error(transparent)]
     External(#[from] anyhow::Error),

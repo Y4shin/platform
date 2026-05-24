@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use axum::{Router, routing::get};
 use junius_sdk::rpc::{RpcResult, ServiceBuilder};
-use junius_sdk::{Plugin, PluginMetadata, PluginResources};
+use junius_sdk::{Plugin, PluginMetadata};
 
 junius_sdk::plugin_metadata!();
 
@@ -59,11 +59,11 @@ impl Plugin for HelloPlugin {
         &METADATA
     }
 
-    fn routes(&self, _resources: PluginResources) -> Router {
+    fn routes(&self) -> Router {
         Router::new().route("/ping", get(|| async { "pong" }))
     }
 
-    fn rpc_routes(&self, _resources: PluginResources) -> Router {
+    fn rpc_routes(&self) -> Router {
         ServiceBuilder::new("hello.v1.HelloService")
             .unary("Greet", Self::greet)
             .into_router()

@@ -1,0 +1,52 @@
+# Authentik blueprint: seed the `junius` OIDC application + provider and two test
+# users for local dev. Applied automatically by the worker on boot (mounted at
+# /blueprints/custom). The client_id/secret are fixed here so they match
+# dev/platform.toml's oidc_client_id and the OIDC_CLIENT_SECRET env var.
+#
+# NOTE: blueprint schemas vary slightly across Authentik releases; if the worker
+# logs a blueprint error on first boot, reconcile against the version pinned in
+# docker-compose.yml (see dev/authentik/README.md). This file is dev-only and is
+# never exercised by CI.
+version: 1
+metadata:
+  name: junius-dev
+entries:
+  # OIDC provider for the platform.
+  - model: authentik_providers_oauth2.oauth2provider
+    identifiers:
+      name: junius-provider
+    attrs:
+      client_type: confidential
+      client_id: platform
+      client_secret: dev-oidc-secret
+      redirect_uris: "http://localhost:18080/api/auth/callback"
+      sub_mode: hashed_user_id
+      include_claims_in_id_token: true
+      authorization_flow:
+        !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+
+  # Application bound to the provider, exposed at /application/o/junius/.
+  - model: authentik_core.application
+    identifiers:
+      slug: junius
+    attrs:
+      name: Junius
+      provider: !KeyOf junius-provider
+
+  # Test users. Set their passwords in the Authentik admin UI (akadmin /
+  # akadmin-dev) on first run, or via `ak create_user` — blueprints don't carry
+  # plaintext passwords.
+  - model: authentik_core.user
+    identifiers:
+      username: alice
+    attrs:
+      name: Alice Example
+      email: alice@local
+      is_active: true
+  - model: authentik_core.user
+    identifiers:
+      username: bob
+    attrs:
+      name: Bob Example
+      email: bob@local
+      is_active: true

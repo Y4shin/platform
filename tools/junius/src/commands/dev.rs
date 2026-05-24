@@ -10,6 +10,7 @@
 //!
 //! File-watching, proto regen, and manifest-driven re-sync land in M05/M06.
 
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -19,6 +20,8 @@ use tokio::signal;
 
 use crate::cli::DevArgs;
 use crate::exit;
+
+const DEFAULT_CONFIG: &str = "platform.toml";
 
 const VITE_PNPM_FILTER: &str = "@junius/shell";
 
@@ -45,6 +48,18 @@ async fn run_async(args: &DevArgs) -> i32 {
         return sync_code;
     }
 
+    // Apply migrations + (re-)emit role grants before booting the host.
+    let migrate_code = super::migrate::up_async(args.config.clone()).await;
+    if migrate_code != exit::OK {
+        eprintln!("junius: dev: migrate up failed; aborting (is Postgres running?)");
+        return migrate_code;
+    }
+
+    let config_path = args
+        .config
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG));
+
     eprintln!("junius dev: starting Vite + juniusd");
     eprintln!("  Vite:    http://127.0.0.1:5173");
     eprintln!("  juniusd: http://127.0.0.1:18080");
@@ -53,7 +68,7 @@ async fn run_async(args: &DevArgs) -> i32 {
         Ok(c) => c,
         Err(code) => return code,
     };
-    let mut cargo = match spawn_cargo() {
+    let mut cargo = match spawn_cargo(&config_path) {
         Ok(c) => c,
         Err(code) => {
             // Best-effort kill of the already-spawned child. tokio sends
@@ -99,9 +114,13 @@ fn spawn_vite() -> Result<Child, i32> {
         })
 }
 
-fn spawn_cargo() -> Result<Child, i32> {
+fn spawn_cargo(config_path: &Path) -> Result<Child, i32> {
+    // The host reads its config from JUNIUS_CONFIG; secret env vars
+    // (OIDC_CLIENT_SECRET / SESSION_KEY / ROLE_PW_SECRET) are inherited from
+    // this process so the same values used for `migrate up` reach the host.
     Command::new("cargo")
         .args(["run", "-p", "platform"])
+        .env("JUNIUS_CONFIG", config_path)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .kill_on_drop(true)

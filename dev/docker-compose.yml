@@ -1,9 +1,18 @@
-# Local dev stack for Junius. Stage A (M06) brings up Postgres for the platform.
-# The Authentik OIDC stack is added alongside the auth backend (M06 stage B).
+# Local dev stack for Junius:
+#   - postgres:       the platform database (connected as platform_migrator)
+#   - authentik-*:    a real OIDC provider for local login (server + worker +
+#                     its own postgres + redis, per Authentik's standard topology)
 #
 #   docker compose -f dev/docker-compose.yml up -d
 #
-# The platform connects as platform_migrator (see dev/platform.toml [config]).
+# Before running `junius dev` / `junius migrate up`, export the secrets the
+# deployment config references (see dev/platform.toml [config]):
+#   export OIDC_CLIENT_SECRET=dev-oidc-secret   # must match dev/authentik blueprint
+#   export SESSION_KEY=dev-session-key
+#   export ROLE_PW_SECRET=dev-role-pw-secret
+#
+# Authentik takes a couple of minutes to become healthy on first boot and apply
+# the blueprint in dev/authentik/blueprints/. See dev/authentik/README.md.
 
 services:
   postgres:
@@ -22,5 +31,70 @@ services:
       timeout: 5s
       retries: 10
 
+  authentik-postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik-dev
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  authentik-redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.12
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: dev-authentik-secret-key-change-in-prod
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-dev
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin-dev
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@local
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.12
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: dev-authentik-secret-key-change-in-prod
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-dev
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin-dev
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@local
+    volumes:
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+
 volumes:
   postgres-data:
+  authentik-db:

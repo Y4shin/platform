@@ -21,7 +21,8 @@ default = []
 embed-frontend = ["dep:rust-embed", "dep:mime_guess"]
 
 [dependencies]
-junius-sdk = { workspace = true }
+junius-sdk      = { workspace = true }
+junius-manifest = { workspace = true }
 
 axum               = { workspace = true }
 tokio              = { workspace = true }
@@ -31,6 +32,19 @@ thiserror          = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# DB + auth (M06)
+sqlx          = { workspace = true }
+uuid          = { workspace = true }
+chrono        = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+tower-cookies = { workspace = true }
+aes-gcm       = { workspace = true }
+rand          = { workspace = true }
+sha2          = { workspace = true }
+reqwest       = { workspace = true }
+openidconnect = { workspace = true }
+
 rust-embed = { workspace = true, optional = true }
 mime_guess = { workspace = true, optional = true }
 
@@ -39,10 +53,12 @@ hello-plugin = { path = "../plugins/hello" }
 # <<< junius managed end
 
 [dev-dependencies]
-http       = { workspace = true }
-reqwest    = { workspace = true }
-prost      = { workspace = true }
-serde_json = { workspace = true }
+http  = { workspace = true }
+prost = { workspace = true }
+
+# Ephemeral Postgres for the auth integration tests (M06).
+testcontainers         = { workspace = true }
+testcontainers-modules = { workspace = true }
 
 [lints]
 workspace = true

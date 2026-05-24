@@ -31,6 +31,19 @@ pub fn run(cmd: &MigrateCmd) -> i32 {
 }
 
 fn run_up(config: Option<PathBuf>) -> i32 {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("junius: cannot start async runtime: {e}");
+            return exit::PARSE_ERROR;
+        }
+    };
+    rt.block_on(up_async(config))
+}
+
+/// Run `migrate up`, returning a process exit code. Async so callers already
+/// inside a runtime (e.g. `junius dev`) can await it without nesting runtimes.
+pub(crate) async fn up_async(config: Option<PathBuf>) -> i32 {
     let Loaded {
         resolved,
         manifests,
@@ -40,14 +53,7 @@ fn run_up(config: Option<PathBuf>) -> i32 {
         Err(code) => return code,
     };
 
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            eprintln!("junius: cannot start async runtime: {e}");
-            return exit::PARSE_ERROR;
-        }
-    };
-    let result = rt.block_on(migrate::up(Path::new("."), &resolved, &manifests, &enabled));
+    let result = migrate::up(Path::new("."), &resolved, &manifests, &enabled).await;
     match result {
         Ok(report) => {
             if report.applied.is_empty() {

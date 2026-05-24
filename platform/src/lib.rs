@@ -3,8 +3,10 @@
 //! The crate is structured as both a library and a binary so integration tests
 //! can drive [`server::build_app`] directly instead of spawning the binary.
 
+pub mod auth;
 pub mod boot;
 pub mod config;
+pub mod db;
 pub mod plugin_registry;
 pub mod server;
 

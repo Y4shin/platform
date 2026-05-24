@@ -5,17 +5,13 @@
 use axum::body::{Body, to_bytes};
 use hello_plugin::HelloPlugin;
 use http::Request;
-use junius_sdk::{Plugin, PluginConfig, PluginResources, Telemetry};
+use junius_sdk::Plugin;
 use tower::ServiceExt;
-
-fn stub_resources() -> PluginResources {
-    PluginResources::new(PluginConfig::empty(), Telemetry::new("hello"))
-}
 
 #[tokio::test]
 async fn ping_returns_pong() {
     let plugin = HelloPlugin::new();
-    let app = plugin.routes(stub_resources());
+    let app = plugin.routes();
 
     let response = app
         .oneshot(Request::get("/ping").body(Body::empty()).unwrap())
@@ -30,7 +26,7 @@ async fn ping_returns_pong() {
 #[tokio::test]
 async fn unknown_route_404s() {
     let plugin = HelloPlugin::new();
-    let app = plugin.routes(stub_resources());
+    let app = plugin.routes();
 
     let response = app
         .oneshot(Request::get("/nope").body(Body::empty()).unwrap())

@@ -61,7 +61,7 @@ sha2          = "0.10"
 hmac          = "0.12"
 aes-gcm       = "0.10"
 rand          = "0.8"
-tower-cookies = "0.10"
+tower-cookies = { version = "0.10", features = ["private"] }
 openidconnect = { version = "3", default-features = false, features = ["reqwest", "rustls-tls"] }
 
 # Integration testing against ephemeral Postgres (M06, dev-only)

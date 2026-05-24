@@ -5,7 +5,7 @@
 //! Skipped automatically (test passes with a note) when no Docker daemon is
 //! reachable, so a Docker-less dev box still gets a green `cargo test`.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::too_many_lines)]
 
 mod common;
 

@@ -8,16 +8,12 @@ use axum::Router;
 use axum::body::{Body, to_bytes};
 use hello_plugin::{GreetRequest, GreetResponse, HelloPlugin};
 use http::{Request, StatusCode, header};
-use junius_sdk::{Plugin, PluginConfig, PluginResources, Telemetry};
+use junius_sdk::Plugin;
 use prost::Message;
 use tower::ServiceExt;
 
-fn stub_resources() -> PluginResources {
-    PluginResources::new(PluginConfig::empty(), Telemetry::new("hello"))
-}
-
 fn rpc_app() -> Router {
-    Router::new().nest("/rpc", HelloPlugin::new().rpc_routes(stub_resources()))
+    Router::new().nest("/rpc", HelloPlugin::new().rpc_routes())
 }
 
 #[tokio::test]
@@ -105,7 +101,7 @@ async fn unknown_rpc_method_404s() {
 async fn http_ping_still_works() {
     // RPC surface is independent of the HTTP surface; sanity-check the M03
     // /ping handler hasn't regressed.
-    let app = HelloPlugin::new().routes(stub_resources());
+    let app = HelloPlugin::new().routes();
     let response = app
         .oneshot(Request::get("/ping").body(Body::empty()).unwrap())
         .await
