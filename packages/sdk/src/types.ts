@@ -1,20 +1,33 @@
 /**
  * Shared types used by `@junius/sdk` consumers.
  *
- * At M04 these are intentionally lean — only the fields the dev-shell auth
- * stub exposes. Membership / per-group permissions arrive in M06.
+ * The `User` shape mirrors the host's `/api/me` payload (camelCase; see
+ * `crates/junius-sdk/src/auth.rs`). Per-group permissions live on each
+ * membership; the permission hooks (M07) read across them.
  */
 
 export type UserId = string;
+export type GroupId = string;
+export type RoleId = string;
+
+export interface Role {
+  id: RoleId;
+  name: string;
+}
+
+export interface Membership {
+  groupId: GroupId;
+  groupName: string;
+  role: Role;
+  /** Permission keys this membership's role grants (`<plugin>:<perm>`). */
+  permissions: ReadonlySet<string>;
+}
 
 export interface User {
   id: UserId;
   email: string;
   displayName: string;
-  /** Empty in M04; populated by the real `/api/me` payload in M06. */
-  memberships: ReadonlyArray<unknown>;
-  /** Flat capability-permission set across all memberships. Empty in M04. */
-  permissions: ReadonlySet<string>;
+  memberships: ReadonlyArray<Membership>;
 }
 
 export interface RouterContext {

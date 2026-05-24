@@ -1,6 +1,6 @@
 export type { AuthProviderProps } from './auth/AuthProvider.js';
 
-export { AuthProvider, useAuth } from './auth/AuthProvider.js';
+export { AuthProvider, goToLogin, useAuth } from './auth/AuthProvider.js';
 export { useIsAuthenticated } from './auth/useIsAuthenticated.js';
 export { useCurrentUser, useUser } from './auth/useUser.js';
 export { requirePermissions } from './permissions/requirePermissions.js';
@@ -20,4 +20,12 @@ export {
   useComponentRegistry,
 } from './registry/ComponentRegistryProvider.js';
 export { useComponent } from './registry/getComponent.js';
-export type { RouterContext, User, UserId } from './types.js';
+export type {
+  GroupId,
+  Membership,
+  Role,
+  RoleId,
+  RouterContext,
+  User,
+  UserId,
+} from './types.js';

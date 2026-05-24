@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { User } from '../types.js';
 import { AuthProvider, useAuth } from './AuthProvider.js';
 
-function UserName() {
+function UserView() {
   const { user, isAuthenticated } = useAuth();
   return (
     <>
@@ -13,31 +14,105 @@ function UserName() {
   );
 }
 
+const SAMPLE_ME = {
+  id: 'u1',
+  email: 'alice@local',
+  displayName: 'Alice',
+  memberships: [
+    {
+      groupId: 'g1',
+      groupName: 'Committee',
+      role: { id: 'r1', name: 'chair' },
+      permissions: ['speakers:read'],
+    },
+  ],
+};
+
+const OVERRIDE_USER: User = {
+  id: 'u2',
+  email: 'bob@local',
+  displayName: 'Bob',
+  memberships: [],
+};
+
+let assign: ReturnType<typeof vi.fn>;
+let originalLocation: Location;
+
+beforeEach(() => {
+  originalLocation = window.location;
+  assign = vi.fn();
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { pathname: '/p/hello', search: '', assign },
+  });
+});
+
+afterEach(() => {
+  Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe('AuthProvider', () => {
-  it('exposes the dev-user stub by default', () => {
+  it('renders the user from /api/me on success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ status: 200, json: async () => SAMPLE_ME })),
+    );
     render(
       <AuthProvider>
-        <UserName />
+        <UserView />
       </AuthProvider>,
     );
-    expect(screen.getByTestId('name').textContent).toBe('Dev User');
+    const name = await screen.findByTestId('name');
+    expect(name.textContent).toBe('Alice');
     expect(screen.getByTestId('auth').textContent).toBe('yes');
+    expect(assign).not.toHaveBeenCalled();
   });
 
-  it('reports anonymous when explicitly given null', () => {
+  it('redirects to login on 401', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ status: 401, json: async () => ({}) })),
+    );
+    render(
+      <AuthProvider>
+        <UserView />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(String(assign.mock.calls[0]?.[0])).toContain('/api/auth/login?return_to=');
+  });
+
+  it('uses an injected user without fetching', () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    render(
+      <AuthProvider user={OVERRIDE_USER}>
+        <UserView />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId('name').textContent).toBe('Bob');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('treats an explicit null override as anonymous without redirecting', () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
     render(
       <AuthProvider user={null}>
-        <UserName />
+        <UserView />
       </AuthProvider>,
     );
     expect(screen.getByTestId('name').textContent).toBe('none');
     expect(screen.getByTestId('auth').textContent).toBe('no');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('throws when useAuth is used outside the provider', () => {
-    // Suppress the React error-boundary noise.
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(() => render(<UserName />)).toThrow(/AuthProvider/);
+    expect(() => render(<UserView />)).toThrow(/AuthProvider/);
     spy.mockRestore();
   });
 });

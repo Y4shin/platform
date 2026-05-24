@@ -1,7 +1,8 @@
+import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { AuthProvider, ComponentRegistryProvider } from '@junius/sdk';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider, ComponentRegistryProvider, goToLogin } from '@junius/sdk';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,7 +11,18 @@ import { routeTree } from './generated/routes.js';
 
 import './styles.css';
 
-const queryClient = new QueryClient();
+// When any query fails with an unauthenticated RPC error (expired/absent
+// session), send the browser to login. AuthProvider handles the same for the
+// initial /api/me check.
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      if (ConnectError.from(error).code === Code.Unauthenticated) {
+        goToLogin();
+      }
+    },
+  }),
+});
 const router = createRouter({ routeTree });
 
 // Single Connect-Web transport for the whole app. Backend RPC routes are

@@ -1,38 +1,84 @@
 /**
- * Dev-mode authentication provider stub.
+ * Authentication provider.
  *
- * Always returns a hard-coded local-dev user. Real OIDC + session lookup via
- * `/api/me` arrives in M06; the same `useUser` / `useIsAuthenticated` hook
- * contract carries through unchanged so consumer code doesn't need to move.
+ * On mount it fetches `/api/me`: a 200 yields the current user; a 401 redirects
+ * the browser to `/api/auth/login` (preserving the current path as `return_to`).
+ * Tests (and any caller that already has a user) can pass the `user` prop to
+ * skip the fetch. The `useUser` / `useIsAuthenticated` hook contract is
+ * unchanged.
  */
 
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { User } from '../types.js';
+import type { Membership, User } from '../types.js';
 
-const DEV_USER: User = {
-  id: 'dev',
-  email: 'dev@local',
-  displayName: 'Dev User',
-  memberships: [],
-  permissions: new Set<string>(),
-};
+type AuthStatus = 'loading' | 'authed' | 'unauth';
 
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
+  status: AuthStatus;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export interface AuthProviderProps {
-  /** Optional override; tests inject a specific user. */
+  /**
+   * Override the current user instead of fetching `/api/me`. `undefined` (the
+   * default) fetches; an explicit `User` or `null` is used as-is without
+   * fetching or redirecting (tests, storybook, SSR).
+   */
   user?: User | null;
   children: ReactNode;
 }
 
-export function AuthProvider({ user = DEV_USER, children }: AuthProviderProps) {
-  const value = useMemo(() => ({ user, isAuthenticated: user !== null }), [user]);
+export function AuthProvider({ user: override, children }: AuthProviderProps) {
+  const hasOverride = override !== undefined;
+  const [user, setUser] = useState<User | null>(hasOverride ? override : null);
+  const [status, setStatus] = useState<AuthStatus>(
+    hasOverride ? (override ? 'authed' : 'unauth') : 'loading',
+  );
+
+  useEffect(() => {
+    if (hasOverride) {
+      return;
+    }
+    let cancelled = false;
+    fetchMe()
+      .then((fetched) => {
+        if (cancelled) {
+          return;
+        }
+        if (fetched) {
+          setUser(fetched);
+          setStatus('authed');
+        } else {
+          setStatus('unauth');
+          goToLogin();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatus('unauth');
+          goToLogin();
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasOverride]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, isAuthenticated: user !== null, status }),
+    [user, status],
+  );
+
+  // Hold rendering until the first /api/me resolves, so children never observe a
+  // transient null user mid-fetch.
+  if (status === 'loading') {
+    return null;
+  }
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -42,4 +88,49 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth must be called inside an <AuthProvider>');
   }
   return ctx;
+}
+
+/** Redirect the browser to the host login, preserving the current path. */
+export function goToLogin(): void {
+  const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.assign(`/api/auth/login?return_to=${returnTo}`);
+}
+
+interface WireRole {
+  id: string;
+  name: string;
+}
+interface WireMembership {
+  groupId: string;
+  groupName: string;
+  role: WireRole;
+  permissions: string[];
+}
+interface WireUser {
+  id: string;
+  email: string;
+  displayName: string;
+  memberships: WireMembership[];
+}
+
+/** Fetch the current user, or `null` on 401 / any non-200. */
+async function fetchMe(): Promise<User | null> {
+  const res = await fetch('/api/me', { credentials: 'include' });
+  if (res.status !== 200) {
+    return null;
+  }
+  const raw = (await res.json()) as WireUser;
+  return {
+    id: raw.id,
+    email: raw.email,
+    displayName: raw.displayName,
+    memberships: (raw.memberships ?? []).map(
+      (m): Membership => ({
+        groupId: m.groupId,
+        groupName: m.groupName,
+        role: { id: m.role.id, name: m.role.name },
+        permissions: new Set(m.permissions ?? []),
+      }),
+    ),
+  };
 }
