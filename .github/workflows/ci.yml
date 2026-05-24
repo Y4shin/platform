@@ -55,3 +55,9 @@ jobs:
 
       - name: JS — typecheck
         run: nix develop --command pnpm run typecheck
+
+      - name: Buf — lint
+        run: nix develop --command pnpm exec buf lint
+
+      - name: Buf — format check
+        run: nix develop --command pnpm exec buf format --diff --exit-code

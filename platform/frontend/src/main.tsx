@@ -1,5 +1,5 @@
-import { createConnectTransport } from '@connectrpc/connect-web';
 import { TransportProvider } from '@connectrpc/connect-query';
+import { createConnectTransport } from '@connectrpc/connect-web';
 import { AuthProvider, ComponentRegistryProvider } from '@junius/sdk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';

@@ -18,7 +18,7 @@ When you confirm a direction below, also:
 | 6 | Trust model & threat model | **Before M07** | First-party plugins only in v1 — see §15.6 | proposed |
 | 7 | Internationalization | **Before M13** | Defer; English-only with a `t()` shim — see §15.7 | proposed |
 | 8 | Worked example & plugin authoring guide | **Emerges M03–M05, finalised at M13** | Use Speakers (M13) as the worked example — see §15.8 | partially in progress (hello demonstrates the shape via M03) |
-| 9 | v0 milestone definition | **Defined by this plan** | M05 is the v0 cut — see §15.9 | locked by this plan |
+| 9 | v0 milestone definition | **Defined by this plan** | M05 is the v0 cut — see §15.9 | ✅ reached at end of M05 |
 
 ## §15.1 Testing strategy ✅ locked at M03
 
@@ -131,7 +131,7 @@ The guide lives at `docs/plugin-authoring-guide.md` (separate from the design + 
 
 ## §15.9 v0 milestone definition (defined by this plan)
 
-**Locked: v0 = end of M05.**
+**Locked: v0 = end of M05. ✅ Reached** — M05 shipped Connect-RPC end-to-end, closing out the v0 cut.
 
 A v0 cut means: the architecture's shape is fully proven end-to-end (workspace → junius → platform core → first plugin → frontend shell → Connect-RPC), without persistence, permissions, ownership, or cross-plugin composition. Everything beyond M05 adds depth, not new architectural shapes — so M05 is the right point to stop, demo, and (if desired) take a beat before continuing.
 

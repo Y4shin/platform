@@ -1,6 +1,29 @@
 # M05 — Connect-RPC End-to-End
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Implemented — see commit `M05: Connect-RPC end-to-end + buf workspace (v0 cut)` in `git log`.
+>
+> **Deviations from this plan (confirmed during implementation):**
+>
+> - **URL scheme is flat.** RPCs are mounted at `/rpc/<pkg>.<Service>/<Method>`
+>   (e.g. `/rpc/hello.v1.HelloService/Greet`), not `/rpc/<plugin>/...`. This is
+>   Connect-Web's natural URL convention; the proto package name (`hello.v1`)
+>   does the plugin scoping. The host nests every plugin's `rpc_routes()` under
+>   a single flat `/rpc`. Connect-Web's transport `baseUrl` is `/rpc`.
+> - **The Connect Rust server is hand-rolled**, not `connect-rs`. No
+>   production-grade Connect-RPC server crate exists on crates.io, so we own a
+>   ~200 LoC unary-protocol module at `crates/junius-sdk/src/rpc/`
+>   (`ServiceBuilder` + binary/JSON codecs + `RpcError` envelope). Its surface
+>   is small enough to swap behind if a robust crate emerges.
+> - **TS codegen uses `@bufbuild/protoc-gen-es` v2 only.** v2 emits message
+>   types *and* service descriptors in one pass, so the older split with
+>   `@connectrpc/protoc-gen-connect-es` is no longer needed.
+> - **buf is delivered via the `@bufbuild/buf` npm package** (root devDep,
+>   invoked as `pnpm exec buf`) and the proto workspace uses buf's v2 layout
+>   (single root `buf.yaml` + `buf.gen.yaml`; `buf.work.yaml` removed).
+> - **`buf generate` is a manual step.** `junius sync` writes the per-plugin
+>   RPC barrel but does **not** auto-invoke `buf generate` — developers run
+>   `pnpm exec buf generate` after editing a `.proto`, the same way they run
+>   `cargo` after editing Rust. Auto-invocation is deferred (revisit in M09).
 
 ## Goal
 

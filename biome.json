@@ -18,7 +18,9 @@
       "!**/.pnpm",
       "!**/dist",
       "!**/target",
-      "!**/*.css"
+      "!**/*.css",
+      "!platform/frontend/src/generated",
+      "!packages/generated/src"
     ]
   },
   "formatter": {
