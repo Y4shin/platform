@@ -116,6 +116,39 @@ The resolver lives in `crates/junius-sdk/src/config.rs`. Plugin code calls `reso
 2. Remove from `[plugins].enabled`.
 3. Sync.
 
+### Developer-only command gating (`develop` cargo feature)
+
+The CLI stays a **single binary**, but commands that only make sense inside the
+source monorepo are gated behind a `develop` cargo feature, so an end-user
+deployment build ships a CLI without scaffolding/dev clutter (and without the
+heavier dev-only dependency tree those commands pull in).
+
+- **`develop` is a default feature.** Working in the source tree (`cargo build`,
+  `cargo run -p junius`) gets the full CLI. The deployment build path
+  (`junius build`, and the example-deployment CI job) compiles the bundled CLI
+  with `--no-default-features` (plus whatever runtime features it needs), so the
+  shipped artifact only carries end-user commands.
+- **End-user commands (always compiled):** `check`, `build`, `migrate`
+  (up/status — deployments run migrations), `plugin` (enable/disable/list/info),
+  plus the future `cache prune` / `--check-config`. These are what operating a
+  deployment requires.
+- **Developer-only commands (gated behind `develop`):** `new` (scaffolding new
+  plugins/migrations/components/rpc/permissions), `sync` (in-source composition
+  glue), `dev` (Vite dev server + hot reload). Their *logic* that other commands
+  reuse (e.g. the composition-glue generation `plugin enable` calls) stays
+  compiled — only the user-facing subcommand entry points are `#[cfg(feature =
+  "develop")]`.
+- **Mechanism:** `#[cfg(feature = "develop")]` on the gated `Command` enum
+  variants and their dispatch arms, and `#[cfg(not(feature = "develop"))]`
+  fallbacks are unnecessary (clap just won't know the subcommand). Keep the
+  feature wiring in `tools/junius/Cargo.toml`; move the dev-only deps
+  (e.g. the Vite/`dev` plumbing) under `optional = true` + the feature so a
+  deployment CLI doesn't compile them.
+- **Verify:** `cargo build -p junius` exposes `new`/`sync`/`dev`;
+  `cargo build -p junius --no-default-features` does not (the binary rejects
+  `junius dev` with an unknown-subcommand error), while `build`/`migrate`/
+  `plugin`/`check` still work.
+
 ### Example deployment
 
 A new directory committed inside the source monorepo under `examples/example-deployment/`:
