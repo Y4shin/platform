@@ -1,6 +1,31 @@
 # M06 — Postgres + Migrations + Roles + OIDC + Sessions
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Implemented — landed in four stages (see commits
+> `M06 (stage A..D)` in `git log`).
+>
+> **Notes / deviations from this plan (confirmed during implementation):**
+>
+> - **Migration filenames** use zero-padded `NNNN_<name>.up.sql` (not the
+>   doc's `<ts>_<name>`); within-plugin order is the lexicographic filename
+>   sort. `0006_meta_migrations` is bootstrapped first on a fresh DB.
+> - **Per-request `PluginResources`.** `PluginResources` is an Axum
+>   `FromRequestParts` extractor combining a per-plugin `PluginResourceCtx`
+>   (attached as an `Extension`) with the session-resolved user, so
+>   `Plugin::routes()`/`rpc_routes()` no longer take a `resources` argument.
+> - **Host config loading** (`HostConfig::load_from_toml`, `juniusd --config`/
+>   `JUNIUS_CONFIG`) pulls the `[config]` subset M06 needs earlier than the
+>   doc's nominal M11.
+> - **OIDC discovery is best-effort**: if the provider is unreachable at boot
+>   the host still starts and `/api/auth/login` returns 503.
+> - **CI runs no live IdP.** Dev uses Authentik (per this doc); the automated
+>   auth tests seed sessions directly against an ephemeral Postgres
+>   (testcontainers).
+> - **Added: typed plugin config + secrets with codegen.** Beyond the original
+>   scope, plugins declare `[config]` (typed schema) and `[secrets]` in their
+>   manifest; `plugin_metadata!()` emits a `Config` struct + a `Secrets`
+>   accessor (one method per declared secret, so referencing an undeclared
+>   secret is a compile error). `junius check` cross-validates a deployment's
+>   `[plugins.<name>]` against the declared schema.
 
 ## Goal
 

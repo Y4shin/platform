@@ -4,9 +4,9 @@
 
 use std::path::Path;
 
-use junius_manifest::{PluginManifest, ValidationReport};
+use junius_manifest::{ConfigType, PluginManifest, ValidationReport};
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
 /// Generate the `pub static METADATA` constant for a plugin whose manifest is
 /// `content` (the literal text of `plugin.toml`). `path` is used only in error
@@ -26,10 +26,134 @@ pub fn plugin_metadata(content: &str, path: &Path) -> TokenStream {
     }
 
     let metadata_tokens = expand_metadata(&manifest);
+    let config_tokens = expand_config(&manifest);
+    let secrets_tokens = expand_secrets(&manifest);
     let tracker = include_bytes_tracker();
     quote! {
         #tracker
         #metadata_tokens
+        #config_tokens
+        #secrets_tokens
+    }
+}
+
+/// Emit a typed `Config` struct + `Config::load` from `[config]`. Empty when the
+/// plugin declares no config.
+fn expand_config(manifest: &PluginManifest) -> TokenStream {
+    if manifest.config.is_empty() {
+        return quote! {};
+    }
+
+    let fields = manifest.config.iter().map(|(key, field)| {
+        let ident = format_ident!("{key}");
+        let ty = rust_type(field.ty);
+        let optional = !field.required && field.default.is_none();
+        let field_ty = if optional {
+            quote! { ::core::option::Option<#ty> }
+        } else {
+            ty
+        };
+        quote! { pub #ident: #field_ty, }
+    });
+
+    let loads = manifest.config.iter().map(|(key, field)| {
+        let ident = format_ident!("{key}");
+        let ty = rust_type(field.ty);
+        let key_lit = key.as_str();
+        let expr = if let Some(default) = &field.default {
+            let default_lit = default_literal(default, field.ty);
+            quote! { cfg.get_opt::<#ty>(#key_lit)?.unwrap_or_else(|| #default_lit) }
+        } else if field.required {
+            quote! { cfg.get::<#ty>(#key_lit)? }
+        } else {
+            quote! { cfg.get_opt::<#ty>(#key_lit)? }
+        };
+        quote! { #ident: #expr, }
+    });
+
+    quote! {
+        /// Typed view of this plugin's `[config]`, generated from `plugin.toml`.
+        #[allow(dead_code)]
+        pub struct Config { #(#fields)* }
+
+        impl Config {
+            /// Read + coerce this plugin's config, applying declared defaults.
+            #[allow(dead_code)]
+            pub fn load(
+                cfg: &::junius_sdk::PluginConfig,
+            ) -> ::core::result::Result<Self, ::junius_sdk::PluginError> {
+                ::core::result::Result::Ok(Self { #(#loads)* })
+            }
+        }
+    }
+}
+
+/// Emit a `Secrets` accessor with one method per declared secret. Empty when the
+/// plugin declares no secrets. Referencing an undeclared secret is a compile
+/// error (no method is generated for it).
+fn expand_secrets(manifest: &PluginManifest) -> TokenStream {
+    if manifest.secrets.is_empty() {
+        return quote! {};
+    }
+
+    let methods = manifest.secrets.keys().map(|name| {
+        let ident = format_ident!("{name}");
+        let name_lit = name.as_str();
+        quote! {
+            /// The named secret, resolved by the host at boot.
+            #[allow(dead_code, clippy::expect_used)]
+            pub fn #ident(&self) -> &::junius_sdk::SecretString {
+                self.0.get(#name_lit).expect(
+                    ::core::concat!("secret '", #name_lit, "' is declared but missing at runtime"),
+                )
+            }
+        }
+    });
+
+    quote! {
+        /// Typed accessor for this plugin's declared secrets, generated from
+        /// `plugin.toml`. Construct with `Secrets::new(resources.secrets())`.
+        #[allow(dead_code)]
+        pub struct Secrets<'a>(&'a ::junius_sdk::SecretStore);
+
+        impl<'a> Secrets<'a> {
+            #[allow(dead_code)]
+            #[must_use]
+            pub fn new(store: &'a ::junius_sdk::SecretStore) -> Self {
+                Self(store)
+            }
+            #(#methods)*
+        }
+    }
+}
+
+fn rust_type(ty: ConfigType) -> TokenStream {
+    match ty {
+        ConfigType::String => quote! { ::std::string::String },
+        ConfigType::Integer => quote! { i64 },
+        ConfigType::Boolean => quote! { bool },
+        ConfigType::Float => quote! { f64 },
+    }
+}
+
+fn default_literal(value: &toml::Value, ty: ConfigType) -> TokenStream {
+    match ty {
+        ConfigType::String => {
+            let s = value.as_str().unwrap_or_default();
+            quote! { ::std::string::String::from(#s) }
+        }
+        ConfigType::Integer => {
+            let n = value.as_integer().unwrap_or_default();
+            quote! { #n }
+        }
+        ConfigType::Boolean => {
+            let b = value.as_bool().unwrap_or_default();
+            quote! { #b }
+        }
+        ConfigType::Float => {
+            let f = value.as_float().unwrap_or_default();
+            quote! { #f }
+        }
     }
 }
 
@@ -284,6 +408,64 @@ mod tests {
                 "missing {needle} in:\n{rendered}"
             );
         }
+    }
+
+    #[test]
+    fn config_and_secrets_emit_typed_codegen() {
+        let rendered = render(
+            r#"
+            [plugin]
+            name = "demo"
+            display_name = "Demo"
+            manifest_schema = 1
+
+            [config.greeting]
+            type = "string"
+            default = "Hi"
+
+            [config.max_items]
+            type = "integer"
+            required = true
+
+            [secrets.api_key]
+            description = "x"
+            "#,
+        );
+        let _ = parse_as_file(&rendered);
+        for needle in [
+            "struct Config",
+            "greeting",
+            "max_items",
+            "struct Secrets",
+            "fn api_key",
+            "SecretString",
+            "PluginConfig",
+        ] {
+            assert!(
+                rendered.contains(needle),
+                "missing {needle} in:\n{rendered}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_config_or_secrets_emits_neither_type() {
+        let rendered = render(
+            r#"
+            [plugin]
+            name = "demo"
+            display_name = "Demo"
+            manifest_schema = 1
+            "#,
+        );
+        assert!(
+            !rendered.contains("struct Config"),
+            "unexpected Config in:\n{rendered}"
+        );
+        assert!(
+            !rendered.contains("struct Secrets"),
+            "unexpected Secrets in:\n{rendered}"
+        );
     }
 
     #[test]

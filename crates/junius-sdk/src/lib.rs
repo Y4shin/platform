@@ -13,6 +13,7 @@ pub mod metadata;
 pub mod plugin;
 pub mod resources;
 pub mod rpc;
+pub mod secrets;
 pub mod telemetry;
 
 pub use junius_sdk_macros::plugin_metadata;
@@ -30,4 +31,5 @@ pub use metadata::{
 };
 pub use plugin::Plugin;
 pub use resources::{PluginResourceCtx, PluginResources};
+pub use secrets::{SecretStore, SecretString};
 pub use telemetry::Telemetry;

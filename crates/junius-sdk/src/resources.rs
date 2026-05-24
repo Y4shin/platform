@@ -18,6 +18,7 @@ use axum::response::{IntoResponse, Response};
 use crate::auth::{AuditEmitter, Auth, User, Users};
 use crate::config::PluginConfig;
 use crate::db::PluginDb;
+use crate::secrets::SecretStore;
 use crate::telemetry::Telemetry;
 
 /// Everything a plugin handler is handed for the current request.
@@ -33,6 +34,8 @@ pub struct PluginResources {
     pub users: Users,
     /// Audit-log writer.
     pub audit: AuditEmitter,
+    /// Resolved secrets; read via the codegen'd `Secrets` accessor.
+    pub(crate) secrets: SecretStore,
 }
 
 impl PluginResources {
@@ -47,6 +50,7 @@ impl PluginResources {
             auth: ctx.auth.clone().with_user(user),
             users: ctx.users.clone(),
             audit: ctx.audit.clone(),
+            secrets: ctx.secrets.clone(),
         }
     }
 
@@ -54,6 +58,13 @@ impl PluginResources {
     #[must_use]
     pub fn db(&self) -> &PluginDb {
         &self.db
+    }
+
+    /// The plugin's resolved secrets. The codegen'd `Secrets::new(...)` wraps
+    /// this to expose declared secrets by name.
+    #[must_use]
+    pub fn secrets(&self) -> &SecretStore {
+        &self.secrets
     }
 }
 
@@ -68,6 +79,7 @@ pub struct PluginResourceCtx {
     auth: Auth,
     users: Users,
     audit: AuditEmitter,
+    secrets: SecretStore,
 }
 
 impl PluginResourceCtx {
@@ -79,6 +91,7 @@ impl PluginResourceCtx {
         auth: Auth,
         users: Users,
         audit: AuditEmitter,
+        secrets: SecretStore,
     ) -> Self {
         Self {
             config,
@@ -87,6 +100,7 @@ impl PluginResourceCtx {
             auth,
             users,
             audit,
+            secrets,
         }
     }
 }

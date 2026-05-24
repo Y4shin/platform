@@ -1239,6 +1239,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "toml",
  "tower",
 ]
 
@@ -1778,6 +1779,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "toml",
 ]
 
 [[package]]

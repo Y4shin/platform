@@ -20,6 +20,46 @@ pub struct PluginManifest {
     pub permissions: BTreeMap<String, String>,
     #[serde(default)]
     pub requires: PluginRequires,
+    /// Typed config schema: `[config.<key>]`. Codegen emits a `Config` struct.
+    #[serde(default)]
+    pub config: BTreeMap<String, ConfigField>,
+    /// Declared secrets: `[secrets.<name>]`. Codegen emits a typed `Secrets`
+    /// accessor; the deployment supplies the values.
+    #[serde(default)]
+    pub secrets: BTreeMap<String, SecretDecl>,
+}
+
+/// A single typed config field declared by a plugin.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigField {
+    #[serde(rename = "type")]
+    pub ty: ConfigType,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub default: Option<toml::Value>,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// The scalar types a config field may declare.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigType {
+    String,
+    Integer,
+    Boolean,
+    Float,
+}
+
+/// A secret a plugin requires. The value is provided by the deployment, never
+/// here.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecretDecl {
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

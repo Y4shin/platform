@@ -6,7 +6,7 @@
 //! constants validated by the manifest crate's own tests.
 #![allow(clippy::expect_used)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -130,6 +130,54 @@ pub(crate) fn plugin(m: &PluginManifest, report: &mut ValidationReport) {
             );
         }
     }
+
+    plugin_config_and_secrets(m, report);
+}
+
+/// Validate a plugin's `[config]` schema and `[secrets]` declarations: names
+/// must be valid Rust identifiers (so codegen maps them to fields/methods) and
+/// each config default must match its declared type.
+fn plugin_config_and_secrets(m: &PluginManifest, report: &mut ValidationReport) {
+    for (key, field) in &m.config {
+        if !RE_SCHEMA_IDENT.is_match(key) {
+            report.error(
+                "CONFIG.KEY.FORMAT",
+                format!("config.{key}"),
+                format!("config key {key:?} must match ^[a-z][a-z0-9_]*$"),
+            );
+        }
+        if let Some(default) = &field.default {
+            if !default_matches_type(default, field.ty) {
+                report.error(
+                    "CONFIG.DEFAULT.TYPE",
+                    format!("config.{key}.default"),
+                    format!(
+                        "default for {key:?} does not match declared type {:?}",
+                        field.ty
+                    ),
+                );
+            }
+        }
+    }
+    for key in m.secrets.keys() {
+        if !RE_SCHEMA_IDENT.is_match(key) {
+            report.error(
+                "SECRET.NAME.FORMAT",
+                format!("secrets.{key}"),
+                format!("secret name {key:?} must match ^[a-z][a-z0-9_]*$"),
+            );
+        }
+    }
+}
+
+fn default_matches_type(value: &toml::Value, ty: crate::plugin::ConfigType) -> bool {
+    use crate::plugin::ConfigType;
+    match ty {
+        ConfigType::String => value.is_str(),
+        ConfigType::Integer => value.is_integer(),
+        ConfigType::Boolean => value.is_bool(),
+        ConfigType::Float => value.is_float(),
+    }
 }
 
 pub(crate) fn platform(m: &PlatformManifest, report: &mut ValidationReport) {
@@ -179,6 +227,80 @@ pub(crate) fn platform(m: &PlatformManifest, report: &mut ValidationReport) {
     }
 }
 
+/// Cross-check a deployment's `[plugins.<name>]` config/secrets against each
+/// enabled plugin's declared schema. `plugins` maps plugin name → its manifest;
+/// plugins absent from the map are skipped (best-effort). Appends issues to
+/// `report`. This is the deploy-time guarantee that a deployment provides every
+/// required config key + declared secret and references nothing undeclared.
+pub fn deployment(
+    platform: &PlatformManifest,
+    plugins: &BTreeMap<String, PluginManifest>,
+    report: &mut ValidationReport,
+) {
+    for name in &platform.plugins.enabled {
+        let Some(plugin) = plugins.get(name) else {
+            continue;
+        };
+        let table = platform
+            .plugins
+            .overrides
+            .get(name)
+            .and_then(|v| v.as_table());
+        let provided_config = sub_keys(table, "config");
+        let provided_secrets = sub_keys(table, "secrets");
+
+        for (key, field) in &plugin.config {
+            if field.required && field.default.is_none() && !provided_config.contains(key.as_str())
+            {
+                report.error(
+                    "DEPLOY.CONFIG.MISSING",
+                    format!("plugins.{name}.config.{key}"),
+                    format!(
+                        "plugin {name:?} requires config key {key:?}, not set in the deployment"
+                    ),
+                );
+            }
+        }
+        for key in plugin.secrets.keys() {
+            if !provided_secrets.contains(key.as_str()) {
+                report.error(
+                    "DEPLOY.SECRET.MISSING",
+                    format!("plugins.{name}.secrets.{key}"),
+                    format!(
+                        "plugin {name:?} declares secret {key:?}, not provided by the deployment"
+                    ),
+                );
+            }
+        }
+        for key in &provided_config {
+            if !plugin.config.contains_key(*key) {
+                report.error(
+                    "DEPLOY.CONFIG.UNDECLARED",
+                    format!("plugins.{name}.config.{key}"),
+                    format!("config key {key:?} is not declared by plugin {name:?}"),
+                );
+            }
+        }
+        for key in &provided_secrets {
+            if !plugin.secrets.contains_key(*key) {
+                report.error(
+                    "DEPLOY.SECRET.UNDECLARED",
+                    format!("plugins.{name}.secrets.{key}"),
+                    format!("secret {key:?} is not declared by plugin {name:?}"),
+                );
+            }
+        }
+    }
+}
+
+fn sub_keys<'a>(table: Option<&'a toml::Table>, section: &str) -> BTreeSet<&'a str> {
+    table
+        .and_then(|t| t.get(section))
+        .and_then(|v| v.as_table())
+        .map(|t| t.keys().map(String::as_str).collect())
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +342,117 @@ mod tests {
             "#,
         );
         assert_eq!(codes(&m.validate()), vec!["PLUGIN.NAME.INVALID"]);
+    }
+
+    #[test]
+    fn plugin_valid_config_and_secrets_ok() {
+        let m = parse_plugin(
+            r#"
+            [plugin]
+            name = "hello"
+            display_name = "Hello"
+            manifest_schema = 1
+
+            [config.greeting]
+            type = "string"
+            default = "Hi"
+
+            [secrets.api_key]
+            description = "x"
+            "#,
+        );
+        let r = m.validate();
+        assert!(r.is_ok(), "expected no issues, got {:?}", r.issues);
+    }
+
+    #[test]
+    fn plugin_bad_config_key_and_default_type_flagged() {
+        let m = parse_plugin(
+            r#"
+            [plugin]
+            name = "hello"
+            display_name = "Hello"
+            manifest_schema = 1
+
+            [config.BadKey]
+            type = "string"
+
+            [config.count]
+            type = "integer"
+            default = "not-an-int"
+            "#,
+        );
+        let found = codes(&m.validate());
+        assert!(found.contains(&"CONFIG.KEY.FORMAT"), "got {found:?}");
+        assert!(found.contains(&"CONFIG.DEFAULT.TYPE"), "got {found:?}");
+    }
+
+    fn deployment_codes(platform_src: &str, plugins: &[(&str, &str)]) -> Vec<&'static str> {
+        let platform = parse_platform(platform_src);
+        let mut map = BTreeMap::new();
+        for (name, src) in plugins {
+            map.insert((*name).to_string(), parse_plugin(src));
+        }
+        let mut report = ValidationReport::default();
+        super::deployment(&platform, &map, &mut report);
+        codes(&report)
+    }
+
+    const HELLO_SCHEMA: &str = r#"
+        [plugin]
+        name = "hello"
+        display_name = "Hello"
+        manifest_schema = 1
+        [config.greeting]
+        type = "string"
+        default = "Hi"
+        [secrets.api_key]
+        description = "x"
+    "#;
+
+    #[test]
+    fn deployment_consistent_is_ok() {
+        let codes = deployment_codes(
+            "[source]\npath = \".\"\n[plugins]\nenabled = [\"hello\"]\n\
+             [plugins.hello.secrets]\napi_key = \"dev\"\n",
+            &[("hello", HELLO_SCHEMA)],
+        );
+        assert!(codes.is_empty(), "expected no issues, got {codes:?}");
+    }
+
+    #[test]
+    fn deployment_missing_declared_secret_flagged() {
+        let codes = deployment_codes(
+            "[source]\npath = \".\"\n[plugins]\nenabled = [\"hello\"]\n",
+            &[("hello", HELLO_SCHEMA)],
+        );
+        assert_eq!(codes, vec!["DEPLOY.SECRET.MISSING"]);
+    }
+
+    #[test]
+    fn deployment_undeclared_secret_flagged() {
+        let codes = deployment_codes(
+            "[source]\npath = \".\"\n[plugins]\nenabled = [\"hello\"]\n\
+             [plugins.hello.secrets]\napi_key = \"dev\"\nrogue = \"x\"\n",
+            &[("hello", HELLO_SCHEMA)],
+        );
+        assert_eq!(codes, vec!["DEPLOY.SECRET.UNDECLARED"]);
+    }
+
+    #[test]
+    fn plugin_bad_secret_name_flagged() {
+        let m = parse_plugin(
+            r#"
+            [plugin]
+            name = "hello"
+            display_name = "Hello"
+            manifest_schema = 1
+
+            [secrets.BadName]
+            description = "x"
+            "#,
+        );
+        assert_eq!(codes(&m.validate()), vec!["SECRET.NAME.FORMAT"]);
     }
 
     #[test]

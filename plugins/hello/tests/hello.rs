@@ -37,6 +37,40 @@ async fn unknown_route_404s() {
 }
 
 #[test]
+fn generated_config_applies_declared_default() {
+    use hello_plugin::Config;
+    use junius_sdk::PluginConfig;
+
+    let cfg = Config::load(&PluginConfig::empty()).unwrap();
+    assert_eq!(cfg.greeting, "Hello");
+}
+
+#[test]
+fn generated_config_reads_override() {
+    use hello_plugin::Config;
+    use junius_sdk::PluginConfig;
+
+    let mut table = toml::Table::new();
+    table.insert(
+        "greeting".to_string(),
+        toml::Value::String("Hi".to_string()),
+    );
+    let cfg = Config::load(&PluginConfig::from_table(table)).unwrap();
+    assert_eq!(cfg.greeting, "Hi");
+}
+
+#[test]
+fn generated_secrets_accessor_reads_declared_secret() {
+    use hello_plugin::Secrets;
+    use junius_sdk::SecretStore;
+
+    let store = SecretStore::from_pairs([("api_key".to_string(), "xyz".to_string())]);
+    let secrets = Secrets::new(&store);
+    assert_eq!(secrets.api_key().expose(), "xyz");
+    // `secrets.undeclared()` would be a compile error — no method is generated.
+}
+
+#[test]
 fn metadata_reports_the_right_mount() {
     let plugin = HelloPlugin::new();
     let m = plugin.metadata();

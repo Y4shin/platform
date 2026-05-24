@@ -1,5 +1,7 @@
 //! Axum server: compose the router, bind, serve with graceful shutdown.
 
+use std::collections::BTreeMap;
+
 use axum::routing::get;
 use axum::{Extension, Router};
 use junius_sdk::Plugin;
@@ -7,7 +9,7 @@ use sqlx::PgPool;
 
 use crate::auth::{self, AuthState};
 use crate::boot;
-use crate::config::HostConfig;
+use crate::config::{HostConfig, PluginRuntime};
 use crate::db::{DbBootstrap, PluginPools};
 
 /// Compose the host base + plugin routes **without** database-backed services.
@@ -25,9 +27,10 @@ pub fn build_app_with_services(
     plugins: &[Box<dyn Plugin>],
     pools: &PluginPools,
     platform_pool: &PgPool,
+    runtimes: &BTreeMap<String, PluginRuntime>,
     auth_state: AuthState,
 ) -> Router {
-    let (http, rpc) = compose(plugins, Some((pools, platform_pool)));
+    let (http, rpc) = compose(plugins, Some((pools, platform_pool, runtimes)));
     let protected = http
         .nest("/rpc", rpc)
         .route("/api/me", get(auth::me::handler))
@@ -46,7 +49,7 @@ pub fn build_app_with_services(
 /// `PluginResourceCtx` as an `Extension` when `services` is provided.
 fn compose(
     plugins: &[Box<dyn Plugin>],
-    services: Option<(&PluginPools, &PgPool)>,
+    services: Option<(&PluginPools, &PgPool, &BTreeMap<String, PluginRuntime>)>,
 ) -> (Router, Router) {
     let mut http = Router::new();
     let mut rpc = Router::new();
@@ -55,9 +58,10 @@ fn compose(
         let mut plugin_http = plugin.routes();
         let mut plugin_rpc = plugin.rpc_routes();
 
-        if let Some((pools, platform_pool)) = services {
+        if let Some((pools, platform_pool, runtimes)) = services {
             if let Some(db) = pools.get(metadata.name) {
-                let ctx = boot::build_ctx(metadata.name, db, platform_pool);
+                let runtime = runtimes.get(metadata.name).cloned().unwrap_or_default();
+                let ctx = boot::build_ctx(metadata.name, db, platform_pool, &runtime);
                 plugin_http = plugin_http.layer(Extension(ctx.clone()));
                 plugin_rpc = plugin_rpc.layer(Extension(ctx));
             } else {
@@ -98,7 +102,7 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         )
         .await?;
 
-    boot::run_startup(&plugins, &pools, &platform_pool).await?;
+    boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins).await?;
 
     // Dev redirect target; prod overrides via config in a later milestone.
     let redirect_uri = format!(
@@ -108,7 +112,13 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
     let auth_state =
         AuthState::from_config(platform_pool.clone(), resolved, &redirect_uri, false).await;
 
-    let app = build_app_with_services(&plugins, &pools, &platform_pool, auth_state);
+    let app = build_app_with_services(
+        &plugins,
+        &pools,
+        &platform_pool,
+        &config.plugins,
+        auth_state,
+    );
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
     let local_addr = listener.local_addr()?;
@@ -123,6 +133,6 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         .with_graceful_shutdown(shutdown)
         .await?;
 
-    boot::run_shutdown(&plugins, &pools, &platform_pool).await;
+    boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins).await;
     Ok(())
 }

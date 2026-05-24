@@ -3,3 +3,17 @@ name = "hello"
 display_name = "Hello"
 description = "Smoke-test plugin exercising the platform shape."
 manifest_schema = 1
+
+# Typed config schema (M06). Codegen emits a `Config` struct; the deployment may
+# override `greeting` under [plugins.hello.config].
+[config.greeting]
+type = "string"
+required = false
+default = "Hello"
+description = "Greeting prefix used by the hello plugin."
+
+# A declared secret (M06). Codegen emits `Secrets::api_key()`; the deployment
+# supplies the value under [plugins.hello.secrets]. Unused by hello's handlers —
+# present to exercise the secrets codegen end-to-end.
+[secrets.api_key]
+description = "Example secret demonstrating the secrets codegen."

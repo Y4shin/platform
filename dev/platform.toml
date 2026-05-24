@@ -17,3 +17,8 @@ oidc_client_id         = "platform"
 oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
 session_encryption_key = "env:SESSION_KEY"
 role_password_secret   = "env:ROLE_PW_SECRET"
+
+# Per-plugin config/secrets. hello's `greeting` uses its declared default; the
+# api_key secret uses a literal dev value (prod would use env: indirection).
+[plugins.hello.secrets]
+api_key = "dev-hello-key"

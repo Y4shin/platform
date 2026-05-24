@@ -110,10 +110,28 @@ fn check_plugin(path: &Path, src: &str, format: OutputFormat) -> i32 {
 }
 
 fn check_platform(path: &Path, src: &str, format: OutputFormat) -> i32 {
-    match PlatformManifest::parse(src) {
-        Ok(manifest) => report(path, src, &manifest.validate(), format),
-        Err(e) => emit_parse_error(path, src, &e, format),
+    let manifest = match PlatformManifest::parse(src) {
+        Ok(m) => m,
+        Err(e) => return emit_parse_error(path, src, &e, format),
+    };
+
+    let mut validation = manifest.validate();
+
+    // Cross-check the deployment's per-plugin config/secrets against each
+    // enabled plugin's declared schema. Best-effort: plugins whose manifest
+    // isn't on disk (relative to cwd) are skipped.
+    let mut plugins = std::collections::BTreeMap::new();
+    for name in &manifest.plugins.enabled {
+        let plugin_toml = PathBuf::from("plugins").join(name).join("plugin.toml");
+        if let Ok(plugin_src) = std::fs::read_to_string(&plugin_toml) {
+            if let Ok(plugin) = PluginManifest::parse(&plugin_src) {
+                plugins.insert(name.clone(), plugin);
+            }
+        }
     }
+    junius_manifest::validate::deployment(&manifest, &plugins, &mut validation);
+
+    report(path, src, &validation, format)
 }
 
 fn report(path: &Path, src: &str, report: &ValidationReport, format: OutputFormat) -> i32 {

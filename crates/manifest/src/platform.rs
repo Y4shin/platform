@@ -26,8 +26,10 @@ pub struct SourceConfig {
     pub path: Option<String>,
 }
 
+// NOTE: no `deny_unknown_fields` here — serde does not support it alongside
+// `#[serde(flatten)]`, and the flatten *is* the catch-all for `[plugins.<name>]`
+// override tables.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct PluginsConfig {
     pub enabled: Vec<String>,
     /// Per-plugin override tables: `[plugins.<name>]`. Stored verbatim.

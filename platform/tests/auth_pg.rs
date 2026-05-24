@@ -98,7 +98,13 @@ async fn api_me_round_trip_and_logout() {
     let session_id = seed_session(&pool).await;
 
     let auth_state = AuthState::for_test(pool.clone(), "test-session-key");
-    let app = server::build_app_with_services(&[], &PluginPools::empty(), &pool, auth_state);
+    let app = server::build_app_with_services(
+        &[],
+        &PluginPools::empty(),
+        &pool,
+        &std::collections::BTreeMap::new(),
+        auth_state,
+    );
 
     // /api/me with a valid session cookie → 200 + camelCase nested JSON.
     let resp = app

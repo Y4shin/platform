@@ -14,7 +14,7 @@ pub use grants::{
 };
 pub use platform::{PlatformManifest, PluginsConfig, SourceConfig};
 pub use plugin::{
-    ExposedComponent, ExposedTable, PluginDep, PluginExposes, PluginIdentity, PluginManifest,
-    PluginMount, PluginRequires,
+    ConfigField, ConfigType, ExposedComponent, ExposedTable, PluginDep, PluginExposes,
+    PluginIdentity, PluginManifest, PluginMount, PluginRequires, SecretDecl,
 };
 pub use secrets::{ResolvedConfig, SecretRef, resolve_config};
