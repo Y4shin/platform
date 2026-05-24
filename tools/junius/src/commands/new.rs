@@ -12,7 +12,7 @@ pub fn run(cmd: &NewCmd, format: OutputFormat) -> i32 {
         NewCmd::Plugin { name } => scaffold_plugin(name, format),
         NewCmd::Component { .. } => not_implemented("new component", "M07"),
         NewCmd::Rpc { .. } => not_implemented("new rpc", "M05"),
-        NewCmd::Migration { .. } => not_implemented("new migration", "M06"),
+        NewCmd::Migration { plugin, name } => scaffold_migration(plugin, name),
         NewCmd::Permission { .. } => not_implemented("new permission", "M07"),
     }
 }
@@ -46,6 +46,87 @@ fn scaffold_plugin(name: &str, format: OutputFormat) -> i32 {
         config: None,
     };
     super::sync::run(&sync_args, format)
+}
+
+fn scaffold_migration(plugin: &str, name: &str) -> i32 {
+    if !is_valid_plugin_name(plugin) {
+        eprintln!("junius: invalid plugin name {plugin:?}");
+        return exit::VALIDATION;
+    }
+    if !is_valid_migration_name(name) {
+        eprintln!("junius: invalid migration name {name:?}; must match ^[a-z][a-z0-9_]*$");
+        return exit::VALIDATION;
+    }
+
+    let plugin_dir: PathBuf = ["plugins", plugin].iter().collect();
+    if !plugin_dir.exists() {
+        eprintln!("junius: no such plugin directory: {}", plugin_dir.display());
+        return exit::PARSE_ERROR;
+    }
+
+    let migrations_dir = plugin_dir.join("migrations");
+    let existing = read_migration_names(&migrations_dir);
+    let number = next_migration_number(existing.iter().map(String::as_str));
+    let filename = format!("{number:04}_{name}.up.sql");
+    let path = migrations_dir.join(&filename);
+    if path.exists() {
+        eprintln!("junius: migration already exists: {}", path.display());
+        return exit::PARSE_ERROR;
+    }
+
+    let template = "-- @requires platform:0007_audit_event\n\
+         -- Add an @requires line for each cross-plugin table this migration references,\n\
+         -- in the form `-- @requires <plugin>:<migration_name>`.\n\
+         \n\
+         -- Migration body goes here.\n";
+
+    if let Err(code) = create(&migrations_dir) {
+        return code;
+    }
+    if let Err(code) = write(&path, template) {
+        return code;
+    }
+    eprintln!("junius: created migration {}", path.display());
+    exit::OK
+}
+
+fn is_valid_migration_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// Read the `NNNN_name` stems of existing `*.up.sql` files in `dir`.
+fn read_migration_names(dir: &std::path::Path) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if let Some(stem) = entry
+                .file_name()
+                .to_str()
+                .and_then(|n| n.strip_suffix(".up.sql"))
+            {
+                names.push(stem.to_string());
+            }
+        }
+    }
+    names
+}
+
+/// Next zero-padded sequence number: max existing `NNNN_` prefix + 1 (1 if none).
+fn next_migration_number<'a>(stems: impl Iterator<Item = &'a str>) -> u32 {
+    let mut max = 0u32;
+    for stem in stems {
+        if let Some((num, _)) = stem.split_once('_') {
+            if let Ok(n) = num.parse::<u32>() {
+                max = max.max(n);
+            }
+        }
+    }
+    max + 1
 }
 
 fn is_valid_plugin_name(name: &str) -> bool {
@@ -189,5 +270,24 @@ mod tests {
         assert_eq!(pascal_case("hello"), "Hello");
         assert_eq!(pascal_case("hello-world"), "HelloWorld");
         assert_eq!(pascal_case("user_admin"), "UserAdmin");
+    }
+
+    #[test]
+    fn migration_name_validation() {
+        assert!(is_valid_migration_name("create_speaker"));
+        assert!(is_valid_migration_name("add_index2"));
+        assert!(!is_valid_migration_name("Create"));
+        assert!(!is_valid_migration_name("with-dash"));
+        assert!(!is_valid_migration_name(""));
+    }
+
+    #[test]
+    fn next_number_from_existing_stems() {
+        assert_eq!(next_migration_number(std::iter::empty()), 1);
+        let stems = ["0001_users", "0003_audit", "0002_sessions"];
+        assert_eq!(next_migration_number(stems.into_iter()), 4);
+        // Non-numeric prefixes are ignored.
+        let mixed = ["bogus_name", "0005_x"];
+        assert_eq!(next_migration_number(mixed.into_iter()), 6);
     }
 }

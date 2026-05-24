@@ -46,7 +46,7 @@ pub enum Command {
     Build(BuildArgs),
     /// One-command developer loop. (Stub — lands in M04.)
     Dev(DevArgs),
-    /// Database migrations. (Stub — lands in M06.)
+    /// Apply database migrations and emit per-plugin Postgres role grants.
     Migrate {
         #[command(subcommand)]
         subcommand: MigrateCmd,
@@ -110,12 +110,21 @@ pub struct DevArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum MigrateCmd {
-    /// Apply all pending migrations.
-    Up,
-    /// Roll back the most recently applied migration.
+    /// Apply all pending migrations, then emit per-plugin Postgres role grants.
+    Up {
+        /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Roll back the most recently applied migration. Not supported in v1
+    /// (forward-fix discipline — write a new migration instead).
     Down,
     /// Show applied and pending migrations.
-    Status,
+    Status {
+        /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

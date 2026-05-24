@@ -12,6 +12,9 @@ serde_json = { workspace = true }
 toml       = { workspace = true }
 thiserror  = { workspace = true }
 regex      = { workspace = true }
+# Role-password derivation (HMAC-SHA256). Pure compute; no IO.
+hmac       = { workspace = true }
+sha2       = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

@@ -6,6 +6,21 @@ pub enum ManifestError {
     Toml(#[from] toml::de::Error),
 }
 
+/// Failures resolving a `[config]` value or secret indirection.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum SecretError {
+    #[error("required config key {0:?} is missing")]
+    MissingKey(String),
+    #[error("config key {0:?} must be a string")]
+    NotAString(String),
+    #[error("secret reference uses an unsupported scheme {0:?}")]
+    UnsupportedScheme(String),
+    #[error("`env:` secret reference has an empty variable name")]
+    EmptyTarget,
+    #[error("environment variable {0:?} (referenced by config) is not set")]
+    EnvMissing(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     Error,

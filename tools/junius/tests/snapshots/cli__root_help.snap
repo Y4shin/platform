@@ -11,7 +11,7 @@ Commands:
   sync     Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config
   build    Build a deployment binary. (Stub — lands in M04.)
   dev      One-command developer loop. (Stub — lands in M04.)
-  migrate  Database migrations. (Stub — lands in M06.)
+  migrate  Apply database migrations and emit per-plugin Postgres role grants
   plugin   Plugin inspection and lifecycle
   new      Scaffold new plugins, components, RPC services, migrations, permissions
 

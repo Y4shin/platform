@@ -6,3 +6,14 @@ path = "."
 
 [plugins]
 enabled = ["hello"]
+
+# Host configuration. Secrets use `env:VAR` indirection so they aren't committed;
+# export OIDC_CLIENT_SECRET / SESSION_KEY / ROLE_PW_SECRET before running the
+# host or `junius migrate`. See dev/docker-compose.yml for the local stack.
+[config]
+database_url           = "postgres://platform_migrator:dev-only@localhost:5432/platform"
+oidc_issuer            = "http://localhost:9000/application/o/junius/"
+oidc_client_id         = "platform"
+oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
+session_encryption_key = "env:SESSION_KEY"
+role_password_secret   = "env:ROLE_PW_SECRET"

@@ -2,13 +2,13 @@
 source: tools/junius/tests/cli.rs
 expression: stdout
 ---
-Database migrations. (Stub — lands in M06.)
+Apply database migrations and emit per-plugin Postgres role grants
 
 Usage: junius migrate [OPTIONS] <COMMAND>
 
 Commands:
-  up      Apply all pending migrations
-  down    Roll back the most recently applied migration
+  up      Apply all pending migrations, then emit per-plugin Postgres role grants
+  down    Roll back the most recently applied migration. Not supported in v1 (forward-fix discipline — write a new migration instead)
   status  Show applied and pending migrations
 
 Options:

@@ -55,6 +55,19 @@ bytes       = "1"
 # Database (used heavily from M06)
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
 
+# Migrations + crypto + auth (M06)
+petgraph      = "0.6"
+sha2          = "0.10"
+hmac          = "0.12"
+aes-gcm       = "0.10"
+rand          = "0.8"
+tower-cookies = "0.10"
+openidconnect = { version = "3", default-features = false, features = ["reqwest", "rustls-tls"] }
+
+# Integration testing against ephemeral Postgres (M06, dev-only)
+testcontainers         = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+
 # Workspace crates
 junius-manifest    = { path = "crates/manifest" }
 junius-sdk         = { path = "crates/junius-sdk" }

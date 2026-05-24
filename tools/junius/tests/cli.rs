@@ -331,13 +331,23 @@ fn cwd_flag_resolves_relative_paths_against_target_dir() {
 // stubs.)
 
 #[test]
-fn migrate_up_stub_exits_64() {
+fn migrate_down_unsupported_exits_64() {
     cmd()
-        .args(["migrate", "up"])
+        .args(["migrate", "down"])
         .assert()
         .failure()
         .code(64)
-        .stderr(predicate::str::contains("not yet implemented"));
+        .stderr(predicate::str::contains("not supported"));
+}
+
+#[test]
+fn migrate_up_missing_config_errors() {
+    cmd()
+        .args(["migrate", "up", "--config", "does-not-exist.toml"])
+        .assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("cannot read"));
 }
 
 #[test]
