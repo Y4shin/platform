@@ -36,3 +36,17 @@ description = "Greetings created via the hello plugin."
 [exposes.tables.note]
 schema = "hello"
 description = "Access-controlled notes (owner/share demo)."
+
+# A read-mostly lookup table (M09). `greetings` declares a *required* dep on this
+# table and reads it via a cross-plugin SQL JOIN; the existing grants
+# (crates/manifest) GRANT role_greetings SELECT on hello.greeting_template.
+[exposes.tables.greeting_template]
+schema = "hello"
+description = "Named greeting templates (e.g. default, formal) other plugins build on."
+
+# A React component (M09) other plugins import directly. `greetings` lists hello
+# as a required dep and imports `GreeterCard` from `@junius/plugin-hello`; the
+# module path is relative to this plugin's frontend `src/`.
+[exposes.components.GreeterCard]
+module = "./lib/GreeterCard"
+description = "Renders a greeting preview; consumed by the greetings plugin."

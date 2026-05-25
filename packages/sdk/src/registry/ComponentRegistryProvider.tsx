@@ -1,18 +1,33 @@
 /**
- * Cross-plugin component registry. At M04 the registry is always empty —
- * `getComponent(key)` returns `undefined` for every key. M09 wires up real
- * cross-plugin component sharing and `junius sync` populates the registry
- * from each plugin's `[exposes.components]` manifest section.
+ * Cross-plugin component registry. A plugin exposes components via
+ * `[exposes.components]` in its `plugin.toml`; `junius sync` generates the
+ * runtime registry (the host's `componentRegistry`) and, for each consuming
+ * plugin, a `declare module '@junius/sdk'` augmentation of [`ComponentRegistry`]
+ * so `useComponent` is keyed and typed per consumer.
  */
 
 import { type ComponentType, createContext, type ReactNode, useContext } from 'react';
 
-export type ComponentRegistry = Record<string, ComponentType<unknown>>;
+/**
+ * Typed map of `'<plugin>.<Component>'` → that component's React type. Empty by
+ * default and **augmented** per consumer by `junius sync` (declaration merging),
+ * so `keyof ComponentRegistry` lists exactly the components a consumer's declared
+ * dependencies expose. Drives `useComponent`'s key checking and return type.
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: open for cross-package augmentation.
+export interface ComponentRegistry {}
 
-const RegistryContext = createContext<ComponentRegistry>({});
+/**
+ * Runtime store the provider holds: keys → components, type-erased (the per-key
+ * types live in [`ComponentRegistry`]). `ComponentType<never>` accepts any
+ * component for storage; `useComponent` casts back to the precise type on lookup.
+ */
+export type ComponentRegistryValue = Record<string, ComponentType<never>>;
+
+const RegistryContext = createContext<ComponentRegistryValue>({});
 
 export interface ComponentRegistryProviderProps {
-  registry?: ComponentRegistry;
+  registry?: ComponentRegistryValue;
   children: ReactNode;
 }
 
@@ -23,6 +38,6 @@ export function ComponentRegistryProvider({
   return <RegistryContext.Provider value={registry}>{children}</RegistryContext.Provider>;
 }
 
-export function useComponentRegistry(): ComponentRegistry {
+export function useComponentRegistry(): ComponentRegistryValue {
   return useContext(RegistryContext);
 }

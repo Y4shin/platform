@@ -110,6 +110,9 @@ importers:
       '@junius/plugin-hello':
         specifier: workspace:*
         version: link:../../plugins/hello/frontend
+      '@junius/plugin-widgets':
+        specifier: workspace:*
+        version: link:../../plugins/widgets/frontend
       '@junius/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -172,6 +175,37 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.6
+
+  plugins/widgets/frontend:
+    dependencies:
+      '@junius/design':
+        specifier: workspace:*
+        version: link:../../../packages/design
+    devDependencies:
+      '@tanstack/react-router':
+        specifier: ^1.95.0
+        version: 1.170.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@testing-library/jest-dom':
+        specifier: ^6.5.0
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.0.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.15
+      jsdom:
+        specifier: ^25.0.0
+        version: 25.0.1
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(jsdom@25.0.1)(lightningcss@1.32.0)
 
 packages:
 

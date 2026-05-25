@@ -1,0 +1,17 @@
+[plugin]
+name = "widgets"
+display_name = "Widgets"
+description = "UI-only plugin exposing reusable React components for other plugins."
+manifest_schema = 1
+
+# A UI-only plugin: no tables, no RPC, no resources. It only exposes a component.
+[permissions]
+"widgets:read" = "View widgets-contributed UI."
+
+# The component other plugins consume. `greetings` declares an *optional* dep on
+# widgets and looks this up at runtime via `useComponent('widgets.VenuePicker')`,
+# falling back to a plain input when widgets is disabled. Module path is relative
+# to this plugin's frontend `src/`.
+[exposes.components.VenuePicker]
+module = "./lib/VenuePicker"
+description = "Pick a venue from a curated list; consumed by the greetings plugin."

@@ -13,6 +13,7 @@ export {
 export type {
   ComponentRegistry,
   ComponentRegistryProviderProps,
+  ComponentRegistryValue,
 } from './registry/ComponentRegistryProvider.js';
 
 export {

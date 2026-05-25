@@ -2535,6 +2535,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "widgets-plugin",
 ]
 
 [[package]]
@@ -4697,6 +4698,18 @@ checksum = "5d4a4db5077702ca3015d3d02d74974948aba2ad9e12ab7df718ee64ccd7e97d"
 dependencies = [
  "libredox",
  "wasite",
+]
+
+[[package]]
+name = "widgets-plugin"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "http 1.4.0",
+ "junius-sdk",
+ "tokio",
+ "tower",
 ]
 
 [[package]]

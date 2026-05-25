@@ -17,6 +17,16 @@ fn sync_with_hello_writes_expected_files() {
     let tmp = tempdir();
     make_repo(tmp.path(), &["hello"]);
 
+    // hello is an RPC-bearing plugin: a `proto/` dir makes `sync` emit its RPC
+    // barrel. UI-only plugins (no `proto/`) get none — see `widgets`.
+    let proto_dir = tmp.path().join("plugins/hello/proto/hello/v1");
+    fs::create_dir_all(&proto_dir).unwrap();
+    fs::write(
+        proto_dir.join("hello.proto"),
+        "syntax = \"proto3\";\npackage hello.v1;\n",
+    )
+    .unwrap();
+
     cmd_in(tmp.path()).args(["sync"]).assert().success();
 
     let plugins_rs =

@@ -17,6 +17,7 @@
     "@junius/design": "workspace:*",
     "@junius/generated": "workspace:*",
     "@junius/plugin-hello": "workspace:*",
+    "@junius/plugin-widgets": "workspace:*",
     "@junius/sdk": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-router": "^1.95.0",

@@ -20,7 +20,8 @@
       "!**/target",
       "!**/*.css",
       "!platform/frontend/src/generated",
-      "!packages/generated/src"
+      "!packages/generated/src",
+      "!plugins/*/frontend/src/generated"
     ]
   },
   "formatter": {
