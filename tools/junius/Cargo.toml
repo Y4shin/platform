@@ -42,10 +42,14 @@ petgraph = { workspace = true }
 # Cross-plugin migration SQL analysis (M09 `junius check`)
 sqlparser = { workspace = true }
 
+# Source resolution (M11): blake3 content hashes for platform.lock.
+blake3 = { workspace = true }
+
 [dev-dependencies]
 insta      = { workspace = true }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
+tempfile   = { workspace = true }
 
 # Ephemeral Postgres for the migration-runner integration tests (M06).
 # junius-manifest/sqlx/tokio are also normal deps; integration-test crates can

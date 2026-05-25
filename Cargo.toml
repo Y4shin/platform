@@ -98,6 +98,10 @@ sha2          = "0.10"
 hmac          = "0.12"
 aes-gcm       = "0.10"
 base64        = "0.22"
+# Content hashing for platform.lock (junius CLI only).
+blake3        = "1"
+# Temp dirs for CLI tests (source-resolution git fixtures, hashing trees).
+tempfile      = "3"
 rand          = "0.8"
 tower-cookies = { version = "0.11", features = ["private"] }
 openidconnect = { version = "3", default-features = false, features = ["reqwest", "rustls-tls"] }

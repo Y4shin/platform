@@ -1,10 +1,13 @@
 //! `junius` — Junius management CLI. See `src/cli.rs` for the user-facing surface.
 
+mod cache;
 mod cli;
 mod commands;
 mod exit;
+mod hash;
 mod markers;
 mod output;
+mod source;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
