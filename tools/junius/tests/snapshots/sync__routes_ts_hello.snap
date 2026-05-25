@@ -7,22 +7,26 @@ expression: routes_ts
 
 import { createRoute } from '@tanstack/react-router';
 
-import { rootRoute } from '../router/root.js';
+import { authedLayoutRoute, rootRoute } from '../router/root.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
 
 const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/',
   component: () => null,
 });
 
 const helloParent = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/p/hello',
 });
 helloParent.addChildren(buildHello(helloParent));
 
 export const routeTree = rootRoute.addChildren([
-  indexRoute,
-  helloParent,
+  authedLayoutRoute.addChildren([
+    indexRoute,
+    helloParent,
+  ]),
 ]);
+
+export const PUBLIC_ROUTE_PREFIXES: string[] = [];

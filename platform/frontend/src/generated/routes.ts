@@ -3,46 +3,59 @@
 
 import { createRoute } from '@tanstack/react-router';
 
-import { rootRoute } from '../router/root.js';
+import { authedLayoutRoute, rootRoute } from '../router/root.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
 import { buildRoutes as buildGreetings } from '@junius/plugin-greetings';
 import { buildRoutes as buildWidgets } from '@junius/plugin-widgets';
-import { buildRoutes as buildEvents } from '@junius/plugin-events';
+import { buildRoutes as buildEvents, buildPublicRoutes as buildEventsPublic } from '@junius/plugin-events';
 
 const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/',
   component: () => null,
 });
 
 const helloParent = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/p/hello',
 });
 helloParent.addChildren(buildHello(helloParent));
 
 const greetingsParent = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/p/greetings',
 });
 greetingsParent.addChildren(buildGreetings(greetingsParent));
 
 const widgetsParent = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/p/widgets',
 });
 widgetsParent.addChildren(buildWidgets(widgetsParent));
 
 const eventsParent = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authedLayoutRoute,
   path: '/p/events',
 });
 eventsParent.addChildren(buildEvents(eventsParent));
 
+const eventsPublicParent = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/i/events',
+});
+eventsPublicParent.addChildren(buildEventsPublic(eventsPublicParent));
+
 export const routeTree = rootRoute.addChildren([
-  indexRoute,
-  helloParent,
-  greetingsParent,
-  widgetsParent,
-  eventsParent,
+  authedLayoutRoute.addChildren([
+    indexRoute,
+    helloParent,
+    greetingsParent,
+    widgetsParent,
+    eventsParent,
+  ]),
+  eventsPublicParent,
 ]);
+
+export const PUBLIC_ROUTE_PREFIXES: string[] = [
+  '/i/events',
+];

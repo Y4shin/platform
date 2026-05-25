@@ -29,10 +29,17 @@ export interface AuthProviderProps {
    * fetching or redirecting (tests, storybook, SSR).
    */
   user?: User | null;
+  /**
+   * Path prefixes that are login-optional: still attempt `/api/me` (so a
+   * logged-in visitor is upgraded), but on a 401 stay unauthenticated and
+   * render children instead of redirecting to login. Used for public pages
+   * like a plugin's `/i/<name>` invite surface.
+   */
+  publicPaths?: string[];
   children: ReactNode;
 }
 
-export function AuthProvider({ user: override, children }: AuthProviderProps) {
+export function AuthProvider({ user: override, publicPaths, children }: AuthProviderProps) {
   const hasOverride = override !== undefined;
   const [user, setUser] = useState<User | null>(hasOverride ? override : null);
   const [status, setStatus] = useState<AuthStatus>(
@@ -43,6 +50,11 @@ export function AuthProvider({ user: override, children }: AuthProviderProps) {
     if (hasOverride) {
       return;
     }
+    const redirectIfPrivate = () => {
+      if (!isPublicPath(publicPaths)) {
+        goToLogin();
+      }
+    };
     let cancelled = false;
     fetchMe()
       .then((fetched) => {
@@ -54,19 +66,19 @@ export function AuthProvider({ user: override, children }: AuthProviderProps) {
           setStatus('authed');
         } else {
           setStatus('unauth');
-          goToLogin();
+          redirectIfPrivate();
         }
       })
       .catch(() => {
         if (!cancelled) {
           setStatus('unauth');
-          goToLogin();
+          redirectIfPrivate();
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [hasOverride]);
+  }, [hasOverride, publicPaths]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, isAuthenticated: user !== null, status }),
@@ -88,6 +100,11 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth must be called inside an <AuthProvider>');
   }
   return ctx;
+}
+
+/** Whether the current path is under one of the login-optional prefixes. */
+export function isPublicPath(publicPaths?: string[]): boolean {
+  return (publicPaths ?? []).some((p) => window.location.pathname.startsWith(p));
 }
 
 /** Redirect the browser to the host login, preserving the current path. */

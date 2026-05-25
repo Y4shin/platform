@@ -1,1 +1,1 @@
-export { buildRoutes } from './routes/index.js';
+export { buildPublicRoutes, buildRoutes } from './routes/index.js';

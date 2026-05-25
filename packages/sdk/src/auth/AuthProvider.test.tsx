@@ -84,6 +84,27 @@ describe('AuthProvider', () => {
     expect(String(assign.mock.calls[0]?.[0])).toContain('/api/auth/login?return_to=');
   });
 
+  it('does not redirect on a 401 when the path is login-optional', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { pathname: '/i/events/abc123', search: '', assign },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ status: 401, json: async () => ({}) })),
+    );
+    render(
+      <AuthProvider publicPaths={['/i/events']}>
+        <UserView />
+      </AuthProvider>,
+    );
+    // Renders children as anonymous; never redirects to login.
+    const auth = await screen.findByTestId('auth');
+    expect(auth.textContent).toBe('no');
+    expect(screen.getByTestId('name').textContent).toBe('none');
+    expect(assign).not.toHaveBeenCalled();
+  });
+
   it('uses an injected user without fetching', () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);

@@ -3,6 +3,10 @@ name = "events"
 display_name = "Events"
 description = "Events (user- or group-owned, private or public) with sign-up invite pages and iCalendar export."
 manifest_schema = 1
+# Opt in to a public (login-optional) frontend surface. `junius sync` mounts
+# this plugin's `buildPublicRoutes` at `/i/events` outside the authed shell —
+# the invite page renders for logged-out visitors (M13).
+public_routes = true
 
 # Permissions (M07). `plugin_metadata!()` generates a marker type per key
 # (`permissions::EventsRead`, …); repo methods + RPC `option (platform.requires)`

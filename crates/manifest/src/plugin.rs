@@ -91,6 +91,11 @@ pub struct PluginIdentity {
     #[serde(default)]
     pub description: Option<String>,
     pub manifest_schema: u32,
+    /// Opt in to a public (login-optional) frontend surface: the plugin's
+    /// `frontend/src` exports `buildPublicRoutes`, which `junius sync` mounts at
+    /// `/i/<name>` outside the authed shell (M13). Default `false`.
+    #[serde(default)]
+    pub public_routes: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
