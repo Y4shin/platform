@@ -1,8 +1,8 @@
-//! In-process tests for the hello plugin's RPC surface. The host nests
-//! `Plugin::rpc_routes()` under `/rpc`, so we add the same prefix here to mirror
-//! real URLs. We exercise the Connect JSON codec end-to-end; protocol-level
-//! correctness (binary framing, streaming, compression) is `connectrpc`'s own
-//! conformance responsibility, not ours to re-test.
+//! In-process tests for the hello plugin's RPC surface. The host folds each
+//! plugin's `register_rpc` into one connectrpc router under `/rpc`; here we build
+//! a one-plugin router the same way. We exercise the Connect JSON codec
+//! end-to-end; protocol-level correctness (binary framing, streaming,
+//! compression) is `connectrpc`'s own conformance responsibility.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -14,7 +14,8 @@ use junius_sdk::Plugin;
 use tower::ServiceExt;
 
 fn rpc_app() -> Router {
-    Router::new().nest("/rpc", HelloPlugin::new().rpc_routes())
+    let connect = HelloPlugin::new().register_rpc(connectrpc::Router::new());
+    Router::new().nest("/rpc", connect.into_axum_router())
 }
 
 async fn greet_json(name_json_body: &'static str) -> (StatusCode, serde_json::Value) {

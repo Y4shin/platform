@@ -8,12 +8,41 @@
 //! request extensions (set by the session middleware), rejecting with a
 //! Connect-shaped error before dispatch.
 
-use axum::extract::Request;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use junius_sdk::{ApiError, User};
+use junius_sdk::{ApiError, PluginResourceCtx, User};
 
-use crate::generated::rpc_requires::RPC_REQUIRES;
+use crate::generated::rpc_requires::{RPC_REQUIRES, RPC_SERVICES};
+
+/// The plugin that owns the service at this post-nest path (`/<service>/<method>`).
+fn plugin_for_path(path: &str) -> Option<&'static str> {
+    let (service, _method) = path.strip_prefix('/')?.rsplit_once('/')?;
+    RPC_SERVICES
+        .iter()
+        .find(|(s, _)| *s == service)
+        .map(|(_, plugin)| *plugin)
+}
+
+/// Attach the owning plugin's `PluginResourceCtx` to the request, so the
+/// aggregated `/rpc` router's handler reads *its* plugin's context via
+/// `PluginContext::from_rpc`. (HTTP routes get this per-subtree; RPC shares one
+/// router, so the right ctx is selected per request by service FQN.)
+pub(crate) async fn inject_ctx(
+    State(ctxs): State<Arc<HashMap<String, PluginResourceCtx>>>,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    if let Some(plugin) = plugin_for_path(req.uri().path()) {
+        if let Some(ctx) = ctxs.get(plugin) {
+            req.extensions_mut().insert(ctx.clone());
+        }
+    }
+    next.run(req).await
+}
 
 /// Look up a method's required permissions by its post-nest path
 /// (`/<service>/<method>`). `None` = not annotated → no requirement.
@@ -42,4 +71,24 @@ pub async fn require_permissions(req: Request, next: Next) -> Response {
         }
     }
     next.run(req).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_resolves_to_owning_plugin() {
+        // RPC_SERVICES is generated; hello's services map to "hello".
+        assert_eq!(
+            plugin_for_path("/hello.v1.HelloService/Greet"),
+            Some("hello")
+        );
+        assert_eq!(
+            plugin_for_path("/hello.v1.NoteService/ListNotes"),
+            Some("hello")
+        );
+        assert_eq!(plugin_for_path("/unknown.v1.Svc/M"), None);
+        assert_eq!(plugin_for_path("/malformed"), None);
+    }
 }

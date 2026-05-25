@@ -269,9 +269,8 @@ impl Plugin for HelloPlugin {
             .route("/greetings", get(list_greetings))
     }
 
-    fn rpc_routes(&self) -> Router {
-        let router = Arc::new(HelloRpc).register(connectrpc::Router::new());
-        let router = Arc::new(NoteRpc).register(router);
-        router.into_axum_router()
+    fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
+        let router = Arc::new(HelloRpc).register(router);
+        Arc::new(NoteRpc).register(router)
     }
 }

@@ -19,3 +19,10 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
     ("hello.v1.NoteService", "ListNotes", &["hello:read"]),
     ("hello.v1.NoteService", "ShareNote", &["hello:read"]),
 ];
+
+/// `service_fqn` -> owning plugin, so the host attaches the right
+/// `PluginResourceCtx` per request on the shared `/rpc` router.
+pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("hello.v1.HelloService", "hello"),
+    ("hello.v1.NoteService", "hello"),
+];

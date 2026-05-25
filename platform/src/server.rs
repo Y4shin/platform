@@ -1,10 +1,11 @@
 //! Axum server: compose the router, bind, serve with graceful shutdown.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 use axum::routing::get;
 use axum::{Extension, Router};
-use junius_sdk::Plugin;
+use junius_sdk::{Plugin, PluginResourceCtx};
 use sqlx::PgPool;
 
 use crate::auth::{self, AuthState};
@@ -13,12 +14,12 @@ use crate::config::{HostConfig, PluginRuntime};
 use crate::db::{DbBootstrap, PluginPools};
 
 /// Compose the host base + plugin routes **without** database-backed services.
-/// Plugin routes that extract `PluginResources` will 500 (no context attached);
+/// Plugin routes/RPC that need `PluginResources` will 500 (no context attached);
 /// use this for resource-less routes (and tests). The full host uses
 /// [`build_app_with_services`].
 pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
-    let (http, rpc) = compose(plugins, None);
-    base_app().merge(http).nest("/rpc", rpc)
+    let http = compose_http(plugins, None);
+    base_app().merge(http).nest("/rpc", build_rpc(plugins))
 }
 
 /// Compose the full host: per-plugin resource context, the `/api/auth/*` public
@@ -30,12 +31,23 @@ pub fn build_app_with_services(
     runtimes: &BTreeMap<String, PluginRuntime>,
     auth_state: AuthState,
 ) -> Router {
-    let (http, rpc) = compose(plugins, Some((pools, platform_pool, runtimes)));
-    // The RPC permission guard sees the post-nest path (`/<service>/<method>`)
-    // and runs inside the session middleware (so `Extension<User>` is set).
-    let rpc = rpc.layer(axum::middleware::from_fn(
-        crate::rpc_guard::require_permissions,
-    ));
+    let http = compose_http(plugins, Some((pools, platform_pool, runtimes)));
+
+    // All plugins' Connect services are folded into one router under `/rpc`. Two
+    // layers run before dispatch (inside the session middleware, so
+    // `Extension<User>` is set): `inject_ctx` attaches the right plugin's
+    // `PluginResourceCtx` (by service FQN) for the handler, and the permission
+    // guard rejects unauthorized calls.
+    let ctx_map = Arc::new(build_ctx_map(plugins, pools, platform_pool, runtimes));
+    let rpc = build_rpc(plugins)
+        .layer(axum::middleware::from_fn(
+            crate::rpc_guard::require_permissions,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            ctx_map,
+            crate::rpc_guard::inject_ctx,
+        ));
+
     let protected = http
         .nest("/rpc", rpc)
         .route("/api/me", get(auth::me::handler))
@@ -50,34 +62,60 @@ pub fn build_app_with_services(
         .layer(tower_cookies::CookieManagerLayer::new())
 }
 
-/// Nest every plugin's HTTP + RPC routers, attaching the per-plugin
-/// `PluginResourceCtx` as an `Extension` when `services` is provided.
-fn compose(
+/// Nest every plugin's HTTP routes under its `http_prefix`, attaching the
+/// per-plugin `PluginResourceCtx` as an `Extension` when `services` is provided.
+fn compose_http(
     plugins: &[Box<dyn Plugin>],
     services: Option<(&PluginPools, &PgPool, &BTreeMap<String, PluginRuntime>)>,
-) -> (Router, Router) {
+) -> Router {
     let mut http = Router::new();
-    let mut rpc = Router::new();
     for plugin in plugins {
         let metadata = plugin.metadata();
         let mut plugin_http = plugin.routes();
-        let mut plugin_rpc = plugin.rpc_routes();
-
         if let Some((pools, platform_pool, runtimes)) = services {
             if let Some(db) = pools.get(metadata.name) {
                 let runtime = runtimes.get(metadata.name).cloned().unwrap_or_default();
                 let ctx = boot::build_ctx(metadata.name, db, platform_pool, &runtime);
-                plugin_http = plugin_http.layer(Extension(ctx.clone()));
-                plugin_rpc = plugin_rpc.layer(Extension(ctx));
+                plugin_http = plugin_http.layer(Extension(ctx));
             } else {
                 tracing::error!(plugin = metadata.name, "no DB pool; resources unavailable");
             }
         }
-
         http = http.nest(metadata.mount.http_prefix, plugin_http);
-        rpc = rpc.merge(plugin_rpc);
     }
-    (http, rpc)
+    http
+}
+
+/// Fold every plugin's Connect services into one `connectrpc` router and convert
+/// it to an axum router (mounted under `/rpc` by the caller).
+fn build_rpc(plugins: &[Box<dyn Plugin>]) -> Router {
+    let mut router = connectrpc::Router::new();
+    for plugin in plugins {
+        router = plugin.register_rpc(router);
+    }
+    router.into_axum_router()
+}
+
+/// Build the per-plugin `PluginResourceCtx` map the RPC `inject_ctx` layer uses
+/// to attach the right context per request (keyed by plugin name).
+fn build_ctx_map(
+    plugins: &[Box<dyn Plugin>],
+    pools: &PluginPools,
+    platform_pool: &PgPool,
+    runtimes: &BTreeMap<String, PluginRuntime>,
+) -> HashMap<String, PluginResourceCtx> {
+    let mut map = HashMap::new();
+    for plugin in plugins {
+        let name = plugin.metadata().name;
+        if let Some(db) = pools.get(name) {
+            let runtime = runtimes.get(name).cloned().unwrap_or_default();
+            map.insert(
+                name.to_string(),
+                boot::build_ctx(name, db, platform_pool, &runtime),
+            );
+        }
+    }
+    map
 }
 
 #[cfg(not(feature = "embed-frontend"))]

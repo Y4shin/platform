@@ -25,16 +25,15 @@ pub trait Plugin: Send + Sync + 'static {
     /// [`CurrentUser`](crate::auth::CurrentUser) extractor.
     fn routes(&self) -> Router;
 
-    /// Build the plugin's Connect-RPC routes. Default returns an empty router
-    /// for plugins that don't expose RPCs. The host merges every plugin's RPC
-    /// router under `/rpc` (a flat namespace — the proto package name is what
-    /// scopes services by plugin). Implement the generated `connectrpc` service
-    /// trait and build the router with
-    /// `service.register(connectrpc::Router::new()).into_axum_router()`; the
-    /// per-plugin `PluginResourceCtx` and the caller flow in via request
-    /// extensions (read in handlers through `RequestContext::extensions`).
-    fn rpc_routes(&self) -> Router {
-        Router::new()
+    /// Register the plugin's Connect-RPC services into the shared `connectrpc`
+    /// router and return it. Default: no RPC. The host folds every plugin's
+    /// services into **one** `connectrpc::Router` (keyed by the proto-package-
+    /// scoped service FQN) and serves it under `/rpc`; it injects the correct
+    /// per-plugin `PluginResourceCtx` per request (by service FQN) so handlers
+    /// read it via `RequestContext::extensions` (`PluginContext::from_rpc`).
+    /// Implement as `Arc::new(MyService).register(router)`.
+    fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
+        router
     }
 
     /// Called once per plugin after migrations and before the server starts

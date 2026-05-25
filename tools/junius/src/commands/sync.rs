@@ -318,6 +318,8 @@ fn render_plugins_rs(plugins: &[ResolvedPlugin]) -> String {
 /// enabled plugin's `.proto` files.
 fn render_rpc_requires_rs(plugins: &[ResolvedPlugin]) -> String {
     let mut entries: Vec<(String, String, Vec<String>)> = Vec::new();
+    // (service_fqn -> plugin), for the host's per-request RPC ctx injection.
+    let mut services: Vec<(String, String)> = Vec::new();
     for p in plugins {
         let proto_dir = PathBuf::from("plugins").join(&p.name).join("proto");
         let mut files = Vec::new();
@@ -325,11 +327,16 @@ fn render_rpc_requires_rs(plugins: &[ResolvedPlugin]) -> String {
         files.sort();
         for file in files {
             if let Ok(content) = std::fs::read_to_string(&file) {
+                for svc in scan_proto_services(&content) {
+                    services.push((svc, p.name.clone()));
+                }
                 entries.extend(scan_proto_requires(&content));
             }
         }
     }
     entries.sort();
+    services.sort();
+    services.dedup();
 
     let mut buf = String::with_capacity(512);
     buf.push_str(
@@ -348,8 +355,42 @@ fn render_rpc_requires_rs(plugins: &[ResolvedPlugin]) -> String {
             .join(", ");
         let _ = writeln!(buf, "    (\"{service}\", \"{method}\", &[{perms_lit}]),");
     }
+    buf.push_str("];\n\n");
+    buf.push_str(
+        "/// `service_fqn` -> owning plugin, so the host attaches the right\n\
+         /// `PluginResourceCtx` per request on the shared `/rpc` router.\n\
+         pub static RPC_SERVICES: &[(&str, &str)] = &[\n",
+    );
+    for (service, plugin) in &services {
+        let _ = writeln!(buf, "    (\"{service}\", \"{plugin}\"),");
+    }
     buf.push_str("];\n");
     buf
+}
+
+/// Extract every service's fully-qualified name (`package.Service`) from a proto.
+#[allow(
+    clippy::unwrap_used,
+    reason = "compile-constant regexes are known-valid"
+)]
+pub(crate) fn scan_proto_services(content: &str) -> Vec<String> {
+    let package = regex::Regex::new(r"(?m)^\s*package\s+([\w.]+)\s*;")
+        .unwrap()
+        .captures(content)
+        .map(|c| c[1].to_string())
+        .unwrap_or_default();
+    let svc_re = regex::Regex::new(r"\bservice\s+(\w+)").unwrap();
+    svc_re
+        .captures_iter(content)
+        .map(|c| {
+            let name = &c[1];
+            if package.is_empty() {
+                name.to_string()
+            } else {
+                format!("{package}.{name}")
+            }
+        })
+        .collect()
 }
 
 /// Recursively collect `*.proto` files under `dir`.
