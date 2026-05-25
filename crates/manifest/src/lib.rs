@@ -19,7 +19,7 @@ pub use infra_config::{
 };
 pub use platform::{PlatformManifest, PluginsConfig, SourceConfig};
 pub use plugin::{
-    ConfigField, ConfigType, ExposedComponent, ExposedTable, PluginDep, PluginExposes,
-    PluginIdentity, PluginManifest, PluginMount, PluginRequires, SecretDecl,
+    BucketDecl, ConfigField, ConfigType, ExposedComponent, ExposedTable, PluginDep, PluginExposes,
+    PluginIdentity, PluginManifest, PluginMount, PluginRequires, PluginStorageDecl, SecretDecl,
 };
 pub use secrets::{ResolvedConfig, SecretRef, resolve_config};

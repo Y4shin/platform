@@ -29,6 +29,7 @@ pub fn plugin_metadata(content: &str, path: &Path) -> TokenStream {
     let config_tokens = expand_config(&manifest);
     let secrets_tokens = expand_secrets(&manifest);
     let permission_markers = expand_permission_markers(&manifest);
+    let bucket_enum = expand_bucket_enum(&manifest);
     let tracker = include_bytes_tracker();
     quote! {
         #tracker
@@ -36,6 +37,41 @@ pub fn plugin_metadata(content: &str, path: &Path) -> TokenStream {
         #config_tokens
         #secrets_tokens
         #permission_markers
+        #bucket_enum
+    }
+}
+
+/// Emit `pub mod buckets { pub enum Bucket { … } }` with one variant per declared
+/// `[storage.buckets]` key, implementing [`BucketName`](::junius_sdk::BucketName).
+/// Empty when the plugin declares no buckets (referencing `Bucket::X` is then a
+/// compile error — the variant doesn't exist). This is the generated, manifest-
+/// authoritative bucket surface: removing a bucket breaks compilation.
+fn expand_bucket_enum(manifest: &PluginManifest) -> TokenStream {
+    if manifest.storage.buckets.is_empty() {
+        return quote! {};
+    }
+    let variants = manifest.storage.buckets.keys().map(|name| {
+        let ty = format_ident!("{}", pascal_case(name));
+        let doc = format!("Logical bucket `{name}`.");
+        quote! { #[doc = #doc] #ty }
+    });
+    let arms = manifest.storage.buckets.keys().map(|name| {
+        let ty = format_ident!("{}", pascal_case(name));
+        let lit = name.as_str();
+        quote! { Bucket::#ty => #lit }
+    });
+    quote! {
+        /// Logical storage buckets generated from `[storage.buckets]` in `plugin.toml`.
+        /// Pass a variant to `resources.storage.bucket(..)`.
+        pub mod buckets {
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub enum Bucket { #(#variants),* }
+            impl ::junius_sdk::BucketName for Bucket {
+                fn logical(&self) -> &'static str {
+                    match self { #(#arms),* }
+                }
+            }
+        }
     }
 }
 
@@ -238,6 +274,7 @@ fn expand_metadata(manifest: &PluginManifest) -> TokenStream {
     let exposed_tables = expand_tables(manifest);
     let permissions = expand_permissions(manifest);
     let capabilities = expand_capabilities(manifest);
+    let buckets = expand_buckets(manifest);
 
     quote! {
         pub static METADATA: ::junius_sdk::PluginMetadata = ::junius_sdk::PluginMetadata {
@@ -255,8 +292,15 @@ fn expand_metadata(manifest: &PluginManifest) -> TokenStream {
             exposed_tables: #exposed_tables,
             permissions: #permissions,
             capabilities: #capabilities,
+            buckets: #buckets,
         };
     }
+}
+
+/// Emit the `&[&str]` of declared logical bucket names for `PluginMetadata`.
+fn expand_buckets(manifest: &PluginManifest) -> TokenStream {
+    let names = manifest.storage.buckets.keys().map(String::as_str);
+    quote! { &[ #(#names),* ] }
 }
 
 fn expand_dependencies(manifest: &PluginManifest) -> TokenStream {

@@ -7,10 +7,11 @@
 //! in `junius-sdk`. Stage 3 added the metrics sink; Stage 4 adds email. Later
 //! stages add the job backend and object stores.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use junius_manifest::ResolvedConfig;
-use junius_sdk::{Email, JobBackend, Jobs, MetricSink, Transport};
+use junius_sdk::{Email, JobBackend, Jobs, MetricSink, ObjectStore, PluginStorage, Transport};
 use sqlx::PgPool;
 
 /// Shared, request-independent infra handles. Cheap to clone (members are
@@ -25,6 +26,16 @@ pub struct HostInfra {
     pub email: EmailInfra,
     /// Job broker backend + connection pool (`None` when no `[config.jobs]`).
     pub jobs: JobsInfra,
+    /// Object stores (one per physical bucket) + the logical→physical mapping.
+    pub storage: StorageInfra,
+}
+
+/// The deployment's object storage: one [`ObjectStore`] per physical bucket plus
+/// the `"<plugin>:<logical>" → physical` mapping.
+#[derive(Clone, Default)]
+pub struct StorageInfra {
+    pub stores: Arc<HashMap<String, Arc<dyn ObjectStore>>>,
+    pub mapping: Arc<HashMap<String, String>>,
 }
 
 /// The deployment's job broker: the publish backend (for `enqueue`) + the
@@ -74,10 +85,18 @@ impl HostInfra {
             }
             None => JobsInfra::default(),
         };
+        let storage = match &resolved.storage {
+            Some(cfg) => StorageInfra {
+                stores: Arc::new(crate::storage::build_object_stores(cfg).await?),
+                mapping: Arc::new(cfg.mapping.clone().into_iter().collect()),
+            },
+            None => StorageInfra::default(),
+        };
         Ok(Self {
             metric_sink,
             email,
             jobs,
+            storage,
         })
     }
 
@@ -111,6 +130,37 @@ impl HostInfra {
             self.jobs.backend.as_ref().map(|_| platform_pool.clone()),
             plugin_name,
             capabilities,
+        )
+    }
+
+    /// Build the per-plugin [`PluginStorage`] handle: this plugin's logical→
+    /// physical bucket map + the shared object stores, gated on `capabilities`.
+    #[must_use]
+    pub fn storage_handle(
+        &self,
+        platform_pool: &PgPool,
+        plugin_name: &'static str,
+        capabilities: &'static [&'static str],
+    ) -> PluginStorage {
+        if self.storage.stores.is_empty() {
+            return PluginStorage::empty(plugin_name, capabilities);
+        }
+        let prefix = format!("{plugin_name}:");
+        let mapping: HashMap<String, String> = self
+            .storage
+            .mapping
+            .iter()
+            .filter_map(|(k, v)| {
+                k.strip_prefix(&prefix)
+                    .map(|logical| (logical.to_string(), v.clone()))
+            })
+            .collect();
+        PluginStorage::new(
+            (*self.storage.stores).clone(),
+            mapping,
+            plugin_name,
+            capabilities,
+            Some(platform_pool.clone()),
         )
     }
 }

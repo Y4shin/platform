@@ -131,6 +131,16 @@ pub(crate) fn plugin(m: &PluginManifest, report: &mut ValidationReport) {
         }
     }
 
+    for bucket_name in m.storage.buckets.keys() {
+        if !RE_SCHEMA_IDENT.is_match(bucket_name) {
+            report.error(
+                "STORAGE.BUCKET.NAME",
+                format!("storage.buckets.{bucket_name}"),
+                format!("bucket name {bucket_name:?} must match ^[a-z][a-z0-9_]*$"),
+            );
+        }
+    }
+
     plugin_config_and_secrets(m, report);
 }
 

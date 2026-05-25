@@ -14,6 +14,7 @@ pub mod jobs;
 pub mod plugin_registry;
 pub mod rpc_guard;
 pub mod server;
+pub mod storage;
 pub mod telemetry;
 
 #[cfg(feature = "embed-frontend")]

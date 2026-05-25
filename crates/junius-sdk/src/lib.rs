@@ -19,6 +19,7 @@ pub mod plugin;
 pub mod repo;
 pub mod resources;
 pub mod secrets;
+pub mod storage;
 pub mod telemetry;
 
 pub use junius_sdk_macros::{PluginCtx, impl_repository, permissions, plugin_metadata, repository};
@@ -45,4 +46,8 @@ pub use metadata::{
 pub use plugin::Plugin;
 pub use resources::{PluginResourceCtx, PluginResources};
 pub use secrets::{SecretStore, SecretString};
+pub use storage::{
+    BucketCapabilities, BucketHandle, BucketName, ObjectId, ObjectStore, PluginStorage,
+    StorageError,
+};
 pub use telemetry::Telemetry;

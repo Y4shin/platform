@@ -14,6 +14,8 @@ pub struct PluginMetadata {
     pub exposed_tables: &'static [ExposedTableDecl],
     pub permissions: &'static [PermissionDecl],
     pub capabilities: &'static [&'static str],
+    /// Logical bucket names declared in `[storage.buckets]`.
+    pub buckets: &'static [&'static str],
 }
 
 #[derive(Debug)]

@@ -23,6 +23,7 @@ use crate::email::Email;
 use crate::error::PluginError;
 use crate::jobs::Jobs;
 use crate::secrets::SecretStore;
+use crate::storage::PluginStorage;
 use crate::telemetry::Telemetry;
 
 /// Fail with [`PluginError::CapabilityNotDeclared`] unless `needed` is in the
@@ -59,6 +60,8 @@ pub struct PluginResources {
     pub email: Email,
     /// Background-job enqueue (gated on `job.enqueue`).
     pub jobs: Jobs,
+    /// Object storage (gated on `storage.read`/`storage.write`).
+    pub storage: PluginStorage,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
     /// The plugin's declared `[requires].capabilities` (for runtime gating of
@@ -81,6 +84,7 @@ impl PluginResources {
             authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
             email: ctx.email.clone(),
             jobs: ctx.jobs.clone(),
+            storage: ctx.storage.clone(),
             secrets: ctx.secrets.clone(),
             capabilities: ctx.capabilities,
         }
@@ -120,6 +124,7 @@ pub struct PluginResourceCtx {
     authz: Authz,
     email: Email,
     jobs: Jobs,
+    storage: PluginStorage,
     secrets: SecretStore,
     capabilities: &'static [&'static str],
 }
@@ -140,6 +145,7 @@ impl PluginResourceCtx {
         authz: Authz,
         email: Email,
         jobs: Jobs,
+        storage: PluginStorage,
         secrets: SecretStore,
         capabilities: &'static [&'static str],
     ) -> Self {
@@ -153,6 +159,7 @@ impl PluginResourceCtx {
             authz,
             email,
             jobs,
+            storage,
             secrets,
             capabilities,
         }

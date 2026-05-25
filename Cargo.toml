@@ -62,6 +62,13 @@ deadpool-lapin = "0.13"
 futures-lite   = "2"
 tokio-util     = { version = "0.7", features = ["rt"] }
 
+# Object storage over S3-compatible backends (host-only — never in junius-sdk;
+# the SDK speaks the `ObjectStore` trait). User-confirmed backend is aws-sdk-s3,
+# but its current release requires rustc 1.91 while this dev shell pins 1.88, so
+# we use the plan's sanctioned fallback rust-s3 (pure-Rust, rustls/ring) behind
+# the same trait — swapping back is localized to platform/src/storage/.
+rust-s3 = { version = "0.37", default-features = false, features = ["tokio-rustls-tls", "fail-on-err"] }
+
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }

@@ -51,6 +51,9 @@ deadpool-lapin = { workspace = true }
 futures-lite   = { workspace = true }
 tokio-util     = { workspace = true }
 
+# Object storage over S3-compatible backends (host-only).
+rust-s3 = { workspace = true }
+
 # DB + auth (M06)
 sqlx          = { workspace = true }
 uuid          = { workspace = true }
