@@ -17,16 +17,25 @@
 //!   CASCADE` (one plugin must not silently delete another's rows).
 //! - `FE.EXPORTS.MATCH_MANIFEST` — every `[exposes.components.X]` must have a
 //!   matching named export `X` in the plugin's `frontend/src/index.ts`.
+//! - `SQL.PRIVATE_TABLE_ACCESS` — a cross-plugin schema-qualified table reference
+//!   (in a migration *or* an `sqlx::query*!` macro) must point at a table the
+//!   owner exposes (`[exposes.tables]`) and that the consumer declares in
+//!   `[dependencies.<owner>].tables`.
 //!
 //! Migration SQL is parsed with `sqlparser` (`PostgreSQL` dialect). FK detection
 //! covers inline (`col … REFERENCES other.table`) and table-level constraints;
-//! non-FK cross-schema references in DDL are out of scope.
+//! `SQL.PRIVATE_TABLE_ACCESS` additionally collects *every* schema-qualified table
+//! reference via `visit_relations`.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 
 use junius_manifest::{PluginManifest, Severity, ValidationIssue, ValidationReport};
-use sqlparser::ast::{ColumnOption, ObjectName, ReferentialAction, Statement, TableConstraint};
+use sqlparser::ast::{
+    ColumnOption, ObjectName, ReferentialAction, SchemaName, Statement, TableConstraint,
+    visit_relations,
+};
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 
@@ -39,12 +48,13 @@ pub fn check_cross_plugin(
     plugins: &BTreeMap<String, PluginManifest>,
     report: &mut ValidationReport,
 ) {
-    let schema_owner = build_schema_owner(plugins);
+    let index = build_schema_index(plugins);
     for (name, manifest) in plugins {
         check_dep_imports(name, manifest, plugins, report);
         check_rpc_methods(name, manifest, report);
-        check_migrations(name, manifest, &schema_owner, report);
+        check_migrations(name, manifest, &index.owner, report);
         check_fe_exports(name, manifest, report);
+        check_private_table_access(name, manifest, &index, report);
     }
 }
 
@@ -73,17 +83,93 @@ pub fn check_storage_mapping(
     }
 }
 
-/// schema name → the plugin that owns it (declares a table under it).
-fn build_schema_owner(plugins: &BTreeMap<String, PluginManifest>) -> BTreeMap<String, String> {
+/// Cross-plugin schema knowledge derived from manifests + migrations.
+struct SchemaIndex {
+    /// SQL schema name → the plugin that owns it.
+    owner: BTreeMap<String, String>,
+    /// plugin → the `schema.table` identifiers it exposes (`[exposes.tables]`).
+    exposed: BTreeMap<String, BTreeSet<String>>,
+}
+
+/// Build the schema index. Ownership comes from each plugin's exposed-table
+/// schemas *and* the schemas it creates in its migrations (private tables aren't
+/// in `[exposes]`, so manifests alone are insufficient).
+fn build_schema_index(plugins: &BTreeMap<String, PluginManifest>) -> SchemaIndex {
     let mut owner = BTreeMap::new();
+    let mut exposed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for (name, manifest) in plugins {
-        for table in manifest.exposes.tables.values() {
+        let mut exp = BTreeSet::new();
+        for (table, decl) in &manifest.exposes.tables {
+            exp.insert(format!("{}.{}", decl.schema, table));
             owner
-                .entry(table.schema.clone())
+                .entry(decl.schema.clone())
                 .or_insert_with(|| name.clone());
         }
+        exposed.insert(name.clone(), exp);
+        for schema in created_schemas(name) {
+            owner.entry(schema).or_insert_with(|| name.clone());
+        }
     }
-    owner
+    SchemaIndex { owner, exposed }
+}
+
+/// Schemas a plugin creates in its migrations (`CREATE SCHEMA` + `CREATE TABLE
+/// schema.t`). Unparseable migrations are skipped (the runner surfaces them).
+fn created_schemas(plugin: &str) -> BTreeSet<String> {
+    let mut schemas = BTreeSet::new();
+    for sql in plugin_migration_sql(plugin) {
+        let Ok(stmts) = Parser::parse_sql(&PostgreSqlDialect {}, &sql) else {
+            continue;
+        };
+        for stmt in stmts {
+            match stmt {
+                Statement::CreateSchema { schema_name, .. } => {
+                    if let Some(s) = schema_name_ident(&schema_name) {
+                        schemas.insert(s);
+                    }
+                }
+                Statement::CreateTable(ct) => {
+                    if let Some(schema) = qualifier(&ct.name) {
+                        schemas.insert(schema);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    schemas
+}
+
+fn schema_name_ident(s: &SchemaName) -> Option<String> {
+    match s {
+        SchemaName::Simple(name) | SchemaName::NamedAuthorization(name, _) => {
+            name.0.last().map(|i| i.value.clone())
+        }
+        SchemaName::UnnamedAuthorization(_) => None,
+    }
+}
+
+/// The schema qualifier of an object name (`schema.table` → `schema`), if any.
+fn qualifier(name: &ObjectName) -> Option<String> {
+    let parts = &name.0;
+    (parts.len() >= 2).then(|| parts[parts.len() - 2].value.clone())
+}
+
+/// The `.up.sql` migration contents for a plugin, in filename order.
+fn plugin_migration_sql(plugin: &str) -> Vec<String> {
+    let dir = PathBuf::from("plugins").join(plugin).join("migrations");
+    let mut files = Vec::new();
+    collect_files(&dir, &["sql"], &mut files);
+    files.sort();
+    files
+        .into_iter()
+        .filter(|f| {
+            f.file_name()
+                .and_then(|s| s.to_str())
+                .is_some_and(|n| n.ends_with(".up.sql"))
+        })
+        .filter_map(|f| std::fs::read_to_string(f).ok())
+        .collect()
 }
 
 fn err(report: &mut ValidationReport, code: &'static str, path: String, message: String) {
@@ -454,6 +540,173 @@ fn check_fk(
     }
 }
 
+// --- SQL.PRIVATE_TABLE_ACCESS ------------------------------------------------
+
+/// Every cross-plugin schema-qualified table reference — in a migration or an
+/// `sqlx::query*!` macro — must point at a table the owner exposes and that the
+/// consumer declares in `[dependencies.<owner>].tables`.
+fn check_private_table_access(
+    name: &str,
+    manifest: &PluginManifest,
+    index: &SchemaIndex,
+    report: &mut ValidationReport,
+) {
+    let mut refs: BTreeSet<(String, String)> = BTreeSet::new();
+
+    // Migrations.
+    for sql in plugin_migration_sql(name) {
+        collect_sql_relations(&sql, &mut refs);
+    }
+    // Repo queries: SQL inside sqlx `query*!` macros under `src/`.
+    let rs_dir = PathBuf::from("plugins").join(name).join("src");
+    let mut rs_files = Vec::new();
+    collect_files(&rs_dir, &["rs"], &mut rs_files);
+    for file in rs_files {
+        let Ok(src) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        for sql in extract_sqlx_queries(&src) {
+            collect_sql_relations(&sql, &mut refs);
+        }
+    }
+
+    for (schema, table) in &refs {
+        let Some(owner) = index.owner.get(schema) else {
+            continue; // unowned schema (platform/public) — not a plugin boundary.
+        };
+        if owner == name {
+            continue; // own schema
+        }
+        let qualified = format!("{schema}.{table}");
+        let path = format!("plugins/{name}");
+        let exposed = index
+            .exposed
+            .get(owner)
+            .is_some_and(|s| s.contains(&qualified));
+        if !exposed {
+            err(
+                report,
+                "SQL.PRIVATE_TABLE_ACCESS",
+                path,
+                format!(
+                    "references {qualified}, which {owner:?} does not expose ([exposes.tables])"
+                ),
+            );
+            continue;
+        }
+        let declared = manifest
+            .dependencies
+            .get(owner)
+            .is_some_and(|d| d.tables.iter().any(|t| t == table));
+        if !declared {
+            err(
+                report,
+                "SQL.PRIVATE_TABLE_ACCESS",
+                path,
+                format!(
+                    "references exposed table {qualified} without declaring it in [dependencies.{owner}].tables"
+                ),
+            );
+        }
+    }
+}
+
+/// Collect every schema-qualified (`schema.table`) relation in a SQL string.
+/// `visit_relations` covers query positions (FROM/JOIN/INTO, subqueries, CTEs);
+/// FK targets inside `CREATE TABLE` are not reported as relations, so inline and
+/// table-level FK `REFERENCES` are pulled out explicitly. Unparseable SQL is
+/// skipped.
+fn collect_sql_relations(sql: &str, out: &mut BTreeSet<(String, String)>) {
+    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
+        return;
+    };
+    let _ = visit_relations(&statements, |name| {
+        if let Some(pair) = schema_table(name) {
+            out.insert(pair);
+        }
+        ControlFlow::<()>::Continue(())
+    });
+    for stmt in &statements {
+        let Statement::CreateTable(ct) = stmt else {
+            continue;
+        };
+        for col in &ct.columns {
+            for opt in &col.options {
+                if let ColumnOption::ForeignKey { foreign_table, .. } = &opt.option {
+                    out.extend(schema_table(foreign_table));
+                }
+            }
+        }
+        for constraint in &ct.constraints {
+            if let TableConstraint::ForeignKey { foreign_table, .. } = constraint {
+                out.extend(schema_table(foreign_table));
+            }
+        }
+    }
+}
+
+/// `(schema, table)` for a schema-qualified object name; `None` if unqualified.
+fn schema_table(name: &ObjectName) -> Option<(String, String)> {
+    let parts = &name.0;
+    (parts.len() >= 2).then(|| {
+        (
+            parts[parts.len() - 2].value.clone(),
+            parts[parts.len() - 1].value.clone(),
+        )
+    })
+}
+
+/// Pull the SQL string out of every sqlx `query*!` macro in a Rust source file.
+/// The SQL is the first string-literal argument (`query_as!` puts a type path
+/// first; the first *string* literal is still the SQL). `LitStr::value()`
+/// normalises raw/escaped/`\`-continued strings.
+fn extract_sqlx_queries(rust_src: &str) -> Vec<String> {
+    let Ok(file) = syn::parse_file(rust_src) else {
+        return Vec::new();
+    };
+    let mut collector = QueryCollector::default();
+    syn::visit::Visit::visit_file(&mut collector, &file);
+    collector.queries
+}
+
+#[derive(Default)]
+struct QueryCollector {
+    queries: Vec<String>,
+}
+
+impl<'ast> syn::visit::Visit<'ast> for QueryCollector {
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        let is_query = mac.path.segments.last().is_some_and(|s| {
+            matches!(
+                s.ident.to_string().as_str(),
+                "query"
+                    | "query_as"
+                    | "query_scalar"
+                    | "query_unchecked"
+                    | "query_as_unchecked"
+                    | "query_scalar_unchecked"
+            )
+        });
+        if is_query {
+            if let Ok(args) = mac.parse_body_with(
+                syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated,
+            ) {
+                for arg in args {
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(s),
+                        ..
+                    }) = arg
+                    {
+                        self.queries.push(s.value());
+                        break; // first string literal is the SQL
+                    }
+                }
+            }
+        }
+        syn::visit::visit_macro(self, mac);
+    }
+}
+
 // --- helpers -----------------------------------------------------------------
 
 fn collect_files(dir: &std::path::Path, exts: &[&str], out: &mut Vec<PathBuf>) {
@@ -542,5 +795,38 @@ mod tests {
             "mapped bucket should pass: {:?}",
             report.issues
         );
+    }
+
+    #[test]
+    fn extracts_sql_from_query_macro_variants() {
+        let src = r##"
+            fn a() { let _ = sqlx::query!("SELECT 1 FROM x"); }
+            fn b() { let _ = query_as!(MyRow, "SELECT id FROM y", arg); }
+            fn c() { let _ = sqlx::query_scalar!(r#"SELECT count(*)
+                       FROM z"#); }
+            fn d() { let _ = query!("INSERT INTO w (a) VALUES ($1) \
+                       RETURNING id", v); }
+            fn not_sql() { println!("query! looking string"); }
+        "##;
+        let q = extract_sqlx_queries(src);
+        assert_eq!(q.len(), 4, "got {q:?}");
+        assert!(q[0].contains("FROM x"));
+        // query_as!: the SQL is the literal after the type path, not `MyRow`.
+        assert!(q[1].contains("FROM y") && !q[1].contains("MyRow"));
+        assert!(q[2].contains("FROM z")); // raw multiline
+        assert!(q[3].contains("RETURNING id")); // `\`-continuation
+    }
+
+    #[test]
+    fn collects_schema_qualified_relations_only() {
+        let mut out = BTreeSet::new();
+        collect_sql_relations(
+            "SELECT * FROM hello.greeting g JOIN other.t ON g.id = t.id WHERE platform.fn(g.id)",
+            &mut out,
+        );
+        assert!(out.contains(&("hello".to_string(), "greeting".to_string())));
+        assert!(out.contains(&("other".to_string(), "t".to_string())));
+        // `platform.fn(...)` is a function call, not a relation — not collected.
+        assert!(!out.iter().any(|(s, _)| s == "platform"));
     }
 }

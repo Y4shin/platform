@@ -80,6 +80,13 @@ fn cons_frontend_index(repo: &Path, ts: &str) {
     fs::write(dir.join("index.ts"), ts).unwrap();
 }
 
+/// Write a `cons` Rust source file (scanned for `sqlx::query*!` table refs).
+fn cons_rust(repo: &Path, rs: &str) {
+    let dir = repo.join("plugins/cons/src");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("repo.rs"), rs).unwrap();
+}
+
 fn check(repo: &Path) -> assert_cmd::assert::Assert {
     cmd_in(repo)
         .args(["check", "--manifest", "platform.toml", "--format", "json"])
@@ -176,7 +183,7 @@ fn clean_cross_plugin_setup_passes() {
     // ok (required dep), import declared.
     cons_manifest(
         tmp.path(),
-        "[dependencies.prov]\nrpc_methods = [\"ProvService.DoThing\"]\n",
+        "[dependencies.prov]\ntables = [\"thing\"]\nrpc_methods = [\"ProvService.DoThing\"]\n",
     );
     cons_frontend(
         tmp.path(),
@@ -185,6 +192,57 @@ fn clean_cross_plugin_setup_passes() {
     cons_migration(
         tmp.path(),
         "-- @requires prov:0001_thing\nCREATE SCHEMA cons;\nCREATE TABLE cons.x (\n  id UUID PRIMARY KEY,\n  t UUID NOT NULL REFERENCES prov.thing (id)\n);\n",
+    );
+
+    check(tmp.path()).success().stdout(
+        predicate::str::contains("\"ok\": true").or(predicate::str::contains("\"ok\":true")),
+    );
+}
+
+#[test]
+fn private_table_access_flags_undeclared_exposed_table_in_query() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    // prov.thing IS exposed, but cons doesn't list it in [dependencies.prov].tables.
+    cons_manifest(tmp.path(), "[dependencies.prov]\n");
+    cons_rust(
+        tmp.path(),
+        "fn f() { let _ = sqlx::query!(\"SELECT id FROM prov.thing\"); }\n",
+    );
+
+    check(tmp.path())
+        .failure()
+        .stdout(predicate::str::contains("SQL.PRIVATE_TABLE_ACCESS"));
+}
+
+#[test]
+fn private_table_access_flags_unexposed_table_in_migration() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    // prov.secret is not in prov's [exposes.tables], even though cons lists it.
+    cons_manifest(tmp.path(), "[dependencies.prov]\ntables = [\"secret\"]\n");
+    cons_migration(
+        tmp.path(),
+        "-- @requires prov:0001_thing\nCREATE SCHEMA cons;\nCREATE TABLE cons.x (\n  id UUID PRIMARY KEY,\n  s UUID REFERENCES prov.secret (id)\n);\n",
+    );
+
+    check(tmp.path())
+        .failure()
+        .stdout(predicate::str::contains("SQL.PRIVATE_TABLE_ACCESS"));
+}
+
+#[test]
+fn private_table_access_passes_for_exposed_and_declared_table() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    cons_manifest(tmp.path(), "[dependencies.prov]\ntables = [\"thing\"]\n");
+    // A raw, multiline query referencing the exposed+declared table.
+    cons_rust(
+        tmp.path(),
+        "fn f() {\n  let _ = sqlx::query_scalar!(\n    r#\"SELECT count(*)\n       FROM prov.thing\"#\n  );\n}\n",
     );
 
     check(tmp.path()).success().stdout(
