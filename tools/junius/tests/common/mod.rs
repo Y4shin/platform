@@ -94,6 +94,9 @@ pub fn write_basic_plugin(repo: &Path, name: &str) {
         ),
     )
     .unwrap();
+    // A `frontend/` dir marks the plugin as full-stack so `junius sync` emits its
+    // route wiring (backend-only plugins — no `frontend/` — get none).
+    fs::create_dir_all(dir.join("frontend")).unwrap();
 }
 
 fn capitalize(s: &str) -> String {

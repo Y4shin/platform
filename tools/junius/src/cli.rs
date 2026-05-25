@@ -202,10 +202,15 @@ pub enum CacheCmd {
 #[cfg(feature = "develop")]
 #[derive(Subcommand, Debug)]
 pub enum NewCmd {
-    /// Scaffold a new plugin under `plugins/<NAME>/` and run `junius sync`.
+    /// Scaffold a new plugin under `plugins/<NAME>/`. Pure scaffolding — does
+    /// not require or touch a deployment `platform.toml`; run `junius sync
+    /// --config <deployment>` afterward to wire it in.
     Plugin {
         /// Plugin name (must match `^[a-z][a-z0-9_-]*$`).
         name: String,
+        /// Scaffold a backend-only plugin (no `frontend/` package).
+        #[arg(long)]
+        backend_only: bool,
     },
     /// Add a new component to a plugin's frontend lib. (Stub — lands in M07.)
     Component { plugin: String, name: String },

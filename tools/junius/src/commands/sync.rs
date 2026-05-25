@@ -40,6 +40,9 @@ struct ResolvedPlugin {
     struct_name: String,
     /// Parsed `plugin.toml`, for `[exposes.components]`/`[dependencies]` codegen.
     manifest: PluginManifest,
+    /// Whether the plugin ships a `frontend/` package. Backend-only plugins
+    /// (none) get no frontend wiring (routes/registry imports).
+    has_frontend: bool,
 }
 
 /// JSON shape of `junius sync`'s result.
@@ -112,11 +115,17 @@ pub(crate) fn run_in(
 
     // (relative-path constant, rendered content) — written under `source_root`,
     // but reported by their stable relative path.
+    // The generated Rust is rustfmt-formatted *here* (on the rendered string,
+    // before writing) so the on-disk file matches what `sync` renders — keeping
+    // `cargo fmt --check` clean AND `sync --dry-run` drift-free.
     let files: [(&str, String); 4] = [
-        (GENERATED_PLUGINS_RS, render_plugins_rs(&plugins)),
+        (
+            GENERATED_PLUGINS_RS,
+            rustfmt_str(render_plugins_rs(&plugins)),
+        ),
         (
             GENERATED_RPC_REQUIRES_RS,
-            render_rpc_requires_rs(&plugins, source_root),
+            rustfmt_str(render_rpc_requires_rs(&plugins, source_root)),
         ),
         (GENERATED_ROUTES_TS, render_routes_ts(&plugins)),
         (
@@ -237,6 +246,11 @@ fn resolve_plugins(
         let crate_name = format!("{name}-plugin");
         let module_name = crate_name.replace('-', "_");
         let struct_name = format!("{}Plugin", to_pascal_case(&name));
+        let has_frontend = source_root
+            .join("plugins")
+            .join(&name)
+            .join("frontend")
+            .is_dir();
 
         out.push(ResolvedPlugin {
             name,
@@ -244,6 +258,7 @@ fn resolve_plugins(
             module_name,
             struct_name,
             manifest: plugin,
+            has_frontend,
         });
     }
     Ok(out)
@@ -495,9 +510,40 @@ pub(crate) fn scan_proto_requires(content: &str) -> Vec<(String, String, Vec<Str
     out
 }
 
+/// Best-effort `rustfmt` of generated Rust *source text* (edition 2024) via
+/// stdin→stdout, so codegen output is fmt-clean as written. Returns the input
+/// unchanged if `rustfmt` is unavailable or errors.
+fn rustfmt_str(src: String) -> String {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let Ok(mut child) = Command::new("rustfmt")
+        .args(["--edition", "2024", "--emit", "stdout"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return src;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        if stdin.write_all(src.as_bytes()).is_err() {
+            return src;
+        }
+    }
+    match child.wait_with_output() {
+        Ok(out) if out.status.success() => String::from_utf8(out.stdout).unwrap_or(src),
+        _ => src,
+    }
+}
+
 fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
-    let publics: Vec<&ResolvedPlugin> = plugins
+    // Only plugins that ship a `frontend/` package get route wiring; backend-only
+    // plugins contribute nothing to the SPA.
+    let fe: Vec<&ResolvedPlugin> = plugins.iter().filter(|p| p.has_frontend).collect();
+    let publics: Vec<&ResolvedPlugin> = fe
         .iter()
+        .copied()
         .filter(|p| p.manifest.plugin.public_routes)
         .collect();
 
@@ -511,7 +557,7 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
          import { authedLayoutRoute, rootRoute } from '../router/root.js';\n",
     );
 
-    for p in plugins {
+    for p in &fe {
         let pascal = p.struct_name.trim_end_matches("Plugin");
         if p.manifest.plugin.public_routes {
             let _ = writeln!(
@@ -532,7 +578,7 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
     // Shell via the pathless `authedLayoutRoute`.
     buf.push_str("\nconst indexRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/',\n  component: () => null,\n});\n\n");
 
-    for p in plugins {
+    for p in &fe {
         let pascal = p.struct_name.trim_end_matches("Plugin");
         let camel = to_camel_case(&p.name);
         let _ = writeln!(buf, "const {camel}Parent = createRoute({{");
@@ -563,7 +609,7 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
     buf.push_str(
         "export const routeTree = rootRoute.addChildren([\n  authedLayoutRoute.addChildren([\n    indexRoute,\n",
     );
-    for p in plugins {
+    for p in &fe {
         let camel = to_camel_case(&p.name);
         let _ = writeln!(buf, "    {camel}Parent,");
     }
@@ -1011,6 +1057,7 @@ mod tests {
             module_name,
             struct_name,
             manifest,
+            has_frontend: true,
         }
     }
 

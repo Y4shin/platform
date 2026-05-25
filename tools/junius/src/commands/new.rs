@@ -4,12 +4,12 @@
 use std::path::PathBuf;
 
 use super::not_implemented;
-use crate::cli::{NewCmd, OutputFormat, SyncArgs};
+use crate::cli::NewCmd;
 use crate::exit;
 
-pub fn run(cmd: &NewCmd, format: OutputFormat) -> i32 {
+pub fn run(cmd: &NewCmd) -> i32 {
     match cmd {
-        NewCmd::Plugin { name } => scaffold_plugin(name, format),
+        NewCmd::Plugin { name, backend_only } => scaffold_plugin(name, *backend_only),
         NewCmd::Component { .. } => not_implemented("new component", "M07"),
         NewCmd::Rpc { .. } => not_implemented("new rpc", "M05"),
         NewCmd::Migration { plugin, name } => scaffold_migration(plugin, name),
@@ -17,9 +17,11 @@ pub fn run(cmd: &NewCmd, format: OutputFormat) -> i32 {
     }
 }
 
-fn scaffold_plugin(name: &str, format: OutputFormat) -> i32 {
-    // Reject names that would fail manifest validation; cheaper to refuse
-    // here than to scaffold an invalid plugin and then fail on the next sync.
+/// Scaffold a plugin. Pure scaffolding: it does **not** require or read a
+/// deployment `platform.toml` and does not run `sync` — creating a plugin is a
+/// dev action independent of any concrete deployment. The author wires it into a
+/// deployment afterward with `junius sync --config <deployment>`.
+fn scaffold_plugin(name: &str, backend_only: bool) -> i32 {
     if !is_valid_plugin_name(name) {
         eprintln!("junius: invalid plugin name {name:?}; must match ^[a-z][a-z0-9_-]*$");
         return exit::VALIDATION;
@@ -31,21 +33,15 @@ fn scaffold_plugin(name: &str, format: OutputFormat) -> i32 {
         return exit::PARSE_ERROR;
     }
 
-    if let Err(code) = write_template(name, &dir) {
+    if let Err(code) = write_template(name, &dir, backend_only) {
         return code;
     }
 
     eprintln!("junius: scaffolded plugin {name:?} at {}", dir.display());
-    eprintln!("junius: remember to add {name:?} to your platform.toml [plugins].enabled");
-
-    // Run sync against the default config (or the env-default config) so the
-    // generated files include the new plugin if it's already enabled.
-    let sync_args = SyncArgs {
-        plugin: None,
-        dry_run: false,
-        config: None,
-    };
-    super::sync::run(&sync_args, format)
+    eprintln!("junius: next steps:");
+    eprintln!("  1. add {name:?} to your deployment's [plugins].enabled (e.g. dev/platform.toml)");
+    eprintln!("  2. run `junius sync --config <deployment>` to wire it in");
+    exit::OK
 }
 
 fn scaffold_migration(plugin: &str, name: &str) -> i32 {
@@ -138,7 +134,7 @@ fn is_valid_plugin_name(name: &str) -> bool {
     chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
-fn write_template(name: &str, dir: &std::path::Path) -> Result<(), i32> {
+fn write_template(name: &str, dir: &std::path::Path, backend_only: bool) -> Result<(), i32> {
     let pascal = pascal_case(name);
 
     let manifest = format!(
@@ -223,7 +219,95 @@ fn write_template(name: &str, dir: &std::path::Path) -> Result<(), i32> {
     write(&dir.join("Cargo.toml"), &cargo_toml)?;
     write(&dir.join("src/lib.rs"), &lib_rs)?;
 
+    if !backend_only {
+        write_frontend_template(name, &pascal, dir)?;
+    }
+
     Ok(())
+}
+
+/// Scaffold the plugin's `frontend/` package so an enabled plugin's generated
+/// `routes.ts` import resolves out of the box. A backend-only plugin omits this
+/// (and `sync` then emits no frontend wiring for it).
+fn write_frontend_template(name: &str, pascal: &str, dir: &std::path::Path) -> Result<(), i32> {
+    let sub = |tpl: &str| tpl_subst(tpl, name, pascal);
+
+    let package_json = sub(r#"{
+  "name": "@junius/plugin-{name}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lib/*": "./src/lib/*.tsx"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.5.0",
+    "@connectrpc/connect-query": "^2.0.0",
+    "@junius/design": "workspace:*",
+    "@junius/generated": "workspace:*",
+    "@junius/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-router": "^1.95.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-router": "^1.95.0",
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0"
+  }
+}
+"#);
+
+    let tsconfig = "{\n  \"extends\": \"../../../tsconfig.base.json\",\n  \"compilerOptions\": {\n    \"jsx\": \"react-jsx\"\n  },\n  \"include\": [\"src/**/*\"]\n}\n";
+
+    let index_ts = "export { buildRoutes } from './routes/index.js';\n";
+
+    let routes_ts = sub(
+        "import { type AnyRoute, createRoute } from '@tanstack/react-router';\n\
+         \n\
+         import { {pascal}Page } from './pages/{pascal}Page.js';\n\
+         \n\
+         /** Compose this plugin's routes under `parent` (mounted at `/p/{name}`). */\n\
+         export function buildRoutes(parent: AnyRoute): AnyRoute[] {\n\
+         \x20 return [\n\
+         \x20   createRoute({ getParentRoute: () => parent, path: '/', component: {pascal}Page }),\n\
+         \x20 ];\n\
+         }\n",
+    );
+
+    let page_tsx = sub("import { Card, Stack } from '@junius/design';\n\
+         \n\
+         export function {pascal}Page() {\n\
+         \x20 return (\n\
+         \x20   <Stack gap=\"md\">\n\
+         \x20     <Card>\n\
+         \x20       <h1 className=\"text-xl font-semibold\">{pascal}</h1>\n\
+         \x20     </Card>\n\
+         \x20   </Stack>\n\
+         \x20 );\n\
+         }\n");
+
+    let fe = dir.join("frontend");
+    create(&fe.join("src/routes/pages"))?;
+    write(&fe.join("package.json"), &package_json)?;
+    write(&fe.join("tsconfig.json"), tsconfig)?;
+    write(&fe.join("src/index.ts"), index_ts)?;
+    write(&fe.join("src/routes/index.ts"), &routes_ts)?;
+    write(
+        &fe.join("src/routes/pages")
+            .join(format!("{pascal}Page.tsx")),
+        &page_tsx,
+    )?;
+    Ok(())
+}
+
+fn tpl_subst(tpl: &str, name: &str, pascal: &str) -> String {
+    tpl.replace("{name}", name).replace("{pascal}", pascal)
 }
 
 fn create(dir: &std::path::Path) -> Result<(), i32> {

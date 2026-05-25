@@ -37,7 +37,7 @@ fn main() -> ExitCode {
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
         cli::Command::Cache { subcommand } => commands::cache_cmd::run(&subcommand, args.format),
         #[cfg(feature = "develop")]
-        cli::Command::New { subcommand } => commands::new::run(&subcommand, args.format),
+        cli::Command::New { subcommand } => commands::new::run(&subcommand),
     };
 
     ExitCode::from(u8::try_from(code).unwrap_or(1))

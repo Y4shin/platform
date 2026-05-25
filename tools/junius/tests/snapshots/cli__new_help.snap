@@ -7,7 +7,7 @@ Scaffold new plugins, components, RPC services, migrations, permissions. (Source
 Usage: junius new [OPTIONS] <COMMAND>
 
 Commands:
-  plugin      Scaffold a new plugin under `plugins/<NAME>/` and run `junius sync`
+  plugin      Scaffold a new plugin under `plugins/<NAME>/`. Pure scaffolding — does not require or touch a deployment `platform.toml`; run `junius sync --config <deployment>` afterward to wire it in
   component   Add a new component to a plugin's frontend lib. (Stub — lands in M07.)
   rpc         Add a new RPC service to a plugin's proto. (Stub — lands in M05.)
   migration   Create a new migration under `plugins/<PLUGIN>/migrations/`. (Stub — lands in M06.)
