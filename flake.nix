@@ -46,6 +46,11 @@
               pkgs.git
               pkgs.openssl
               pkgs.pkg-config
+
+              # `cargo sqlx prepare` regenerates the committed `.sqlx/` offline
+              # query cache that the repository `query!` macros check against in
+              # CI (SQLX_OFFLINE=true).
+              pkgs.sqlx-cli
             ];
 
             shellHook = ''

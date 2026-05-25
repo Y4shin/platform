@@ -12,6 +12,12 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # Repository `query!` macros check against the committed `.sqlx/` offline
+    # cache rather than a live DB. A query changed without re-running
+    # `cargo sqlx prepare` then has no cache entry and fails the build here; the
+    # testcontainers integration tests catch schema drift at runtime.
+    env:
+      SQLX_OFFLINE: "true"
     steps:
       - uses: actions/checkout@v4
 

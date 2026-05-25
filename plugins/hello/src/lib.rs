@@ -26,6 +26,8 @@ mod proto {
     include!(concat!(env!("OUT_DIR"), "/_connectrpc.rs"));
 }
 
+pub mod repo;
+
 use proto::hello::v1::{HelloService, HelloServiceExt, OwnedGreetRequestView};
 // Wire message types, re-exported for tests and any in-process callers.
 pub use proto::hello::v1::{GreetRequest, GreetResponse};

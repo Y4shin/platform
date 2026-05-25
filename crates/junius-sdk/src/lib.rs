@@ -12,13 +12,15 @@ pub mod error;
 pub mod metadata;
 pub mod permissions;
 pub mod plugin;
+pub mod repo;
 pub mod resources;
 pub mod secrets;
 pub mod telemetry;
 
-pub use junius_sdk_macros::{permissions, plugin_metadata};
+pub use junius_sdk_macros::{impl_repository, permissions, plugin_metadata, repository};
 
 pub use permissions::{And, Has, Permission, PermissionList};
+pub use repo::{RepoPool, ScopedDb};
 
 pub use auth::{
     AuditEmitter, Auth, CurrentUser, GroupId, MaybeUser, Membership, Role, RoleId, User,
@@ -26,7 +28,7 @@ pub use auth::{
 };
 pub use config::PluginConfig;
 pub use db::PluginDb;
-pub use error::PluginError;
+pub use error::{PluginError, RepoError};
 pub use metadata::{
     DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,
     PluginMetadata,

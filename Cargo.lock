@@ -1432,6 +1432,7 @@ dependencies = [
  "axum",
  "buffa",
  "buffa-types",
+ "chrono",
  "connectrpc",
  "connectrpc-build",
  "http 1.4.0",
@@ -1439,10 +1440,12 @@ dependencies = [
  "junius-sdk",
  "serde",
  "serde_json",
+ "sqlx",
  "tokio",
  "toml 0.8.23",
  "tower",
  "trybuild",
+ "uuid",
 ]
 
 [[package]]

@@ -24,3 +24,10 @@ description = "Example secret demonstrating the secrets codegen."
 [permissions]
 "hello:read" = "Read greetings."
 "hello:write" = "Create or modify greetings."
+
+# The table this plugin owns (M07). Declaring its schema is what grants
+# `role_hello` DML on it (see crates/manifest grants); the schema + table itself
+# are created by migrations/0001_greeting.up.sql.
+[exposes.tables.greeting]
+schema = "hello"
+description = "Greetings created via the hello plugin."

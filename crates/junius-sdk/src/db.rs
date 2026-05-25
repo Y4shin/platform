@@ -28,9 +28,8 @@ impl PluginDb {
         self.plugin_name
     }
 
-    /// The underlying pool. Crate-private: the M07 repository layer (built in
-    /// this crate) reaches it here; plugins never get a raw executor.
-    #[allow(dead_code, reason = "consumed by the M07 repository derive")]
+    /// The underlying pool. Crate-private: the repository layer (`ScopedDb`,
+    /// built in this crate) reaches it here; plugins never get a raw executor.
     pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }

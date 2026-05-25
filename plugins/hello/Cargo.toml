@@ -17,6 +17,9 @@ buffa-types = { workspace = true }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
 http-body   = { workspace = true }
+sqlx        = { workspace = true }
+uuid        = { workspace = true }
+chrono      = { workspace = true }
 
 [build-dependencies]
 connectrpc-build = { workspace = true }

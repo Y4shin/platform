@@ -11,6 +11,7 @@
 //! The `Repository`/`PluginCtx` derives arrive later in M07.
 
 mod expand;
+mod repo;
 
 use proc_macro::TokenStream;
 
@@ -59,4 +60,23 @@ pub fn plugin_metadata(_input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn permissions(input: TokenStream) -> TokenStream {
     expand::permissions_macro(input.into()).into()
+}
+
+/// Attribute on a marker struct (`#[repository] pub struct HelloRepo<P = ()>;`)
+/// that rewrites it into a repository: injects the private db/user/audit fields
+/// and generates `new`, the sealed `pool()` accessor, and a `Clone` impl. Method
+/// impls go in `#[impl_repository]` blocks.
+#[proc_macro_attribute]
+pub fn repository(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    repo::repository(item.into()).into()
+}
+
+/// Attribute on a repository's method impl block
+/// (`#[impl_repository(HelloRepo)] impl<P: Has<HelloRead>> HelloRepo<P> { … }`).
+/// Injects a fresh index type-param for each `Has<Perm>` bound so the underlying
+/// `Has<X, Idx>` membership trait stays coherent, and anchors the
+/// `junius check` data-access scan.
+#[proc_macro_attribute]
+pub fn impl_repository(attr: TokenStream, item: TokenStream) -> TokenStream {
+    repo::impl_repository(attr.into(), item.into()).into()
 }
