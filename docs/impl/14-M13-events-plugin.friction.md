@@ -1,0 +1,18 @@
+# M13 — Plugin-authoring friction log
+
+Living record of every friction point hit while building the `events` plugin
+(the first real domain plugin), captured as we go for a **joint triage at the
+end of M13**. Append-only; one row per annoyance.
+
+- **Severity:** `blocker` (had to work around to proceed) · `friction` (slowed
+  authoring) · `papercut` (minor) · `wish` (nice-to-have).
+- **Proposed fix:** concrete enough for triage to scope directly.
+
+| Date | Stage | Area | Annoyance / missing feature | Severity | Proposed fix |
+|------|-------|------|-----------------------------|----------|--------------|
+| 2026-05-25 | 1 | new / sync | `junius new plugin events` auto-runs `sync` with the default `platform.toml` (cwd), which doesn't exist in this repo (dev config is `dev/platform.toml`) → prints `cannot read platform.toml` and **exits 1** despite scaffolding succeeding. Misleading. | friction | `new` should accept/`--config` the deployment path (or skip auto-sync and just print the next step). At minimum, don't exit non-zero when scaffolding succeeded but the optional auto-sync was a no-op. |
+| 2026-05-25 | 1 | new | Scaffold emits only `plugin.toml` + `Cargo.toml` + `src/lib.rs` (a `/ping` route). No `build.rs`, `proto/`, `migrations/`, `repo`, `service`, or `frontend/` — every real plugin hand-copies these from an existing plugin. The authoring guide leans on scaffolding, so the gap is felt immediately. | friction | Expand the scaffold (flags like `--with-proto`, `--with-migration`, `--with-frontend`) or generate a fuller, commented skeleton mirroring `hello`. |
+| 2026-05-25 | 1 | sync | Enabling a plugin requires a **frontend package** too — the generated `routes.ts` unconditionally `import`s `buildRoutes` from `@junius/plugin-<name>`, so a backend-only plugin fails `pnpm typecheck` until you hand-create `frontend/{package.json,tsconfig.json,src/index.ts,routes/...}`. No way to declare a plugin as backend-only. | friction | Let a plugin opt out of a frontend (manifest flag), or have `sync` emit the FE wiring only when `frontend/` exists; scaffold the FE package. |
+| 2026-05-25 | 1 | sync | `junius sync` emits Rust (`platform/src/generated/*.rs`) that is **not rustfmt-formatted** (single-line tuples), so `cargo fmt --check` fails after every sync — you must run `cargo fmt` afterward and commit the reformatted generated files. (Same class as the M11 `cross_check` nit.) | papercut | `sync` should run `rustfmt` on emitted Rust (or emit already-formatted code) so generated files are fmt-clean as written. |
+| 2026-05-25 | 1 | sync | Enabling a plugin also requires manually adding `"@junius/plugin-<name>": "workspace:*"` to `platform/frontend/package.json` (+ `pnpm install`) — sync emits the `routes.ts` import but not the workspace dependency, so host typecheck fails with `Cannot find module '@junius/plugin-events'`. | friction | `sync` should add/remove the host frontend's `workspace:*` dep for each enabled plugin (it already rewrites `platform/Cargo.toml` deps for the Rust side). |
+| 2026-05-25 | 1 | proto/build.rs | Adding a plugin with a proto requires **manually** (a) appending `plugins/events/proto` to the workspace `buf.yaml` `modules:` and (b) running `pnpm exec buf generate` to emit the TS `*_pb.ts`. Neither is done by `junius sync`, and there's no Taskfile target for `buf generate` — yet sync *does* emit `packages/generated/src/plugins/events/rpc.ts` importing the not-yet-generated `events_pb.js`, so `pnpm typecheck` breaks until you do both by hand. | blocker | Have `junius sync` register the plugin's proto path in `buf.yaml` (or auto-discover plugin protos) and run/emit the TS proto codegen; add a `task gen:proto`. |

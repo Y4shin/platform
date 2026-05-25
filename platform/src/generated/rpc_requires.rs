@@ -33,6 +33,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `service_fqn` -> owning plugin, so the host attaches the right
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("events.v1.EventService", "events"),
     ("greetings.v1.GreetingService", "greetings"),
     ("hello.v1.HelloService", "hello"),
     ("hello.v1.NoteService", "hello"),

@@ -5,7 +5,7 @@
 path = "."
 
 [plugins]
-enabled = ["hello", "greetings", "widgets"]
+enabled = ["hello", "greetings", "widgets", "events"]
 
 # Host configuration. Secrets use `env:VAR` indirection so they aren't committed;
 # export OIDC_CLIENT_SECRET / SESSION_KEY / ROLE_PW_SECRET before running the

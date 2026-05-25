@@ -110,6 +110,9 @@ importers:
       '@junius/generated':
         specifier: workspace:*
         version: link:../../packages/generated
+      '@junius/plugin-events':
+        specifier: workspace:*
+        version: link:../../plugins/events/frontend
       '@junius/plugin-greetings':
         specifier: workspace:*
         version: link:../../plugins/greetings/frontend
@@ -153,6 +156,34 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.2(jiti@2.7.0)(lightningcss@1.32.0)
+
+  plugins/events/frontend:
+    dependencies:
+      '@bufbuild/protobuf':
+        specifier: ^2.5.0
+        version: 2.12.0
+      '@connectrpc/connect-query':
+        specifier: ^2.0.0
+        version: 2.2.0(@bufbuild/protobuf@2.12.0)(@connectrpc/connect@2.1.1(@bufbuild/protobuf@2.12.0))(@tanstack/query-core@5.100.11)(@tanstack/react-query@5.100.11(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@junius/design':
+        specifier: workspace:*
+        version: link:../../../packages/design
+      '@junius/generated':
+        specifier: workspace:*
+        version: link:../../../packages/generated
+      '@junius/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/sdk
+    devDependencies:
+      '@tanstack/react-router':
+        specifier: ^1.95.0
+        version: 1.170.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.15
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
 
   plugins/greetings/frontend:
     dependencies:

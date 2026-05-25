@@ -7,6 +7,7 @@ import { rootRoute } from '../router/root.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
 import { buildRoutes as buildGreetings } from '@junius/plugin-greetings';
 import { buildRoutes as buildWidgets } from '@junius/plugin-widgets';
+import { buildRoutes as buildEvents } from '@junius/plugin-events';
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -32,9 +33,16 @@ const widgetsParent = createRoute({
 });
 widgetsParent.addChildren(buildWidgets(widgetsParent));
 
+const eventsParent = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/p/events',
+});
+eventsParent.addChildren(buildEvents(eventsParent));
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   helloParent,
   greetingsParent,
   widgetsParent,
+  eventsParent,
 ]);

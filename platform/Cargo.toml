@@ -75,6 +75,7 @@ mime_guess = { workspace = true, optional = true }
 hello-plugin = { path = "../plugins/hello" }
 greetings-plugin = { path = "../plugins/greetings" }
 widgets-plugin = { path = "../plugins/widgets" }
+events-plugin = { path = "../plugins/events" }
 # <<< junius managed end
 
 [dev-dependencies]

@@ -1,0 +1,19 @@
+// Events plugin RPC surface. Stage 1 ships a permission-free `Ping` to prove the
+// proto/build/Connect-RPC path end-to-end; Stage 4 adds the gated event CRUD
+// methods (`option (platform.v1.requires)`), enforced by the host RPC guard +
+// the typed permission witness in each handler.
+syntax = "proto3";
+
+package events.v1;
+
+import "platform/v1/annotations.proto";
+
+service EventService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  string message = 1;
+}

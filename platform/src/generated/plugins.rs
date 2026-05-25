@@ -10,5 +10,6 @@ pub fn plugins() -> Vec<Box<dyn Plugin>> {
         Box::new(hello_plugin::HelloPlugin::new()),
         Box::new(greetings_plugin::GreetingsPlugin::new()),
         Box::new(widgets_plugin::WidgetsPlugin::new()),
+        Box::new(events_plugin::EventsPlugin::new()),
     ]
 }

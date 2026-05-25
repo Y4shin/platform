@@ -1,0 +1,21 @@
+[plugin]
+name = "events"
+display_name = "Events"
+description = "Events (user- or group-owned, private or public) with sign-up invite pages and iCalendar export."
+manifest_schema = 1
+
+# Permissions (M07). `plugin_metadata!()` generates a marker type per key
+# (`permissions::EventsRead`, …); repo methods + RPC `option (platform.requires)`
+# gate on them. Sign-up itself is not a permission (public invites accept
+# anonymous sign-ups; private invites are gated by events:read at the handler).
+[permissions]
+"events:read" = "View events you own, that belong to your groups, or that are public."
+"events:write" = "Create, edit, and delete events and configure their invite pages."
+"events:share" = "Share a private event with another user or group."
+
+# The events plugin's own table (M07). Declaring its schema grants role_events
+# DML on it; the schema + table are created by migrations/0001_event.up.sql.
+# Only `event` is exposed; invite/signup/calendar tables stay private.
+[exposes.tables.event]
+schema = "events"
+description = "Events (public ones are world-readable; private ones gated by ownership)."

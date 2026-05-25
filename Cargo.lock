@@ -1632,6 +1632,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "events-plugin"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "buffa",
+ "buffa-types",
+ "chrono",
+ "connectrpc",
+ "connectrpc-build",
+ "http 1.4.0",
+ "http-body 1.0.1",
+ "junius-sdk",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "executor-trait"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3574,6 +3597,7 @@ dependencies = [
  "chrono",
  "connectrpc",
  "deadpool-lapin",
+ "events-plugin",
  "futures-lite",
  "greetings-plugin",
  "hello-plugin",
