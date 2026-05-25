@@ -63,6 +63,8 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 
 # Migrations + crypto + auth (M06)
 petgraph      = "0.6"
+# Cross-plugin migration SQL analysis for `junius check` (M09)
+sqlparser     = "0.52"
 sha2          = "0.10"
 hmac          = "0.12"
 aes-gcm       = "0.10"

@@ -176,6 +176,9 @@ fn check_platform(path: &Path, src: &str, format: OutputFormat) -> i32 {
     }
     junius_manifest::validate::deployment(&manifest, &plugins, &mut validation);
 
+    // Cross-plugin rules (M09): dep/RPC declarations, cross-schema FK + @requires.
+    crate::commands::cross_check::check_cross_plugin(&plugins, &mut validation);
+
     report(path, src, &validation, format)
 }
 

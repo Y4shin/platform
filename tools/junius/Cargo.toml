@@ -30,6 +30,9 @@ sqlx     = { workspace = true }
 sha2     = { workspace = true }
 petgraph = { workspace = true }
 
+# Cross-plugin migration SQL analysis (M09 `junius check`)
+sqlparser = { workspace = true }
+
 [dev-dependencies]
 insta      = { workspace = true }
 assert_cmd = { workspace = true }

@@ -1,5 +1,6 @@
 pub mod build;
 pub mod check;
+pub mod cross_check;
 pub mod dev;
 pub mod migrate;
 pub mod new;

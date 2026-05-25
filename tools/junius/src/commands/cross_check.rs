@@ -1,0 +1,390 @@
+//! Cross-plugin validation for `junius check` (M09).
+//!
+//! Runs when checking a *deployment* manifest (`platform.toml`), with every
+//! enabled plugin loaded, so it can validate references that span the plugin
+//! boundary against the declarations that authorize them:
+//!
+//! - `DEP.UNDECLARED` — a frontend import of `@junius/plugin-<other>` /
+//!   `@junius/generated/<other>/…`, or a Rust `<other>_plugin::` path, must have a
+//!   matching `[dependencies.<other>]`.
+//! - `RPC.UNDECLARED` — each `[dependencies.<dep>].rpc_methods` entry must name a
+//!   real `Service.Method` in `<dep>`'s proto.
+//! - `SQL.REQUIRES.MISSING` — a migration whose SQL references another plugin's
+//!   schema (via a cross-schema FK) must declare `-- @requires <owner>:<migration>`.
+//! - `FK.OPTIONAL.NULLABLE` — an FK into an *optional* dependency's schema must be
+//!   nullable (so the row survives the dependency being absent).
+//! - `FK.CROSS.CASCADE` — an FK across a plugin boundary must not `ON DELETE/UPDATE
+//!   CASCADE` (one plugin must not silently delete another's rows).
+//!
+//! Migration SQL is parsed with `sqlparser` (`PostgreSQL` dialect). FK detection
+//! covers inline (`col … REFERENCES other.table`) and table-level constraints;
+//! non-FK cross-schema references in DDL are out of scope.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
+
+use junius_manifest::{PluginManifest, Severity, ValidationIssue, ValidationReport};
+use sqlparser::ast::{ColumnOption, ObjectName, ReferentialAction, Statement, TableConstraint};
+use sqlparser::dialect::PostgreSqlDialect;
+use sqlparser::parser::Parser;
+
+use junius::migrate::header::parse_requires;
+
+use crate::commands::sync::{collect_proto_files, scan_proto_service_methods};
+
+/// Run every cross-plugin rule over the enabled plugins.
+pub fn check_cross_plugin(
+    plugins: &BTreeMap<String, PluginManifest>,
+    report: &mut ValidationReport,
+) {
+    let schema_owner = build_schema_owner(plugins);
+    for (name, manifest) in plugins {
+        check_dep_imports(name, manifest, plugins, report);
+        check_rpc_methods(name, manifest, report);
+        check_migrations(name, manifest, &schema_owner, report);
+    }
+}
+
+/// schema name → the plugin that owns it (declares a table under it).
+fn build_schema_owner(plugins: &BTreeMap<String, PluginManifest>) -> BTreeMap<String, String> {
+    let mut owner = BTreeMap::new();
+    for (name, manifest) in plugins {
+        for table in manifest.exposes.tables.values() {
+            owner
+                .entry(table.schema.clone())
+                .or_insert_with(|| name.clone());
+        }
+    }
+    owner
+}
+
+fn err(report: &mut ValidationReport, code: &'static str, path: String, message: String) {
+    report.issues.push(ValidationIssue {
+        severity: Severity::Error,
+        code,
+        path,
+        message,
+    });
+}
+
+// --- DEP.UNDECLARED ----------------------------------------------------------
+
+fn check_dep_imports(
+    name: &str,
+    manifest: &PluginManifest,
+    plugins: &BTreeMap<String, PluginManifest>,
+    report: &mut ValidationReport,
+) {
+    let declared: BTreeSet<&str> = manifest.dependencies.keys().map(String::as_str).collect();
+    let mut used: BTreeSet<String> = BTreeSet::new();
+
+    // Frontend TS: `@junius/plugin-<other>` and `@junius/generated/<other>/…`.
+    // Skip generated/ (derived; its imports mirror declared deps anyway).
+    let fe_src = PathBuf::from("plugins")
+        .join(name)
+        .join("frontend")
+        .join("src");
+    let mut ts_files = Vec::new();
+    collect_files(&fe_src, &["ts", "tsx"], &mut ts_files);
+    let re_plugin = regex_plugin();
+    let re_generated = regex_generated();
+    for file in &ts_files {
+        if file.components().any(|c| c.as_os_str() == "generated") {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        for caps in re_plugin
+            .captures_iter(&content)
+            .chain(re_generated.captures_iter(&content))
+        {
+            used.insert(caps[1].to_string());
+        }
+    }
+
+    // Rust: a `<other>_plugin::` path to another plugin's crate.
+    let rs_src = PathBuf::from("plugins").join(name).join("src");
+    let mut rs_files = Vec::new();
+    collect_files(&rs_src, &["rs"], &mut rs_files);
+    let rust_src: String = rs_files
+        .iter()
+        .filter_map(|f| std::fs::read_to_string(f).ok())
+        .collect();
+    for other in plugins.keys() {
+        let module = format!("{}_plugin::", other.replace('-', "_"));
+        if rust_src.contains(&module) {
+            used.insert(other.clone());
+        }
+    }
+
+    for other in used {
+        if other != name && !declared.contains(other.as_str()) {
+            err(
+                report,
+                "DEP.UNDECLARED",
+                format!("plugins/{name}"),
+                format!(
+                    "uses plugin {other:?} (import or `{other}_plugin::`) without a matching [dependencies.{other}]"
+                ),
+            );
+        }
+    }
+}
+
+// --- RPC.UNDECLARED ----------------------------------------------------------
+
+fn check_rpc_methods(name: &str, manifest: &PluginManifest, report: &mut ValidationReport) {
+    for (dep_name, dep) in &manifest.dependencies {
+        if dep.rpc_methods.is_empty() {
+            continue;
+        }
+        let services = plugin_proto_services(dep_name);
+        for spec in &dep.rpc_methods {
+            let Some((service, method)) = spec.split_once('.') else {
+                err(
+                    report,
+                    "RPC.UNDECLARED",
+                    format!("plugins/{name}/dependencies.{dep_name}.rpc_methods"),
+                    format!("rpc_methods entry {spec:?} must be \"Service.Method\""),
+                );
+                continue;
+            };
+            let found = services
+                .iter()
+                .any(|(svc, methods)| svc == service && methods.iter().any(|m| m == method));
+            if !found {
+                err(
+                    report,
+                    "RPC.UNDECLARED",
+                    format!("plugins/{name}/dependencies.{dep_name}.rpc_methods"),
+                    format!(
+                        "declared RPC {spec:?} is not a method of any service in plugin {dep_name:?}"
+                    ),
+                );
+            }
+        }
+    }
+}
+
+/// All `(service, [method])` declared by a plugin's protos (`PascalCase` names).
+fn plugin_proto_services(plugin: &str) -> Vec<(String, Vec<String>)> {
+    let mut files = Vec::new();
+    collect_proto_files(
+        &PathBuf::from("plugins").join(plugin).join("proto"),
+        &mut files,
+    );
+    let mut out = Vec::new();
+    for file in files {
+        if let Ok(content) = std::fs::read_to_string(&file) {
+            out.extend(scan_proto_service_methods(&content));
+        }
+    }
+    out
+}
+
+// --- SQL rules (sqlparser) ---------------------------------------------------
+
+fn check_migrations(
+    name: &str,
+    manifest: &PluginManifest,
+    schema_owner: &BTreeMap<String, String>,
+    report: &mut ValidationReport,
+) {
+    let dir = PathBuf::from("plugins").join(name).join("migrations");
+    let mut files = Vec::new();
+    collect_files(&dir, &["sql"], &mut files);
+    files.sort();
+    for file in files {
+        let Some(fname) = file.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !fname.ends_with(".up.sql") {
+            continue;
+        }
+        let Ok(sql) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        let required: BTreeSet<String> =
+            parse_requires(&sql).into_iter().map(|e| e.plugin).collect();
+        let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, &sql) else {
+            // Unparseable SQL: the migration runner will surface it; skip here.
+            continue;
+        };
+        for stmt in statements {
+            let Statement::CreateTable(ct) = stmt else {
+                continue;
+            };
+            let not_null: BTreeMap<String, bool> = ct
+                .columns
+                .iter()
+                .map(|c| {
+                    (
+                        c.name.value.clone(),
+                        c.options
+                            .iter()
+                            .any(|o| matches!(o.option, ColumnOption::NotNull)),
+                    )
+                })
+                .collect();
+
+            for col in &ct.columns {
+                for opt in &col.options {
+                    if let ColumnOption::ForeignKey {
+                        foreign_table,
+                        on_delete,
+                        on_update,
+                        ..
+                    } = &opt.option
+                    {
+                        check_fk(
+                            name,
+                            manifest,
+                            schema_owner,
+                            &required,
+                            fname,
+                            foreign_table,
+                            *on_delete,
+                            *on_update,
+                            std::slice::from_ref(&col.name.value),
+                            &not_null,
+                            report,
+                        );
+                    }
+                }
+            }
+
+            for constraint in &ct.constraints {
+                if let TableConstraint::ForeignKey {
+                    foreign_table,
+                    on_delete,
+                    on_update,
+                    columns,
+                    ..
+                } = constraint
+                {
+                    let local: Vec<String> = columns.iter().map(|c| c.value.clone()).collect();
+                    check_fk(
+                        name,
+                        manifest,
+                        schema_owner,
+                        &required,
+                        fname,
+                        foreign_table,
+                        *on_delete,
+                        *on_update,
+                        &local,
+                        &not_null,
+                        report,
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_fk(
+    name: &str,
+    manifest: &PluginManifest,
+    schema_owner: &BTreeMap<String, String>,
+    required: &BTreeSet<String>,
+    migration: &str,
+    foreign_table: &ObjectName,
+    on_delete: Option<ReferentialAction>,
+    on_update: Option<ReferentialAction>,
+    local_columns: &[String],
+    not_null: &BTreeMap<String, bool>,
+    report: &mut ValidationReport,
+) {
+    // Schema-qualified target only; an unqualified table is same-schema.
+    let parts = &foreign_table.0;
+    if parts.len() < 2 {
+        return;
+    }
+    let schema = parts[parts.len() - 2].value.as_str();
+    let Some(owner) = schema_owner.get(schema) else {
+        return; // unknown schema (e.g. `platform`): not a plugin boundary here.
+    };
+    if owner == name {
+        return; // own schema
+    }
+    let path = format!("plugins/{name}/migrations/{migration}");
+
+    if !required.contains(owner) {
+        err(
+            report,
+            "SQL.REQUIRES.MISSING",
+            path.clone(),
+            format!(
+                "FK references {schema}.* (owned by {owner:?}) but the migration has no `-- @requires {owner}:<migration>`"
+            ),
+        );
+    }
+
+    if matches!(on_delete, Some(ReferentialAction::Cascade))
+        || matches!(on_update, Some(ReferentialAction::Cascade))
+    {
+        err(
+            report,
+            "FK.CROSS.CASCADE",
+            path.clone(),
+            format!(
+                "cross-plugin FK into {owner:?}'s schema must not use ON DELETE/UPDATE CASCADE"
+            ),
+        );
+    }
+
+    let optional = manifest.dependencies.get(owner).is_some_and(|d| d.optional);
+    if optional {
+        let any_not_null = local_columns
+            .iter()
+            .any(|c| not_null.get(c).copied().unwrap_or(false));
+        if any_not_null {
+            err(
+                report,
+                "FK.OPTIONAL.NULLABLE",
+                path,
+                format!(
+                    "FK into optional dependency {owner:?} must be nullable (column(s) {local_columns:?} are NOT NULL)"
+                ),
+            );
+        }
+    }
+}
+
+// --- helpers -----------------------------------------------------------------
+
+fn collect_files(dir: &std::path::Path, exts: &[&str], out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(&path, exts, out);
+        } else if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| exts.contains(&e))
+        {
+            out.push(path);
+        }
+    }
+}
+
+#[allow(
+    clippy::unwrap_used,
+    reason = "compile-constant regexes are known-valid"
+)]
+fn regex_plugin() -> regex::Regex {
+    regex::Regex::new(r"@junius/plugin-([a-z0-9_-]+)").unwrap()
+}
+
+#[allow(
+    clippy::unwrap_used,
+    reason = "compile-constant regexes are known-valid"
+)]
+fn regex_generated() -> regex::Regex {
+    regex::Regex::new(r"@junius/generated/([a-z0-9_-]+)/").unwrap()
+}

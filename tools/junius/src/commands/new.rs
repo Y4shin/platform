@@ -178,7 +178,7 @@ fn write_template(name: &str, dir: &std::path::Path) -> Result<(), i32> {
          \n\
          use async_trait::async_trait;\n\
          use axum::{{Router, routing::get}};\n\
-         use junius_sdk::{{Plugin, PluginMetadata, PluginResources}};\n\
+         use junius_sdk::{{Plugin, PluginMetadata}};\n\
          \n\
          junius_sdk::plugin_metadata!();\n\
          \n\
@@ -203,9 +203,16 @@ fn write_template(name: &str, dir: &std::path::Path) -> Result<(), i32> {
          \x20       &METADATA\n\
          \x20   }}\n\
          \n\
-         \x20   fn routes(&self, _resources: PluginResources) -> Router {{\n\
+         \x20   // Plain-HTTP routes; the host nests them under `/h/{name}`. Handlers\n\
+         \x20   // obtain host resources per request via the `PluginResources` extractor.\n\
+         \x20   fn routes(&self) -> Router {{\n\
          \x20       Router::new().route(\"/ping\", get(|| async {{ \"pong\" }}))\n\
          \x20   }}\n\
+         \n\
+         \x20   // Optionally register Connect-RPC services:\n\
+         \x20   // fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {{\n\
+         \x20   //     std::sync::Arc::new(MyService).register(router)\n\
+         \x20   // }}\n\
          }}\n"
     );
 

@@ -280,6 +280,10 @@ fn new_plugin_scaffolds_expected_files() {
     let lib_rs = fs::read_to_string(dir.join("src/lib.rs")).unwrap();
     assert!(lib_rs.contains("pub struct DemoPlugin"));
     assert!(lib_rs.contains("junius_sdk::plugin_metadata!()"));
+    // Current Plugin trait signature (M06+): `routes(&self)` takes no resources arg
+    // (the pre-M06 `routes(&self, _resources: PluginResources)` is gone).
+    assert!(lib_rs.contains("fn routes(&self) -> Router"));
+    assert!(!lib_rs.contains("_resources: PluginResources"));
 }
 
 #[test]
