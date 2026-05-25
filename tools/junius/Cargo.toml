@@ -10,6 +10,15 @@ publish      = false
 name = "junius"
 path = "src/main.rs"
 
+[features]
+# `develop` gates the source-tree-only subcommands (`new`, `sync`, `dev`) so an
+# end-user deployment build ships a CLI with only `check`/`build`/`migrate`/
+# `plugin`/`cache`. It trims the *command surface*, not the dependency tree —
+# the dev commands share tokio/regex with end-user commands (migrate needs the
+# tokio runtime; build calls sync's generation), so no dep actually drops out.
+default = ["develop"]
+develop = []
+
 [dependencies]
 junius-manifest = { workspace = true }
 

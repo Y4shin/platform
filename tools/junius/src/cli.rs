@@ -40,11 +40,13 @@ pub enum Command {
     Check(CheckArgs),
     /// Rewrite derived files (`platform/src/generated/plugins.rs` and the
     /// `junius managed` regions of `Cargo.toml`s) so they match the
-    /// deployment config.
+    /// deployment config. (Source-tree-only — gated behind the `develop` feature.)
+    #[cfg(feature = "develop")]
     Sync(SyncArgs),
-    /// Build a deployment binary. (Stub — lands in M04.)
+    /// Build a deployment binary.
     Build(BuildArgs),
-    /// One-command developer loop. (Stub — lands in M04.)
+    /// One-command developer loop. (Source-tree-only — gated behind `develop`.)
+    #[cfg(feature = "develop")]
     Dev(DevArgs),
     /// Apply database migrations and emit per-plugin Postgres role grants.
     Migrate {
@@ -57,6 +59,8 @@ pub enum Command {
         subcommand: PluginCmd,
     },
     /// Scaffold new plugins, components, RPC services, migrations, permissions.
+    /// (Source-tree-only — gated behind the `develop` feature.)
+    #[cfg(feature = "develop")]
     New {
         #[command(subcommand)]
         subcommand: NewCmd,
@@ -101,6 +105,7 @@ pub struct BuildArgs {
     pub config: Option<PathBuf>,
 }
 
+#[cfg(feature = "develop")]
 #[derive(clap::Args, Debug)]
 pub struct DevArgs {
     /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
@@ -143,6 +148,7 @@ pub enum PluginCmd {
     Disable { name: String },
 }
 
+#[cfg(feature = "develop")]
 #[derive(Subcommand, Debug)]
 pub enum NewCmd {
     /// Scaffold a new plugin under `plugins/<NAME>/` and run `junius sync`.

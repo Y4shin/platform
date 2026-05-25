@@ -8,12 +8,12 @@ Usage: junius [OPTIONS] <COMMAND>
 
 Commands:
   check    Validate manifests against the schema and semantic rules
-  sync     Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config
-  build    Build a deployment binary. (Stub — lands in M04.)
-  dev      One-command developer loop. (Stub — lands in M04.)
+  sync     Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config. (Source-tree-only — gated behind the `develop` feature.)
+  build    Build a deployment binary
+  dev      One-command developer loop. (Source-tree-only — gated behind `develop`.)
   migrate  Apply database migrations and emit per-plugin Postgres role grants
   plugin   Plugin inspection and lifecycle
-  new      Scaffold new plugins, components, RPC services, migrations, permissions
+  new      Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
 
 Options:
       --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]

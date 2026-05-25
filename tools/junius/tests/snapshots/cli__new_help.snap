@@ -2,7 +2,7 @@
 source: tools/junius/tests/cli.rs
 expression: stdout
 ---
-Scaffold new plugins, components, RPC services, migrations, permissions
+Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
 
 Usage: junius new [OPTIONS] <COMMAND>
 

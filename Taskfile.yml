@@ -67,6 +67,9 @@ tasks:
     desc: Lint everything (clippy, biome, buf, junius check).
     cmds:
       - cargo clippy --workspace --all-targets -- -D warnings
+      # The end-user CLI (no `develop` feature) must still compile — proves the
+      # source-tree-only subcommands are cleanly gated.
+      - cargo build -p junius --no-default-features
       - pnpm exec biome ci
       - pnpm exec buf lint
       - cargo run -q -p junius -- check --manifest {{.CONFIG}}

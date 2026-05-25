@@ -25,11 +25,14 @@ fn main() -> ExitCode {
 
     let code = match args.command {
         cli::Command::Check(a) => commands::check::run(&a, args.format),
+        #[cfg(feature = "develop")]
         cli::Command::Sync(a) => commands::sync::run(&a, args.format),
         cli::Command::Build(a) => commands::build::run(&a),
+        #[cfg(feature = "develop")]
         cli::Command::Dev(a) => commands::dev::run(&a),
         cli::Command::Migrate { subcommand } => commands::migrate::run(&subcommand),
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
+        #[cfg(feature = "develop")]
         cli::Command::New { subcommand } => commands::new::run(&subcommand, args.format),
     };
 
