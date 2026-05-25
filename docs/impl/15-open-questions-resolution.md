@@ -16,7 +16,7 @@ When you confirm a direction below, also:
 | 4 | Multi-tenancy | **Before M06** | Single-tenant locked for v1 — see §15.4 | proposed |
 | 5 | Audit logging | **Before M06** | Host-wide `platform.audit_event`, 365-day default retention — see §15.5 | proposed |
 | 6 | Trust model & threat model | **Before M07** | First-party plugins only in v1 — see §15.6 | proposed |
-| 7 | Internationalization | **Before M13** | Defer; English-only with a `t()` shim — see §15.7 | proposed |
+| 7 | Internationalization | **M14 (next after M13)** | English-only through M13; M14 delivers real i18n (top priority) — see §15.7 | resolved |
 | 8 | Worked example & plugin authoring guide | **Emerges M03–M05, finalised at M13** | Use Speakers (M13) as the worked example — see §15.8 | partially in progress (hello demonstrates the shape via M03) |
 | 9 | v0 milestone definition | **Defined by this plan** | M05 is the v0 cut — see §15.9 | ✅ reached at end of M05 |
 
@@ -104,18 +104,25 @@ If either fails, fall back options (in order of effort):
 
 **Locked in:** M07, where the permission system goes live, makes this explicit.
 
-## §15.7 Internationalization (gated before M13)
+## §15.7 Internationalization (English-only through M13; M14 delivers it)
 
-**Recommended:** **defer.** v1 ships English-only.
+**Resolved:** M00–M13 ship **English-only** (plain English strings, no `t()` shim
+required in M13), and **internationalization is the prioritized next milestone,
+[M14](16-M14-internationalization.md)** — the first thing after M13, not an
+open-ended post-v1 punt.
 
-To keep the future seam clean:
-- `@junius/sdk` exports a no-op `t(key, vars?) => interpolate(key, vars)` shim. Plugin authors write `t('Save speaker')` from M13 onward.
-- Strings include English content; the keys are themselves human-readable, so the no-op behaviour is sensible.
-- When real i18n lands, the shim is replaced with a real implementation (likely `lingui`, `i18next`, or `react-intl`); strings get extracted into a catalog by tooling.
+M14 owns the whole seam in one focused effort rather than a frontend-only shim:
+- A real **frontend** translation library (lingui / i18next / react-intl — decided
+  in M14) behind a stable `@junius/sdk` `t()`, plus extraction/check tooling
+  (`junius i18n extract` / `check`).
+- **Backend** locale too — emails, iCalendar `SUMMARY`/`DESCRIPTION`, and validation
+  errors aren't reachable from a frontend `t()`, so M14 designs the host-side seam.
+- Locale negotiation + a per-user preference, and a retrofit of the existing
+  plugins (`hello`/`greetings`/`widgets`/`events`) to the seam.
 
-**Locked in:** M13 introduces the `t()` shim.
-
-**If you need i18n for v1:** pick a library now, swap the shim, and update M13's "Library choices" + the authoring guide.
+Deferring the shim out of M13 (rather than shipping a no-op one) avoids a
+half-measure that wouldn't cover the backend anyway; M14 migrates the
+English strings to keys as part of its scope.
 
 ## §15.8 Worked example & plugin authoring guide (emerges M03–M05, finalised at M13)
 

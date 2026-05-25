@@ -23,9 +23,12 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M10** | ✅ | [Infra capabilities](11-M10-infra-capabilities.md) | Jobs (RabbitMQ), Storage (S3-compatible), Email (lettre), Telemetry (OTel→LGTM); runtime capability gating | Job dispatched from RPC runs and sends an email |
 | **M11** | ✅ | [Deployment workflow](12-M11-deployment-workflow.md) | `[source]` resolution (git/path), `platform.lock`, source cache + `cache prune`, `file:` secrets, `plugin enable/disable`, example deployment dir, `develop`-feature CLI gating | Build a binary from outside the source repo |
 | **M12** | ✅ | [Hardening](13-M12-hardening.md) | Full `junius check` ruleset (private-table access, exposed-table breaking changes, FE export/manifest match); four-job CI with Postgres integration + `buf breaking` + `sqlx prepare --check` | CI fails on every deliberate violation |
-| **M13** | 🚧 | [Speakers plugin](14-M13-speakers-plugin.md) | First real domain plugin, end-to-end | Speakers CRUD works; `events` plugin reuses `SpeakerPicker` |
+| **M13** | 🚧 | [Events plugin](14-M13-events-plugin.md) | First real domain plugin, end-to-end | Events CRUD with user/group ownership, public/private visibility, sign-up invite pages, and revocable iCalendar export/feeds |
+| **M14** | 🚧 ★ | [Internationalization](16-M14-internationalization.md) | Real i18n: frontend translation seam + a chosen library, backend locale for emails/iCalendar/errors, locale negotiation + per-user preference, extraction/check tooling, retrofit of existing plugins | Switch locale → UI **and** emails/calendar render translated |
 
 **v0 cut** = end of M05. From there onward, every milestone adds depth (persistence, permissions, ownership, cross-plugin composition, etc.) rather than new top-level capability.
+
+**★ Top priority:** M00–M13 ship **English-only**; **M14 (Internationalization) is the prioritized next milestone** — the first thing tackled after M13. i18n is no longer an open-ended "post-v1" punt.
 
 ## Other docs in this folder
 
