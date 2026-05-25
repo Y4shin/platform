@@ -351,10 +351,19 @@ fn migrate_up_missing_config_errors() {
 }
 
 #[test]
-fn plugin_enable_stub_exits_64() {
+fn plugin_enable_missing_config_errors() {
+    // `plugin enable` is implemented (M11): with no deployment config it fails
+    // reading `platform.toml` rather than returning the old NOT_IMPLEMENTED stub.
     cmd()
-        .args(["plugin", "enable", "demo"])
+        .args([
+            "plugin",
+            "enable",
+            "demo",
+            "--config",
+            "does-not-exist.toml",
+        ])
         .assert()
         .failure()
-        .code(64);
+        .code(1)
+        .stderr(predicate::str::contains("cannot read"));
 }

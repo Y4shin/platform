@@ -1,6 +1,27 @@
 # M11 — Deployment Workflow + `[source]` Resolution
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Done (2026-05-25).
+
+## Reconciliation (as built)
+
+The plan below is the design; the shipped implementation differs in a few spots:
+
+- **Git resolution shells out to the `git` CLI** (in the nix dev shell), not the
+  `gix` crate — lighter, and it reuses the user's existing git auth.
+- **`platform.lock` content-hashes `path` sources too** (not just git). A
+  consequence: the in-repo `examples/example-deployment/` points at the live
+  monorepo via `path = "../.."`, so its lock would be perpetually stale — it's
+  gitignored, and CI builds it with `--update-lock`.
+- **The artifact is the host binary `juniusd`, copied to `<deployment>/platform`.**
+- **`develop` gates only the command surface** (`new`/`sync`/`dev`), not the
+  dependency tree: the dev commands share `tokio`/`regex` with end-user commands
+  (`migrate` needs the tokio runtime; `build` reuses sync's generation), so no
+  dependency actually drops out under `--no-default-features`.
+- **`build` always builds release** (deployment artifacts are optimized).
+- The source/cache/hash logic lives in the CLI (`blake3` stays out of the host +
+  manifest); the lock **type** is pure serde in `junius-manifest`.
+- Secret resolver: added `file:PATH`; `vault:` remains an explicit
+  unsupported-scheme error (real Vault integration stays out of scope).
 
 ## Goal
 
