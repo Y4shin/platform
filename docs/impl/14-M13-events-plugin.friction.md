@@ -8,6 +8,18 @@ end of M13**. Append-only; one row per annoyance.
   authoring) · `papercut` (minor) · `wish` (nice-to-have).
 - **Proposed fix:** concrete enough for triage to scope directly.
 
+**Mid-M13 triage (2026-05-25):** the `junius new`/`sync` workflow cluster
+("Cluster A" — rows tagged Stage 1) is being **fixed in M13 Stage 4** (`new`
+becomes scaffold-only and needs no `platform.toml`, since dev-facing commands
+that don't deploy an instance shouldn't require a deployment config; `sync`
+fully wires a plugin: buf.yaml + buf generate, host frontend workspace dep,
+rustfmt-clean output, backend-only opt-out). The SDK/host-ergonomics + Groups
+authorization + FE redirect items (rows tagged Stage 2/3, B/C/D) are **deferred
+to [M15](17-M15-plugin-authoring-dx.md)**, with the constraint that the
+`PluginResourceCtx` fix must be **compile-time-checked** (named-field struct
+literal, not a builder). The two "fixed this stage" rows (group directory,
+public routes) are done.
+
 | Date | Stage | Area | Annoyance / missing feature | Severity | Proposed fix |
 |------|-------|------|-----------------------------|----------|--------------|
 | 2026-05-25 | 1 | new / sync | `junius new plugin events` auto-runs `sync` with the default `platform.toml` (cwd), which doesn't exist in this repo (dev config is `dev/platform.toml`) → prints `cannot read platform.toml` and **exits 1** despite scaffolding succeeding. Misleading. | friction | `new` should accept/`--config` the deployment path (or skip auto-sync and just print the next step). At minimum, don't exit non-zero when scaffolding succeeded but the optional auto-sync was a no-op. |
