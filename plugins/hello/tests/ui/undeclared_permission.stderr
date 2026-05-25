@@ -1,0 +1,5 @@
+error[E0412]: cannot find type `HelloNope` in module `hello_plugin::permissions`
+ --> tests/ui/undeclared_permission.rs:5:68
+  |
+5 | type Witness = junius_sdk::permissions!(hello_plugin::permissions::HelloNope);
+  |                                                                    ^^^^^^^^^ not found in `hello_plugin::permissions`

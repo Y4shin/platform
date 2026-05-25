@@ -3,10 +3,12 @@
 //! At M02 this crate exposes a single macro:
 //!
 //! - [`plugin_metadata!`] — invoked once per plugin crate; reads the crate's
-//!   `plugin.toml` at compile time and emits a `pub static METADATA` of type
-//!   [`junius_sdk::PluginMetadata`].
+//!   `plugin.toml` at compile time and emits `pub static METADATA`, the typed
+//!   `Config`/`Secrets` accessors, and a `pub mod permissions` of marker types.
+//! - [`permissions!`] — builds a type-level permission witness from a `&`-list of
+//!   marker types (`permissions!(A & B)` → `And<A, And<B, ()>>`).
 //!
-//! Repository/permissions/PluginCtx derives arrive in M07.
+//! The `Repository`/`PluginCtx` derives arrive later in M07.
 
 mod expand;
 
@@ -47,4 +49,14 @@ pub fn plugin_metadata(_input: TokenStream) -> TokenStream {
     };
 
     expand::plugin_metadata(&content, &path).into()
+}
+
+/// Build a type-level permission witness from a `&`-separated list of permission
+/// marker types: `permissions!(HelloRead & HelloWrite)` expands to
+/// `junius_sdk::permissions::And<HelloRead, And<HelloWrite, ()>>`. The marker
+/// types come from a plugin's `plugin_metadata!()`-generated `permissions`
+/// module; an empty invocation yields `()` (the no-permission witness).
+#[proc_macro]
+pub fn permissions(input: TokenStream) -> TokenStream {
+    expand::permissions_macro(input.into()).into()
 }

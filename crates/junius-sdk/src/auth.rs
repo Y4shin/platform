@@ -81,6 +81,19 @@ pub struct User {
     pub memberships: Vec<Membership>,
 }
 
+impl User {
+    /// Whether the user holds `permission` (e.g. `"hello:read"`) through any of
+    /// their group memberships. The host's session middleware populates
+    /// `memberships[].permissions`; the `PluginCtx` extractor and the RPC guard
+    /// use this to enforce a handler's declared permission witness at runtime.
+    #[must_use]
+    pub fn has_permission(&self, permission: &str) -> bool {
+        self.memberships
+            .iter()
+            .any(|m| m.permissions.contains(permission))
+    }
+}
+
 /// Minimal public projection of a user, for directory lookups.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

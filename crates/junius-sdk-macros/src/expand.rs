@@ -28,13 +28,78 @@ pub fn plugin_metadata(content: &str, path: &Path) -> TokenStream {
     let metadata_tokens = expand_metadata(&manifest);
     let config_tokens = expand_config(&manifest);
     let secrets_tokens = expand_secrets(&manifest);
+    let permission_markers = expand_permission_markers(&manifest);
     let tracker = include_bytes_tracker();
     quote! {
         #tracker
         #metadata_tokens
         #config_tokens
         #secrets_tokens
+        #permission_markers
     }
+}
+
+/// Expand `permissions!(A & B & C)` into a right-nested, `()`-terminated witness
+/// `And<A, And<B, And<C, ()>>>`. Empty input → `()`. Marker paths resolve in the
+/// caller's scope (typically `use crate::permissions::{…}`).
+pub fn permissions_macro(input: proc_macro2::TokenStream) -> TokenStream {
+    use syn::parse::Parser as _;
+    let parser = syn::punctuated::Punctuated::<syn::Path, syn::Token![&]>::parse_terminated;
+    let paths = match parser.parse2(input) {
+        Ok(p) => p,
+        Err(e) => return e.to_compile_error(),
+    };
+    let mut chain = quote! { () };
+    for path in paths.iter().rev() {
+        chain = quote! { ::junius_sdk::permissions::And<#path, #chain> };
+    }
+    chain
+}
+
+/// Emit `pub mod permissions { … }` with one zero-sized marker type per declared
+/// `[permissions]` key, each implementing `Permission`. Empty when the plugin
+/// declares none (referencing an undeclared permission is then a compile error —
+/// the marker type doesn't exist).
+fn expand_permission_markers(manifest: &PluginManifest) -> TokenStream {
+    if manifest.permissions.is_empty() {
+        return quote! {};
+    }
+
+    let markers = manifest.permissions.keys().map(|key| {
+        let ty = format_ident!("{}", pascal_case(key));
+        let name_lit = key.as_str();
+        let doc = format!("Permission marker for `{key}`.");
+        quote! {
+            #[doc = #doc]
+            pub struct #ty;
+            impl ::junius_sdk::permissions::Permission for #ty {
+                const NAME: &'static str = #name_lit;
+            }
+        }
+    });
+
+    quote! {
+        /// Permission marker types generated from `[permissions]` in `plugin.toml`.
+        /// Combine them in a witness via `junius_sdk::permissions!(A & B)`.
+        pub mod permissions {
+            #(#markers)*
+        }
+    }
+}
+
+/// Convert a permission key like `hello:read` or `speakers:book_slot` into a Rust
+/// type name (`HelloRead`, `SpeakersBookSlot`) by upper-camel-casing each `:`/`_`
+/// segment. Inputs are pre-validated by the manifest's `PERM.NAME.FORMAT` rule.
+fn pascal_case(key: &str) -> String {
+    key.split([':', '_'])
+        .filter(|s| !s.is_empty())
+        .map(|seg| {
+            let mut chars = seg.chars();
+            chars.next().map_or_else(String::new, |first| {
+                first.to_uppercase().collect::<String>() + chars.as_str()
+            })
+        })
+        .collect()
 }
 
 /// Emit a typed `Config` struct + `Config::load` from `[config]`. Empty when the
@@ -466,6 +531,66 @@ mod tests {
             !rendered.contains("struct Secrets"),
             "unexpected Secrets in:\n{rendered}"
         );
+    }
+
+    #[test]
+    fn permissions_module_and_markers_emitted() {
+        let rendered = render(
+            r#"
+            [plugin]
+            name = "hello"
+            display_name = "Hello"
+            manifest_schema = 1
+
+            [permissions]
+            "hello:read" = "Read."
+            "hello:write" = "Write."
+            "#,
+        );
+        let _ = parse_as_file(&rendered);
+        for needle in [
+            "mod permissions",
+            "struct HelloRead",
+            "struct HelloWrite",
+            "Permission for HelloRead",
+            "\"hello:read\"",
+            "\"hello:write\"",
+        ] {
+            assert!(
+                rendered.contains(needle),
+                "missing {needle} in:\n{rendered}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_permissions_emits_no_module() {
+        let rendered = render(
+            r#"
+            [plugin]
+            name = "hello"
+            display_name = "Hello"
+            manifest_schema = 1
+            "#,
+        );
+        assert!(
+            !rendered.contains("mod permissions"),
+            "unexpected permissions module in:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn permissions_macro_builds_terminated_and_chain() {
+        let single = permissions_macro(quote! { HelloRead }).to_string();
+        assert!(single.contains("And < HelloRead"), "got: {single}");
+        assert!(single.contains("()"), "got: {single}");
+
+        let pair = permissions_macro(quote! { HelloRead & HelloWrite }).to_string();
+        assert!(pair.contains("And < HelloRead"), "got: {pair}");
+        assert!(pair.contains("And < HelloWrite"), "got: {pair}");
+
+        // Empty witness is the unit type.
+        assert_eq!(permissions_macro(quote! {}).to_string(), "()");
     }
 
     #[test]

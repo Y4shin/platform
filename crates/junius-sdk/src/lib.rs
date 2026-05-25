@@ -10,12 +10,15 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod metadata;
+pub mod permissions;
 pub mod plugin;
 pub mod resources;
 pub mod secrets;
 pub mod telemetry;
 
-pub use junius_sdk_macros::plugin_metadata;
+pub use junius_sdk_macros::{permissions, plugin_metadata};
+
+pub use permissions::{And, Has, Permission, PermissionList};
 
 pub use auth::{
     AuditEmitter, Auth, CurrentUser, GroupId, MaybeUser, Membership, Role, RoleId, User,

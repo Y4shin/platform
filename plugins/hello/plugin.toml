@@ -17,3 +17,10 @@ description = "Greeting prefix used by the hello plugin."
 # present to exercise the secrets codegen end-to-end.
 [secrets.api_key]
 description = "Example secret demonstrating the secrets codegen."
+
+# Permissions (M07). `plugin_metadata!()` generates a marker type per key
+# (`permissions::HelloRead`, `permissions::HelloWrite`); repository methods and
+# RPC `option (platform.requires)` gate on them.
+[permissions]
+"hello:read" = "Read greetings."
+"hello:write" = "Create or modify greetings."
