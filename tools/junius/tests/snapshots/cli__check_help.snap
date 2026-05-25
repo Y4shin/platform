@@ -11,5 +11,6 @@ Options:
       --manifest <MANIFEST>  Validate a single manifest at this path
       --plugin <PLUGIN>      Validate the manifest at plugins/<NAME>/plugin.toml
   -v, --verbose...           Increase verbosity (repeat for more)
+      --base <BASE>          Git ref to diff against for breaking-change detection (`SQL.EXPOSED.NO_BREAKING`). No-op outside a git repo or if the ref is unresolvable. CI typically passes `origin/main` [default: main]
       --cwd <CWD>            Run as if junius were started in <CWD>
   -h, --help                 Print help

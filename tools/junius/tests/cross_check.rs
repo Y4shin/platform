@@ -87,6 +87,55 @@ fn cons_rust(repo: &Path, rs: &str) {
     fs::write(dir.join("repo.rs"), rs).unwrap();
 }
 
+/// Write `plugins/<plugin>/migrations/<file>` with `sql`.
+fn write_migration(repo: &Path, plugin: &str, file: &str, sql: &str) {
+    let dir = repo.join(format!("plugins/{plugin}/migrations"));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join(file), sql).unwrap();
+}
+
+fn git(repo: &Path, args: &[&str]) {
+    let status = std::process::Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?} failed");
+}
+
+/// Init a git repo on branch `main` and commit the current tree as the baseline.
+fn git_init_commit(repo: &Path) {
+    git(repo, &["init", "-q", "-b", "main"]);
+    git(repo, &["add", "."]);
+    git(
+        repo,
+        &[
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-q",
+            "-m",
+            "baseline",
+        ],
+    );
+}
+
+fn check_base(repo: &Path, base: &str) -> assert_cmd::assert::Assert {
+    cmd_in(repo)
+        .args([
+            "check",
+            "--manifest",
+            "platform.toml",
+            "--format",
+            "json",
+            "--base",
+            base,
+        ])
+        .assert()
+}
+
 fn check(repo: &Path) -> assert_cmd::assert::Assert {
     cmd_in(repo)
         .args(["check", "--manifest", "platform.toml", "--format", "json"])
@@ -248,6 +297,64 @@ fn private_table_access_passes_for_exposed_and_declared_table() {
     check(tmp.path()).success().stdout(
         predicate::str::contains("\"ok\": true").or(predicate::str::contains("\"ok\":true")),
     );
+}
+
+#[test]
+fn exposed_no_breaking_flags_uncoordinated_breaking_change() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    cons_manifest(tmp.path(), "[dependencies.prov]\ntables = [\"thing\"]\n");
+    git_init_commit(tmp.path());
+    // A new (untracked) breaking change to prov's exposed table; cons declares it
+    // and ships no coordinating migration.
+    write_migration(
+        tmp.path(),
+        "prov",
+        "0002_drop.up.sql",
+        "ALTER TABLE prov.thing DROP COLUMN id;\n",
+    );
+
+    check_base(tmp.path(), "main")
+        .failure()
+        .stdout(predicate::str::contains("SQL.EXPOSED.NO_BREAKING"));
+}
+
+#[test]
+fn exposed_no_breaking_allows_coordinated_change() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    cons_manifest(tmp.path(), "[dependencies.prov]\ntables = [\"thing\"]\n");
+    git_init_commit(tmp.path());
+    write_migration(
+        tmp.path(),
+        "prov",
+        "0002_drop.up.sql",
+        "ALTER TABLE prov.thing DROP COLUMN id;\n",
+    );
+    // cons coordinates with a migration in the same change set.
+    write_migration(tmp.path(), "cons", "0002_adapt.up.sql", "SELECT 1;\n");
+
+    check_base(tmp.path(), "main").success();
+}
+
+#[test]
+fn exposed_no_breaking_is_noop_without_git() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    cons_manifest(tmp.path(), "[dependencies.prov]\ntables = [\"thing\"]\n");
+    // No git repo → the rule cannot diff and must no-op (so the breaking change
+    // is not flagged here).
+    write_migration(
+        tmp.path(),
+        "prov",
+        "0002_drop.up.sql",
+        "ALTER TABLE prov.thing DROP COLUMN id;\n",
+    );
+
+    check_base(tmp.path(), "main").success();
 }
 
 #[test]

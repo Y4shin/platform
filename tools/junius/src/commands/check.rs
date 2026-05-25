@@ -92,7 +92,7 @@ pub fn run(args: &CheckArgs, format: OutputFormat) -> i32 {
 
     match file_name {
         "plugin.toml" => check_plugin(&path, &src, format),
-        "platform.toml" => check_platform(&path, &src, format),
+        "platform.toml" => check_platform(&path, &src, &args.base, format),
         other => {
             eprintln!(
                 "junius: don't know how to validate {other:?}; expected plugin.toml or platform.toml"
@@ -169,7 +169,7 @@ fn check_proto_requires(
     }
 }
 
-fn check_platform(path: &Path, src: &str, format: OutputFormat) -> i32 {
+fn check_platform(path: &Path, src: &str, base: &str, format: OutputFormat) -> i32 {
     let manifest = match PlatformManifest::parse(src) {
         Ok(m) => m,
         Err(e) => return emit_parse_error(path, src, &e, format),
@@ -191,8 +191,9 @@ fn check_platform(path: &Path, src: &str, format: OutputFormat) -> i32 {
     }
     junius_manifest::validate::deployment(&manifest, &plugins, &mut validation);
 
-    // Cross-plugin rules (M09): dep/RPC declarations, cross-schema FK + @requires.
-    crate::commands::cross_check::check_cross_plugin(&plugins, &mut validation);
+    // Cross-plugin rules (M09 + M12): dep/RPC declarations, cross-schema FK +
+    // @requires, private-table access, and breaking changes vs `base`.
+    crate::commands::cross_check::check_cross_plugin(&plugins, base, &mut validation);
 
     // M10: every declared logical bucket must be mapped in [config.storage.mapping].
     // Read the raw mapping table (no secret resolution needed).

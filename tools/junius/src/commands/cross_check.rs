@@ -21,6 +21,10 @@
 //!   (in a migration *or* an `sqlx::query*!` macro) must point at a table the
 //!   owner exposes (`[exposes.tables]`) and that the consumer declares in
 //!   `[dependencies.<owner>].tables`.
+//! - `SQL.EXPOSED.NO_BREAKING` — a breaking change (DROP/RENAME COLUMN, DROP
+//!   TABLE, narrowing type, ADD NOT NULL) to an exposed table, in a migration
+//!   *added vs the diff base*, is rejected unless every consumer that declares
+//!   the table also ships a migration in the same change set.
 //!
 //! Migration SQL is parsed with `sqlparser` (`PostgreSQL` dialect). FK detection
 //! covers inline (`col … REFERENCES other.table`) and table-level constraints;
@@ -29,12 +33,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::ControlFlow;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use junius_manifest::{PluginManifest, Severity, ValidationIssue, ValidationReport};
 use sqlparser::ast::{
-    ColumnOption, ObjectName, ReferentialAction, SchemaName, Statement, TableConstraint,
-    visit_relations,
+    AlterColumnOperation, AlterTableOperation, ColumnOption, DataType, ObjectName, ObjectType,
+    ReferentialAction, SchemaName, Statement, TableConstraint, visit_relations,
 };
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
@@ -43,9 +47,11 @@ use junius::migrate::header::parse_requires;
 
 use crate::commands::sync::{collect_proto_files, scan_proto_service_methods};
 
-/// Run every cross-plugin rule over the enabled plugins.
+/// Run every cross-plugin rule over the enabled plugins. `base` is the git ref
+/// to diff against for `SQL.EXPOSED.NO_BREAKING` (no-op outside a git repo).
 pub fn check_cross_plugin(
     plugins: &BTreeMap<String, PluginManifest>,
+    base: &str,
     report: &mut ValidationReport,
 ) {
     let index = build_schema_index(plugins);
@@ -56,6 +62,7 @@ pub fn check_cross_plugin(
         check_fe_exports(name, manifest, report);
         check_private_table_access(name, manifest, &index, report);
     }
+    check_no_breaking(plugins, &index, base, report);
 }
 
 /// `STORAGE.BUCKET.UNMAPPED` — every logical bucket a plugin declares
@@ -656,6 +663,207 @@ fn schema_table(name: &ObjectName) -> Option<(String, String)> {
     })
 }
 
+// --- SQL.EXPOSED.NO_BREAKING -------------------------------------------------
+
+/// A breaking change to an exposed table — in a migration *added vs `base`* — is
+/// allowed only if every consumer that declares the table also has a migration
+/// in the same change set (the spec's coordination heuristic). No-op when git or
+/// the base ref is unavailable.
+fn check_no_breaking(
+    plugins: &BTreeMap<String, PluginManifest>,
+    index: &SchemaIndex,
+    base: &str,
+    report: &mut ValidationReport,
+) {
+    let Some(added) = added_migrations(base) else {
+        return;
+    };
+    if added.is_empty() {
+        return;
+    }
+    let added_plugins: BTreeSet<String> = added
+        .iter()
+        .filter_map(|p| plugin_of_migration(p))
+        .collect();
+
+    for file in &added {
+        let Some(producer) = plugin_of_migration(file) else {
+            continue;
+        };
+        let Ok(sql) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, &sql) else {
+            continue;
+        };
+        for stmt in &statements {
+            for (schema, table, reason) in breaking_changes(stmt) {
+                let qualified = format!("{schema}.{table}");
+                let exposed = index
+                    .exposed
+                    .get(&producer)
+                    .is_some_and(|s| s.contains(&qualified));
+                if !exposed {
+                    continue; // private table: the producer's own business.
+                }
+                for (consumer, manifest) in plugins {
+                    if consumer == &producer {
+                        continue;
+                    }
+                    let declares = manifest
+                        .dependencies
+                        .get(&producer)
+                        .is_some_and(|d| d.tables.iter().any(|t| t == &table));
+                    if declares && !added_plugins.contains(consumer) {
+                        err(
+                            report,
+                            "SQL.EXPOSED.NO_BREAKING",
+                            file.display().to_string(),
+                            format!(
+                                "{reason} on exposed table {qualified} (owned by {producer:?}), but consumer {consumer:?} declares it and has no coordinating migration in this change"
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Migration `.up.sql` files added vs `base` (committed + untracked),
+/// repo-root-relative. `None` when not a git repo, `base` is unresolvable, or
+/// git is unavailable — the rule then no-ops rather than failing the check.
+fn added_migrations(base: &str) -> Option<BTreeSet<PathBuf>> {
+    use crate::source::git;
+    git(&["rev-parse", "--git-dir"]).ok()?;
+    git(&["rev-parse", "--verify", "--quiet", base]).ok()?;
+
+    let mut files = BTreeSet::new();
+    let committed = git(&[
+        "diff",
+        "--diff-filter=A",
+        "--name-only",
+        &format!("{base}...HEAD"),
+        "--",
+        "plugins",
+    ]);
+    let untracked = git(&[
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "plugins",
+    ]);
+    for out in [committed, untracked].into_iter().flatten() {
+        for line in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
+            let path = PathBuf::from(line);
+            if is_migration_file(&path) {
+                files.insert(path);
+            }
+        }
+    }
+    Some(files)
+}
+
+fn is_migration_file(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str() == "migrations")
+        && path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .is_some_and(|n| n.ends_with(".up.sql"))
+}
+
+/// The `<name>` in `plugins/<name>/migrations/…`.
+fn plugin_of_migration(path: &Path) -> Option<String> {
+    let comps: Vec<String> = path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let i = comps.iter().position(|c| c == "plugins")?;
+    comps.get(i + 1).cloned()
+}
+
+/// Breaking `(schema, table, reason)` changes in one statement (exposed-table
+/// filtering happens at the call site).
+fn breaking_changes(stmt: &Statement) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    match stmt {
+        Statement::AlterTable {
+            name, operations, ..
+        } => {
+            if let Some((schema, table)) = schema_table(name) {
+                for op in operations {
+                    if let Some(reason) = breaking_alter_op(op) {
+                        out.push((schema.clone(), table.clone(), reason));
+                    }
+                }
+            }
+        }
+        Statement::Drop {
+            object_type: ObjectType::Table,
+            names,
+            ..
+        } => {
+            for n in names {
+                if let Some((schema, table)) = schema_table(n) {
+                    out.push((schema, table, "drops the table".to_string()));
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+/// Classify one `ALTER TABLE` operation; `Some(reason)` if breaking. Type changes
+/// are conservatively breaking unless the target is an obvious widening (the old
+/// type isn't reconstructed here).
+fn breaking_alter_op(op: &AlterTableOperation) -> Option<String> {
+    match op {
+        AlterTableOperation::DropColumn { column_name, .. } => {
+            Some(format!("drops column {}", column_name.value))
+        }
+        AlterTableOperation::RenameColumn {
+            old_column_name,
+            new_column_name,
+        } => Some(format!(
+            "renames column {} to {}",
+            old_column_name.value, new_column_name.value
+        )),
+        AlterTableOperation::ChangeColumn {
+            old_name, new_name, ..
+        } => Some(format!(
+            "changes column {} to {}",
+            old_name.value, new_name.value
+        )),
+        AlterTableOperation::AlterColumn { column_name, op } => match op {
+            AlterColumnOperation::SetNotNull => {
+                Some(format!("adds NOT NULL to column {}", column_name.value))
+            }
+            AlterColumnOperation::SetDataType { data_type, .. } if !is_widening(data_type) => {
+                Some(format!(
+                    "narrows the type of column {} to {data_type}",
+                    column_name.value
+                ))
+            }
+            _ => None,
+        },
+        _ => None, // AddColumn, DropNotNull, defaults, indexes, etc. are compatible.
+    }
+}
+
+/// Obvious widening targets (compatible). Conservative: anything else is treated
+/// as a narrowing/breaking type change.
+fn is_widening(dt: &DataType) -> bool {
+    matches!(
+        dt,
+        DataType::Text
+            | DataType::Varchar(None)
+            | DataType::CharacterVarying(None)
+            | DataType::BigInt(_)
+    )
+}
+
 /// Pull the SQL string out of every sqlx `query*!` macro in a Rust source file.
 /// The SQL is the first string-literal argument (`query_as!` puts a type path
 /// first; the first *string* literal is still the SQL). `LitStr::value()`
@@ -815,6 +1023,38 @@ mod tests {
         assert!(q[1].contains("FROM y") && !q[1].contains("MyRow"));
         assert!(q[2].contains("FROM z")); // raw multiline
         assert!(q[3].contains("RETURNING id")); // `\`-continuation
+    }
+
+    #[test]
+    fn classifies_breaking_vs_compatible_changes() {
+        let reasons = |sql: &str| -> Vec<String> {
+            Parser::parse_sql(&PostgreSqlDialect {}, sql)
+                .expect("parses")
+                .iter()
+                .flat_map(breaking_changes)
+                .map(|(_, _, r)| r)
+                .collect()
+        };
+        // Breaking.
+        for sql in [
+            "ALTER TABLE a.t DROP COLUMN c",
+            "ALTER TABLE a.t RENAME COLUMN c TO d",
+            "DROP TABLE a.t",
+            "ALTER TABLE a.t ALTER COLUMN c SET NOT NULL",
+            "ALTER TABLE a.t ALTER COLUMN c TYPE varchar(10)",
+        ] {
+            assert!(!reasons(sql).is_empty(), "expected breaking: {sql}");
+        }
+        // Compatible.
+        for sql in [
+            "ALTER TABLE a.t ADD COLUMN c text",
+            "ALTER TABLE a.t ALTER COLUMN c DROP NOT NULL",
+            "ALTER TABLE a.t ALTER COLUMN c TYPE text",
+            "CREATE INDEX idx ON a.t (c)",
+            "DROP INDEX a.idx",
+        ] {
+            assert!(reasons(sql).is_empty(), "expected compatible: {sql}");
+        }
     }
 
     #[test]

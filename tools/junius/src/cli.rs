@@ -81,6 +81,12 @@ pub struct CheckArgs {
     /// Validate the manifest at plugins/<NAME>/plugin.toml.
     #[arg(long, conflicts_with = "manifest")]
     pub plugin: Option<String>,
+
+    /// Git ref to diff against for breaking-change detection
+    /// (`SQL.EXPOSED.NO_BREAKING`). No-op outside a git repo or if the ref is
+    /// unresolvable. CI typically passes `origin/main`.
+    #[arg(long, default_value = "main")]
+    pub base: String,
 }
 
 #[cfg(feature = "develop")]

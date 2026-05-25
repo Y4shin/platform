@@ -91,7 +91,7 @@ fn path_str(p: &Path) -> anyhow::Result<&str> {
 }
 
 /// Run `git` with `args`, returning stdout; errors include stderr.
-fn git(args: &[&str]) -> anyhow::Result<String> {
+pub(crate) fn git(args: &[&str]) -> anyhow::Result<String> {
     let out = Command::new("git")
         .args(args)
         .output()
