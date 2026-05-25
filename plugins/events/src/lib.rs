@@ -53,11 +53,12 @@ use proto::events::v1 as pb;
 use proto::events::v1::{
     CalendarService, CalendarServiceExt, EventService, EventServiceExt, InviteService,
     InviteServiceExt, OwnedCreateEventRequestView, OwnedCreateGroupKeyRequestView,
-    OwnedCreateInviteRequestView, OwnedDeleteEventRequestView, OwnedGetEventRequestView,
-    OwnedGetInviteRequestView, OwnedGetPersonalFeedRequestView, OwnedListEventsRequestView,
-    OwnedListFeedsRequestView, OwnedListSignupsRequestView, OwnedOptOutRequestView,
-    OwnedRevokeFeedRequestView, OwnedSetGroupPublicRequestView, OwnedShareEventRequestView,
-    OwnedSignupRequestView, OwnedUpdateEventRequestView, OwnedUpdateInviteRequestView,
+    OwnedCreateInviteRequestView, OwnedDeleteEventRequestView, OwnedGetEventInviteRequestView,
+    OwnedGetEventRequestView, OwnedGetInviteRequestView, OwnedGetPersonalFeedRequestView,
+    OwnedListEventsRequestView, OwnedListFeedsRequestView, OwnedListSignupsRequestView,
+    OwnedOptOutRequestView, OwnedRevokeFeedRequestView, OwnedSetGroupPublicRequestView,
+    OwnedShareEventRequestView, OwnedSignupRequestView, OwnedUpdateEventRequestView,
+    OwnedUpdateInviteRequestView,
 };
 
 /// Per-request state for the events plugin: its repositories, typed on the
@@ -437,6 +438,21 @@ impl InviteService for InviteRpc {
         }
         Ok(Response::new(pb::ListSignupsResponse {
             signups,
+            ..Default::default()
+        }))
+    }
+
+    async fn get_event_invite(
+        &self,
+        ctx: RequestContext,
+        request: OwnedGetEventInviteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::GetEventInviteResponse>> {
+        let event_id = parse_uuid(request.event_id, "event_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let invite = ectx.state.invites.get_for_event(event_id).await?;
+        Ok(Response::new(pb::GetEventInviteResponse {
+            has_invite: invite.is_some(),
+            invite: invite.map(invite_to_proto).into(),
             ..Default::default()
         }))
     }

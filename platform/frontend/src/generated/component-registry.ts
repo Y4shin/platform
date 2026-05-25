@@ -8,8 +8,12 @@
 import type { ComponentRegistryValue } from '@junius/sdk';
 import { GreeterCard as Hello_GreeterCard } from '@junius/plugin-hello';
 import { VenuePicker as Widgets_VenuePicker } from '@junius/plugin-widgets';
+import { EventCard as Events_EventCard } from '@junius/plugin-events';
+import { EventPicker as Events_EventPicker } from '@junius/plugin-events';
 
 export const componentRegistry: ComponentRegistryValue = {
   'hello.GreeterCard': Hello_GreeterCard,
   'widgets.VenuePicker': Widgets_VenuePicker,
+  'events.EventCard': Events_EventCard,
+  'events.EventPicker': Events_EventPicker,
 };

@@ -17,6 +17,17 @@ public_routes = true
 "events:write" = "Create, edit, and delete events and configure their invite pages."
 "events:share" = "Share a private event with another user or group."
 
+# Exposed React components (M09). `junius sync` registers these in the host
+# component registry; other plugins reach them via `useComponent('events.<name>')`.
+# Module paths are relative to this plugin's frontend `src/`.
+[exposes.components.EventCard]
+module = "./lib/EventCard"
+description = "Compact event summary card (title, when, where, visibility)."
+
+[exposes.components.EventPicker]
+module = "./lib/EventPicker"
+description = "Searchable event selector for cross-plugin reuse."
+
 # The events plugin's own table (M07). Declaring its schema grants role_events
 # DML on it; the schema + table are created by migrations/0001_event.up.sql.
 # Only `event` is exposed; invite/signup/calendar tables stay private.

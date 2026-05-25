@@ -48,6 +48,11 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
         "CreateInvite",
         &["events:read", "events:write"],
     ),
+    (
+        "events.v1.InviteService",
+        "GetEventInvite",
+        &["events:read"],
+    ),
     ("events.v1.InviteService", "ListSignups", &["events:read"]),
     (
         "events.v1.InviteService",

@@ -19,6 +19,10 @@ service InviteService {
   rpc ListSignups(ListSignupsRequest) returns (ListSignupsResponse) {
     option (platform.v1.requires) = "events:read";
   }
+  // Owner-side: the current invite configuration for an event (by id), if any.
+  rpc GetEventInvite(GetEventInviteRequest) returns (GetEventInviteResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
 
   // Viewer/attendee side — no static `requires` (see file header).
   rpc GetInvite(GetInviteRequest) returns (GetInviteResponse);
@@ -73,6 +77,14 @@ message UpdateInviteRequest {
 }
 message UpdateInviteResponse {
   Invite invite = 1;
+}
+
+message GetEventInviteRequest {
+  string event_id = 1;
+}
+message GetEventInviteResponse {
+  bool has_invite = 1;
+  Invite invite = 2;
 }
 
 message ListSignupsRequest {

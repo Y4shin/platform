@@ -27,6 +27,7 @@ export const rpc = {
   },
   InviteService: {
     createInvite: InviteService.method.createInvite,
+    getEventInvite: InviteService.method.getEventInvite,
     getInvite: InviteService.method.getInvite,
     listSignups: InviteService.method.listSignups,
     optOut: InviteService.method.optOut,

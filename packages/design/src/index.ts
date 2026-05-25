@@ -8,7 +8,7 @@ export { DateRange, DateTimeInput } from './DateTime.js';
 export type { FormProps } from './Form.js';
 export { Form } from './Form.js';
 export type { FormFieldProps, FormFieldRender } from './FormField.js';
-export { FormField } from './FormField.js';
+export { createFormField, FormField } from './FormField.js';
 export type { InputProps } from './Input.js';
 export { CONTROL_CLASS, Input } from './Input.js';
 export type { SelectOption, SelectProps } from './Select.js';
