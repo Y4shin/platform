@@ -42,9 +42,16 @@ tasks:
       - pnpm run typecheck
 
   test:e2e:
-    desc: Playwright browser E2E (wired in M09 Stage E).
+    desc: Playwright browser E2E (needs the dev stack + a login; set JUNIUS_E2E=1).
     cmds:
-      - echo "task test:e2e — Playwright lands in M09 Stage E"
+      - |
+        if [ -n "$JUNIUS_E2E" ]; then
+          pnpm exec playwright test --config e2e/playwright.config.ts
+        else
+          echo "task test:e2e — skipped: set JUNIUS_E2E=1 with the dev stack running"
+          echo "  (docker compose -f dev/docker-compose.yml up -d; task dev; log in)."
+          echo "  Deterministic enabled/disabled coverage runs in task test:js."
+        fi
 
   # --- format / lint --------------------------------------------------------
 

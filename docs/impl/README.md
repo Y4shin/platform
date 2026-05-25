@@ -19,7 +19,7 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M06** | ✅ | [DB + auth](07-M06-db-auth.md) | Postgres, host migrations, per-plugin roles, OIDC, sessions, typed plugin config/secrets | Log in via Authentik; `GET /api/me` returns user |
 | **M07** | ✅ | [Repos + permissions](08-M07-repos-permissions.md) | `#[repository]`, `Has<X>`, `#[derive(PluginCtx)]`, RPC `requires` enforcement | Compile-fail test rejects writes without the permission |
 | **M08** | ✅ | [Resource access](09-M08-resource-access.md) | `resource_principal`/`resource_share` recording, `viewerCanX` flags | User A's private note invisible to B until shared |
-| **M09** | 🚧 | [Cross-plugin](10-M09-cross-plugin.md) | Required + optional inter-plugin deps; component registry; narrow RPC namespaces | Disabling `widgets` degrades the page gracefully |
+| **M09** | ✅ | [Cross-plugin](10-M09-cross-plugin.md) | Required + optional inter-plugin deps; component registry; narrow RPC namespaces | Disabling `widgets` degrades the page gracefully |
 | **M10** | 🚧 | [Infra capabilities](11-M10-infra-capabilities.md) | Jobs (apalis), Storage (S3), Email (lettre), Telemetry (OTel) | Job dispatched from RPC runs and sends an email |
 | **M11** | 🚧 | [Deployment workflow](12-M11-deployment-workflow.md) | `[source]` resolution, `platform.lock`, example deployment dir, `develop`-feature CLI gating | Build a binary from outside the source repo |
 | **M12** | 🚧 | [Hardening](13-M12-hardening.md) | All `junius check` rules; CI schema test; breaking-change detection | CI fails on every deliberate violation |
