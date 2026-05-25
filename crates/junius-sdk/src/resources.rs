@@ -15,7 +15,7 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 
-use crate::auth::{AuditEmitter, Auth, User, Users};
+use crate::auth::{AuditEmitter, Auth, Groups, User, Users};
 use crate::authz::Authz;
 use crate::config::PluginConfig;
 use crate::db::PluginDb;
@@ -52,6 +52,8 @@ pub struct PluginResources {
     pub auth: Auth,
     /// User-directory handle.
     pub users: Users,
+    /// Group-directory handle (resolve by name/id, enumerate members).
+    pub groups: Groups,
     /// Audit-log writer.
     pub audit: AuditEmitter,
     /// Per-resource ownership + sharing (caller attached per request).
@@ -80,6 +82,7 @@ impl PluginResources {
             db: ctx.db.clone(),
             auth: ctx.auth.clone().with_user(user.clone()),
             users: ctx.users.clone(),
+            groups: ctx.groups.clone(),
             audit: ctx.audit.clone(),
             authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
             email: ctx.email.clone(),
@@ -120,6 +123,7 @@ pub struct PluginResourceCtx {
     db: PluginDb,
     auth: Auth,
     users: Users,
+    groups: Groups,
     audit: AuditEmitter,
     authz: Authz,
     email: Email,
@@ -141,6 +145,7 @@ impl PluginResourceCtx {
         db: PluginDb,
         auth: Auth,
         users: Users,
+        groups: Groups,
         audit: AuditEmitter,
         authz: Authz,
         email: Email,
@@ -155,6 +160,7 @@ impl PluginResourceCtx {
             db,
             auth,
             users,
+            groups,
             audit,
             authz,
             email,

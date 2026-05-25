@@ -9,8 +9,8 @@
 use std::time::Duration;
 
 use junius_sdk::{
-    AuditEmitter, Auth, Authz, Email, Job, JobHandler, Jobs, PluginConfig, PluginDb, PluginError,
-    PluginResourceCtx, PluginStorage, SecretStore, Telemetry, Users,
+    AuditEmitter, Auth, Authz, Email, Groups, Job, JobHandler, Jobs, PluginConfig, PluginDb,
+    PluginError, PluginResourceCtx, PluginStorage, SecretStore, Telemetry, Users,
 };
 use platform::jobs::worker::{JobRegistry, declare_job_queues, run_worker};
 use platform::jobs::{build, declare_exchanges};
@@ -110,6 +110,7 @@ async fn jobs_round_trip_and_dead_letter() {
         PluginDb::new(pool.clone(), "testjobs"),
         Auth::new(pool.clone()),
         Users::new(pool.clone()),
+        Groups::new(pool.clone()),
         AuditEmitter::new(pool.clone()),
         Authz::new(pool.clone()),
         Email::disabled("testjobs", &[]),

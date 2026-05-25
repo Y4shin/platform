@@ -3,7 +3,7 @@
 //! `on_shutdown` with a caller-less [`PluginResources`] built from it.
 
 use junius_sdk::{
-    AuditEmitter, Auth, Authz, Plugin, PluginDb, PluginMetadata, PluginResourceCtx,
+    AuditEmitter, Auth, Authz, Groups, Plugin, PluginDb, PluginMetadata, PluginResourceCtx,
     PluginResources, Telemetry, Users,
 };
 use sqlx::PgPool;
@@ -29,6 +29,7 @@ pub fn build_ctx(
         db,
         Auth::new(platform_pool.clone()),
         Users::new(platform_pool.clone()),
+        Groups::new(platform_pool.clone()),
         AuditEmitter::new(platform_pool.clone()),
         Authz::new(platform_pool.clone()),
         infra.email_handle(meta.name, meta.capabilities),

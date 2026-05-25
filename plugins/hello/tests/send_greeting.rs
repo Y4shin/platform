@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use hello_plugin::{HelloPlugin, SendGreeting};
 use junius_sdk::{
-    AuditEmitter, Auth, Authz, BucketName, Email, EmailMessage, Jobs, Plugin, PluginConfig,
+    AuditEmitter, Auth, Authz, BucketName, Email, EmailMessage, Groups, Jobs, Plugin, PluginConfig,
     PluginDb, PluginResourceCtx, PluginResources, PluginStorage, SecretStore, Telemetry, Transport,
     TransportError, Users,
 };
@@ -50,6 +50,7 @@ async fn send_greeting_job_emails_via_capability() {
         PluginDb::new(pool.clone(), "hello"),
         Auth::new(pool.clone()),
         Users::new(pool.clone()),
+        Groups::new(pool.clone()),
         AuditEmitter::new(pool.clone()),
         Authz::new(pool.clone()),
         email,

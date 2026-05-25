@@ -171,6 +171,98 @@ async fn lookup_display(pool: &PgPool, id: UserId) -> Result<Option<UserDisplay>
     }))
 }
 
+/// Minimal public projection of a group, for directory lookups.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupRef {
+    pub id: GroupId,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+/// A member of a group, with the role they hold there.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupMember {
+    pub user: UserDisplay,
+    pub role: Role,
+}
+
+/// A group-directory handle: resolve groups by name/id and enumerate their
+/// members without touching `platform.group*` directly. Like [`Users`], it runs
+/// on the platform pool, so it needs no per-plugin grant.
+#[derive(Clone)]
+pub struct Groups {
+    pool: PgPool,
+}
+
+impl Groups {
+    #[must_use]
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Resolve a group by its platform `name`. Group names are **not** unique in
+    /// `platform.group`; this returns the earliest-created match (callers that
+    /// need determinism should prefer ids — e.g. the calendar feed keeps an
+    /// id-based path as canonical).
+    pub async fn by_name(&self, name: &str) -> Result<Option<GroupRef>, PluginError> {
+        let row = sqlx::query(
+            "SELECT id, name, description FROM platform.group \
+             WHERE name = $1 ORDER BY created_at LIMIT 1",
+        )
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| GroupRef {
+            id: GroupId(r.get("id")),
+            name: r.get("name"),
+            description: r.get("description"),
+        }))
+    }
+
+    /// Look up a group by id.
+    pub async fn by_id(&self, id: GroupId) -> Result<Option<GroupRef>, PluginError> {
+        let row = sqlx::query("SELECT id, name, description FROM platform.group WHERE id = $1")
+            .bind(id.0)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|r| GroupRef {
+            id: GroupId(r.get("id")),
+            name: r.get("name"),
+            description: r.get("description"),
+        }))
+    }
+
+    /// Enumerate a group's members (e.g. for group sign-up pre-fill).
+    pub async fn members(&self, id: GroupId) -> Result<Vec<GroupMember>, PluginError> {
+        let rows = sqlx::query(
+            "SELECT u.id, u.email, u.display_name, r.id AS role_id, r.name AS role_name \
+             FROM platform.group_membership m \
+             JOIN platform.user u ON u.id = m.user_id \
+             JOIN platform.group_role r ON r.id = m.role_id \
+             WHERE m.group_id = $1 ORDER BY u.display_name",
+        )
+        .bind(id.0)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| GroupMember {
+                user: UserDisplay {
+                    id: UserId(r.get("id")),
+                    email: r.get("email"),
+                    display_name: r.get("display_name"),
+                },
+                role: Role {
+                    id: RoleId(r.get("role_id")),
+                    name: r.get("role_name"),
+                },
+            })
+            .collect())
+    }
+}
+
 /// Append-only audit logging into `platform.audit_event`.
 #[derive(Clone)]
 pub struct AuditEmitter {
