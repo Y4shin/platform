@@ -1,13 +1,22 @@
-// Hello plugin RPC surface. M05's smoke-test contract: one unary method
-// that echoes a name back into a greeting string. No permissions yet —
-// `option (platform.requires)` arrives once M07 lands the permission
-// system.
+// Hello plugin RPC surface. `Greet` is the M05 smoke test (no permission).
+// M07 adds greeting CRUD gated by `option (platform.v1.requires)`, enforced by
+// the host RPC guard + the typed permission witness in each handler.
 syntax = "proto3";
 
 package hello.v1;
 
+import "platform/v1/annotations.proto";
+
 service HelloService {
   rpc Greet(GreetRequest) returns (GreetResponse);
+
+  rpc ListGreetings(ListGreetingsRequest) returns (ListGreetingsResponse) {
+    option (platform.v1.requires) = "hello:read";
+  }
+
+  rpc CreateGreeting(CreateGreetingRequest) returns (CreateGreetingResponse) {
+    option (platform.v1.requires) = "hello:read,hello:write";
+  }
 }
 
 message GreetRequest {
@@ -16,4 +25,26 @@ message GreetRequest {
 
 message GreetResponse {
   string message = 1;
+}
+
+message Greeting {
+  string id = 1;
+  string name = 2;
+  string body = 3;
+  string created = 4; // RFC 3339 timestamp
+}
+
+message ListGreetingsRequest {}
+
+message ListGreetingsResponse {
+  repeated Greeting greetings = 1;
+}
+
+message CreateGreetingRequest {
+  string name = 1;
+  string body = 2;
+}
+
+message CreateGreetingResponse {
+  Greeting greeting = 1;
 }

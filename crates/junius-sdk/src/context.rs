@@ -56,6 +56,25 @@ impl<S, P> PluginContext<S, P> {
     }
 }
 
+impl<S, P> PluginContext<S, P>
+where
+    S: BuildState,
+    P: PermissionList,
+{
+    /// Build the context inside a Connect-RPC handler, from its
+    /// [`RequestContext`](connectrpc::RequestContext). Same checks as the HTTP
+    /// extractor — resolve resources + caller from request extensions, verify the
+    /// witness `P` — but callable from the fixed generated handler signature.
+    /// (The host's RPC guard also enforces the proto's declared permissions
+    /// independently, before the handler runs.)
+    pub fn from_rpc(ctx: &connectrpc::RequestContext) -> Result<Self, ApiError> {
+        let (resources, user) = resolve(ctx.extensions())?;
+        check_perms(user.as_ref(), &P::names())?;
+        let state = S::build(&resources, user.as_ref());
+        Ok(Self::__new(state, user, resources))
+    }
+}
+
 /// Error returned by the `PluginCtx` extractor / RPC entry point: a missing
 /// caller (401), a missing permission (403), or unconfigured resources (500).
 /// Rendered as a small JSON body matching the Connect error envelope so HTTP and
@@ -144,6 +163,26 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let body = serde_json::json!({ "code": self.code, "message": self.message });
         (self.status, axum::Json(body)).into_response()
+    }
+}
+
+impl From<ApiError> for connectrpc::ConnectError {
+    fn from(err: ApiError) -> Self {
+        match err.code {
+            "unauthenticated" => Self::unauthenticated(err.message),
+            "permission_denied" => Self::permission_denied(err.message),
+            "not_found" => Self::not_found(err.message),
+            _ => Self::internal(err.message),
+        }
+    }
+}
+
+impl From<RepoError> for connectrpc::ConnectError {
+    fn from(err: RepoError) -> Self {
+        match err {
+            RepoError::NotFound => Self::not_found("not found"),
+            other => Self::internal(other.to_string()),
+        }
     }
 }
 

@@ -31,6 +31,11 @@ pub fn build_app_with_services(
     auth_state: AuthState,
 ) -> Router {
     let (http, rpc) = compose(plugins, Some((pools, platform_pool, runtimes)));
+    // The RPC permission guard sees the post-nest path (`/<service>/<method>`)
+    // and runs inside the session middleware (so `Extension<User>` is set).
+    let rpc = rpc.layer(axum::middleware::from_fn(
+        crate::rpc_guard::require_permissions,
+    ));
     let protected = http
         .nest("/rpc", rpc)
         .route("/api/me", get(auth::me::handler))

@@ -11,6 +11,7 @@ junius-sdk-macros = { workspace = true }
 
 axum        = { workspace = true }
 async-trait = { workspace = true }
+connectrpc  = { workspace = true }
 thiserror   = { workspace = true }
 anyhow      = { workspace = true }
 serde       = { workspace = true }

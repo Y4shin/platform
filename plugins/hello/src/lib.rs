@@ -28,12 +28,27 @@ mod proto {
 
 pub mod repo;
 
-use proto::hello::v1::{HelloService, HelloServiceExt, OwnedGreetRequestView};
+use proto::hello::v1 as pb;
+use proto::hello::v1::{
+    HelloService, HelloServiceExt, OwnedCreateGreetingRequestView, OwnedGreetRequestView,
+    OwnedListGreetingsRequestView,
+};
 // Wire message types, re-exported for tests and any in-process callers.
 pub use proto::hello::v1::{GreetRequest, GreetResponse};
 
-use crate::permissions::HelloRead;
-use crate::repo::{Greeting, HelloRepo};
+use crate::permissions::{HelloRead, HelloWrite};
+use crate::repo::{Greeting, HelloRepo, NewGreeting};
+
+/// Convert a stored greeting into its proto wire form.
+fn greeting_to_proto(g: Greeting) -> pb::Greeting {
+    pb::Greeting {
+        id: g.id.0.to_string(),
+        name: g.name,
+        body: g.body,
+        created: g.created.to_rfc3339(),
+        ..Default::default()
+    }
+}
 
 /// Per-request state for the hello plugin: its repositories, typed on the
 /// permission witness `P`. `#[derive(PluginCtx)]` generates the extractor for
@@ -71,9 +86,11 @@ impl Default for HelloPlugin {
     }
 }
 
-/// Connect-RPC implementation of `hello.v1.HelloService`. Stateless for now;
-/// once M07 lands repositories, `Greet` would route through one (reading the
-/// caller + plugin resources from `ctx.extensions()`).
+/// Connect-RPC implementation of `hello.v1.HelloService`. `Greet` is permission-
+/// free; the CRUD methods build a typed `HelloCtx<P>` from the request context
+/// (`from_rpc`), which re-checks the witness and yields the permission-gated
+/// repository. The host's RPC guard also enforces each method's
+/// `(platform.v1.requires)` before the handler runs.
 struct HelloRpc;
 
 impl HelloService for HelloRpc {
@@ -89,6 +106,39 @@ impl HelloService for HelloRpc {
         };
         Ok(Response::new(GreetResponse {
             message: format!("Hello, {name}!"),
+            ..Default::default()
+        }))
+    }
+
+    async fn list_greetings(
+        &self,
+        ctx: RequestContext,
+        _request: OwnedListGreetingsRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListGreetingsResponse>> {
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead)>::from_rpc(&ctx)?;
+        let greetings = hctx.state.greetings.list().await?;
+        Ok(Response::new(pb::ListGreetingsResponse {
+            greetings: greetings.into_iter().map(greeting_to_proto).collect(),
+            ..Default::default()
+        }))
+    }
+
+    async fn create_greeting(
+        &self,
+        ctx: RequestContext,
+        request: OwnedCreateGreetingRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateGreetingResponse>> {
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead & HelloWrite)>::from_rpc(&ctx)?;
+        let created = hctx
+            .state
+            .greetings
+            .create(NewGreeting {
+                name: request.name.to_string(),
+                body: request.body.to_string(),
+            })
+            .await?;
+        Ok(Response::new(pb::CreateGreetingResponse {
+            greeting: Some(greeting_to_proto(created)).into(),
             ..Default::default()
         }))
     }

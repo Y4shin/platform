@@ -7,7 +7,9 @@ pub mod auth;
 pub mod boot;
 pub mod config;
 pub mod db;
+pub mod generated;
 pub mod plugin_registry;
+pub mod rpc_guard;
 pub mod server;
 
 #[cfg(feature = "embed-frontend")]

@@ -2,8 +2,6 @@
 //! generated plugin registry, initialises tracing, and hands off to
 //! `platform::server::run`.
 
-mod generated;
-
 use std::path::PathBuf;
 
 use anyhow::Context as _;
@@ -16,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     let path = config_path();
     let config = HostConfig::load_from_toml(&path)
         .with_context(|| format!("loading host config from {}", path.display()))?;
-    let plugins = generated::plugins::plugins();
+    let plugins = platform::generated::plugins::plugins();
     platform::server::run(config, plugins).await
 }
 
