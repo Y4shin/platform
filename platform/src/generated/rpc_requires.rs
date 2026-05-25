@@ -10,4 +10,12 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
         &["hello:read", "hello:write"],
     ),
     ("hello.v1.HelloService", "ListGreetings", &["hello:read"]),
+    (
+        "hello.v1.NoteService",
+        "CreateNote",
+        &["hello:read", "hello:write"],
+    ),
+    ("hello.v1.NoteService", "GetNote", &["hello:read"]),
+    ("hello.v1.NoteService", "ListNotes", &["hello:read"]),
+    ("hello.v1.NoteService", "ShareNote", &["hello:read"]),
 ];

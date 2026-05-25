@@ -24,6 +24,7 @@ description = "Example secret demonstrating the secrets codegen."
 [permissions]
 "hello:read" = "Read greetings."
 "hello:write" = "Create or modify greetings."
+"hello:share" = "Share a note with another user or group."
 
 # The table this plugin owns (M07). Declaring its schema is what grants
 # `role_hello` DML on it (see crates/manifest grants); the schema + table itself
@@ -31,3 +32,7 @@ description = "Example secret demonstrating the secrets codegen."
 [exposes.tables.greeting]
 schema = "hello"
 description = "Greetings created via the hello plugin."
+
+[exposes.tables.note]
+schema = "hello"
+description = "Access-controlled notes (owner/share demo)."

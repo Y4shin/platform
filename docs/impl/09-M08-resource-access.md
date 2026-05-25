@@ -1,6 +1,27 @@
 # M08 — Resource Ownership + Per-Resource Access + `viewerCanX`
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Done.
+>
+> **Implementation notes / deviations from the sketch below:**
+> - **`platform.user_can_access` is now `SECURITY DEFINER`** (migration
+>   `0008_authz_functions`). It was `SECURITY INVOKER`, and plugin roles have no
+>   SELECT on the authz tables, so a plugin repo calling it would have failed on
+>   the function's internal reads. Ownership is recorded through a companion
+>   `SECURITY DEFINER` `platform.record_owner(...)` so a plugin's own transaction
+>   records ownership atomically with the resource INSERT without direct write
+>   access. `resource_share` gained a surface `id` (PK) so shares can be returned
+>   + revoked individually. Verified end-to-end through an actual least-privilege
+>   `role_hello` pool.
+> - **`Authz` is on `PluginResources`** (request-scoped with the caller, like
+>   `Auth`), holding the platform pool for `share`/`unshare` (owner-checked +
+>   audited) and exposing `record_owner(&mut tx, …)` for the in-transaction path.
+> - **RPC is a second connectrpc service** `hello.v1.NoteService` registered
+>   alongside `HelloService`; `ShareNote` requires only `hello:read` (the
+>   owner-check is host-side in `authz.share`). Repos use `sqlx::query!` with the
+>   `as "viewer_can_*!"` not-null override.
+> - **FE deferred**: the `viewerCanX` flags flow onto the generated TS `Note`
+>   type; a `NoteList` component is optional polish (the rule "the FE never
+>   recomputes access" still holds).
 
 ## Goal
 

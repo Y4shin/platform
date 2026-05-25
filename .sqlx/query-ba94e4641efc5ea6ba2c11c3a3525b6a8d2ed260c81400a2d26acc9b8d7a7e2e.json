@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT n.id, n.title, n.body, n.created,\n              platform.user_can_access('hello:note', n.id, $1, 'hello:write') AS \"viewer_can_edit!\",\n              platform.user_can_access('hello:note', n.id, $1, 'hello:share') AS \"viewer_can_share!\"\n            FROM hello.note n\n            WHERE platform.user_can_access('hello:note', n.id, $1, 'hello:read')\n            ORDER BY n.created\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "viewer_can_edit!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "viewer_can_share!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ba94e4641efc5ea6ba2c11c3a3525b6a8d2ed260c81400a2d26acc9b8d7a7e2e"
+}

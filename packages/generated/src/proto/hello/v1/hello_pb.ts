@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hello/v1/hello.proto.
  */
 export const file_hello_v1_hello: GenFile = /*@__PURE__*/
-  fileDesc("ChRoZWxsby92MS9oZWxsby5wcm90bxIIaGVsbG8udjEiHAoMR3JlZXRSZXF1ZXN0EgwKBG5hbWUYASABKAkiIAoNR3JlZXRSZXNwb25zZRIPCgdtZXNzYWdlGAEgASgJIkMKCEdyZWV0aW5nEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEYm9keRgDIAEoCRIPCgdjcmVhdGVkGAQgASgJIhYKFExpc3RHcmVldGluZ3NSZXF1ZXN0Ij4KFUxpc3RHcmVldGluZ3NSZXNwb25zZRIlCglncmVldGluZ3MYASADKAsyEi5oZWxsby52MS5HcmVldGluZyIzChVDcmVhdGVHcmVldGluZ1JlcXVlc3QSDAoEbmFtZRgBIAEoCRIMCgRib2R5GAIgASgJIj4KFkNyZWF0ZUdyZWV0aW5nUmVzcG9uc2USJAoIZ3JlZXRpbmcYASABKAsyEi5oZWxsby52MS5HcmVldGluZzKbAgoMSGVsbG9TZXJ2aWNlEjgKBUdyZWV0EhYuaGVsbG8udjEuR3JlZXRSZXF1ZXN0GhcuaGVsbG8udjEuR3JlZXRSZXNwb25zZRJgCg1MaXN0R3JlZXRpbmdzEh4uaGVsbG8udjEuTGlzdEdyZWV0aW5nc1JlcXVlc3QaHy5oZWxsby52MS5MaXN0R3JlZXRpbmdzUmVzcG9uc2UiDoqmHQpoZWxsbzpyZWFkEm8KDkNyZWF0ZUdyZWV0aW5nEh8uaGVsbG8udjEuQ3JlYXRlR3JlZXRpbmdSZXF1ZXN0GiAuaGVsbG8udjEuQ3JlYXRlR3JlZXRpbmdSZXNwb25zZSIaiqYdFmhlbGxvOnJlYWQsaGVsbG86d3JpdGViBnByb3RvMw", [file_platform_v1_annotations]);
+  fileDesc("ChRoZWxsby92MS9oZWxsby5wcm90bxIIaGVsbG8udjEiHAoMR3JlZXRSZXF1ZXN0EgwKBG5hbWUYASABKAkiIAoNR3JlZXRSZXNwb25zZRIPCgdtZXNzYWdlGAEgASgJIkMKCEdyZWV0aW5nEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEYm9keRgDIAEoCRIPCgdjcmVhdGVkGAQgASgJIhYKFExpc3RHcmVldGluZ3NSZXF1ZXN0Ij4KFUxpc3RHcmVldGluZ3NSZXNwb25zZRIlCglncmVldGluZ3MYASADKAsyEi5oZWxsby52MS5HcmVldGluZyIzChVDcmVhdGVHcmVldGluZ1JlcXVlc3QSDAoEbmFtZRgBIAEoCRIMCgRib2R5GAIgASgJIj4KFkNyZWF0ZUdyZWV0aW5nUmVzcG9uc2USJAoIZ3JlZXRpbmcYASABKAsyEi5oZWxsby52MS5HcmVldGluZyJzCgROb3RlEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEgwKBGJvZHkYAyABKAkSDwoHY3JlYXRlZBgEIAEoCRIXCg92aWV3ZXJfY2FuX2VkaXQYBSABKAgSGAoQdmlld2VyX2Nhbl9zaGFyZRgGIAEoCCISChBMaXN0Tm90ZXNSZXF1ZXN0IjIKEUxpc3ROb3Rlc1Jlc3BvbnNlEh0KBW5vdGVzGAEgAygLMg4uaGVsbG8udjEuTm90ZSIcCg5HZXROb3RlUmVxdWVzdBIKCgJpZBgBIAEoCSIvCg9HZXROb3RlUmVzcG9uc2USHAoEbm90ZRgBIAEoCzIOLmhlbGxvLnYxLk5vdGUiMAoRQ3JlYXRlTm90ZVJlcXVlc3QSDQoFdGl0bGUYASABKAkSDAoEYm9keRgCIAEoCSIyChJDcmVhdGVOb3RlUmVzcG9uc2USHAoEbm90ZRgBIAEoCzIOLmhlbGxvLnYxLk5vdGUiYAoQU2hhcmVOb3RlUmVxdWVzdBIKCgJpZBgBIAEoCRIWCg5wcmluY2lwYWxfa2luZBgCIAEoCRIUCgxwcmluY2lwYWxfaWQYAyABKAkSEgoKcGVybWlzc2lvbhgEIAEoCSIlChFTaGFyZU5vdGVSZXNwb25zZRIQCghzaGFyZV9pZBgBIAEoCTKbAgoMSGVsbG9TZXJ2aWNlEjgKBUdyZWV0EhYuaGVsbG8udjEuR3JlZXRSZXF1ZXN0GhcuaGVsbG8udjEuR3JlZXRSZXNwb25zZRJgCg1MaXN0R3JlZXRpbmdzEh4uaGVsbG8udjEuTGlzdEdyZWV0aW5nc1JlcXVlc3QaHy5oZWxsby52MS5MaXN0R3JlZXRpbmdzUmVzcG9uc2UiDoqmHQpoZWxsbzpyZWFkEm8KDkNyZWF0ZUdyZWV0aW5nEh8uaGVsbG8udjEuQ3JlYXRlR3JlZXRpbmdSZXF1ZXN0GiAuaGVsbG8udjEuQ3JlYXRlR3JlZXRpbmdSZXNwb25zZSIaiqYdFmhlbGxvOnJlYWQsaGVsbG86d3JpdGUy7gIKC05vdGVTZXJ2aWNlElQKCUxpc3ROb3RlcxIaLmhlbGxvLnYxLkxpc3ROb3Rlc1JlcXVlc3QaGy5oZWxsby52MS5MaXN0Tm90ZXNSZXNwb25zZSIOiqYdCmhlbGxvOnJlYWQSTgoHR2V0Tm90ZRIYLmhlbGxvLnYxLkdldE5vdGVSZXF1ZXN0GhkuaGVsbG8udjEuR2V0Tm90ZVJlc3BvbnNlIg6Kph0KaGVsbG86cmVhZBJjCgpDcmVhdGVOb3RlEhsuaGVsbG8udjEuQ3JlYXRlTm90ZVJlcXVlc3QaHC5oZWxsby52MS5DcmVhdGVOb3RlUmVzcG9uc2UiGoqmHRZoZWxsbzpyZWFkLGhlbGxvOndyaXRlElQKCVNoYXJlTm90ZRIaLmhlbGxvLnYxLlNoYXJlTm90ZVJlcXVlc3QaGy5oZWxsby52MS5TaGFyZU5vdGVSZXNwb25zZSIOiqYdCmhlbGxvOnJlYWRiBnByb3RvMw", [file_platform_v1_annotations]);
 
 /**
  * @generated from message hello.v1.GreetRequest
@@ -155,6 +155,206 @@ export const CreateGreetingResponseSchema: GenMessage<CreateGreetingResponse> = 
   messageDesc(file_hello_v1_hello, 6);
 
 /**
+ * @generated from message hello.v1.Note
+ */
+export type Note = Message<"hello.v1.Note"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string title = 2;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string body = 3;
+   */
+  body: string;
+
+  /**
+   * RFC 3339
+   *
+   * @generated from field: string created = 4;
+   */
+  created: string;
+
+  /**
+   * @generated from field: bool viewer_can_edit = 5;
+   */
+  viewerCanEdit: boolean;
+
+  /**
+   * @generated from field: bool viewer_can_share = 6;
+   */
+  viewerCanShare: boolean;
+};
+
+/**
+ * Describes the message hello.v1.Note.
+ * Use `create(NoteSchema)` to create a new message.
+ */
+export const NoteSchema: GenMessage<Note> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 7);
+
+/**
+ * @generated from message hello.v1.ListNotesRequest
+ */
+export type ListNotesRequest = Message<"hello.v1.ListNotesRequest"> & {
+};
+
+/**
+ * Describes the message hello.v1.ListNotesRequest.
+ * Use `create(ListNotesRequestSchema)` to create a new message.
+ */
+export const ListNotesRequestSchema: GenMessage<ListNotesRequest> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 8);
+
+/**
+ * @generated from message hello.v1.ListNotesResponse
+ */
+export type ListNotesResponse = Message<"hello.v1.ListNotesResponse"> & {
+  /**
+   * @generated from field: repeated hello.v1.Note notes = 1;
+   */
+  notes: Note[];
+};
+
+/**
+ * Describes the message hello.v1.ListNotesResponse.
+ * Use `create(ListNotesResponseSchema)` to create a new message.
+ */
+export const ListNotesResponseSchema: GenMessage<ListNotesResponse> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 9);
+
+/**
+ * @generated from message hello.v1.GetNoteRequest
+ */
+export type GetNoteRequest = Message<"hello.v1.GetNoteRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message hello.v1.GetNoteRequest.
+ * Use `create(GetNoteRequestSchema)` to create a new message.
+ */
+export const GetNoteRequestSchema: GenMessage<GetNoteRequest> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 10);
+
+/**
+ * @generated from message hello.v1.GetNoteResponse
+ */
+export type GetNoteResponse = Message<"hello.v1.GetNoteResponse"> & {
+  /**
+   * @generated from field: hello.v1.Note note = 1;
+   */
+  note?: Note | undefined;
+};
+
+/**
+ * Describes the message hello.v1.GetNoteResponse.
+ * Use `create(GetNoteResponseSchema)` to create a new message.
+ */
+export const GetNoteResponseSchema: GenMessage<GetNoteResponse> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 11);
+
+/**
+ * @generated from message hello.v1.CreateNoteRequest
+ */
+export type CreateNoteRequest = Message<"hello.v1.CreateNoteRequest"> & {
+  /**
+   * @generated from field: string title = 1;
+   */
+  title: string;
+
+  /**
+   * @generated from field: string body = 2;
+   */
+  body: string;
+};
+
+/**
+ * Describes the message hello.v1.CreateNoteRequest.
+ * Use `create(CreateNoteRequestSchema)` to create a new message.
+ */
+export const CreateNoteRequestSchema: GenMessage<CreateNoteRequest> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 12);
+
+/**
+ * @generated from message hello.v1.CreateNoteResponse
+ */
+export type CreateNoteResponse = Message<"hello.v1.CreateNoteResponse"> & {
+  /**
+   * @generated from field: hello.v1.Note note = 1;
+   */
+  note?: Note | undefined;
+};
+
+/**
+ * Describes the message hello.v1.CreateNoteResponse.
+ * Use `create(CreateNoteResponseSchema)` to create a new message.
+ */
+export const CreateNoteResponseSchema: GenMessage<CreateNoteResponse> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 13);
+
+/**
+ * @generated from message hello.v1.ShareNoteRequest
+ */
+export type ShareNoteRequest = Message<"hello.v1.ShareNoteRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 'user' | 'group' | 'public'
+   *
+   * @generated from field: string principal_kind = 2;
+   */
+  principalKind: string;
+
+  /**
+   * user/group UUID; empty for 'public'
+   *
+   * @generated from field: string principal_id = 3;
+   */
+  principalId: string;
+
+  /**
+   * @generated from field: string permission = 4;
+   */
+  permission: string;
+};
+
+/**
+ * Describes the message hello.v1.ShareNoteRequest.
+ * Use `create(ShareNoteRequestSchema)` to create a new message.
+ */
+export const ShareNoteRequestSchema: GenMessage<ShareNoteRequest> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 14);
+
+/**
+ * @generated from message hello.v1.ShareNoteResponse
+ */
+export type ShareNoteResponse = Message<"hello.v1.ShareNoteResponse"> & {
+  /**
+   * @generated from field: string share_id = 1;
+   */
+  shareId: string;
+};
+
+/**
+ * Describes the message hello.v1.ShareNoteResponse.
+ * Use `create(ShareNoteResponseSchema)` to create a new message.
+ */
+export const ShareNoteResponseSchema: GenMessage<ShareNoteResponse> = /*@__PURE__*/
+  messageDesc(file_hello_v1_hello, 15);
+
+/**
  * @generated from service hello.v1.HelloService
  */
 export const HelloService: GenService<{
@@ -184,4 +384,46 @@ export const HelloService: GenService<{
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hello_v1_hello, 0);
+
+/**
+ * @generated from service hello.v1.NoteService
+ */
+export const NoteService: GenService<{
+  /**
+   * @generated from rpc hello.v1.NoteService.ListNotes
+   */
+  listNotes: {
+    methodKind: "unary";
+    input: typeof ListNotesRequestSchema;
+    output: typeof ListNotesResponseSchema;
+  },
+  /**
+   * @generated from rpc hello.v1.NoteService.GetNote
+   */
+  getNote: {
+    methodKind: "unary";
+    input: typeof GetNoteRequestSchema;
+    output: typeof GetNoteResponseSchema;
+  },
+  /**
+   * @generated from rpc hello.v1.NoteService.CreateNote
+   */
+  createNote: {
+    methodKind: "unary";
+    input: typeof CreateNoteRequestSchema;
+    output: typeof CreateNoteResponseSchema;
+  },
+  /**
+   * The owner-only check is enforced host-side in authz.share; the caller just
+   * needs to be able to see the note.
+   *
+   * @generated from rpc hello.v1.NoteService.ShareNote
+   */
+  shareNote: {
+    methodKind: "unary";
+    input: typeof ShareNoteRequestSchema;
+    output: typeof ShareNoteResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hello_v1_hello, 1);
 

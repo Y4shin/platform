@@ -80,6 +80,6 @@ fn metadata_reports_the_right_mount() {
     assert_eq!(m.mount.route_prefix, "/p/hello");
     assert_eq!(m.mount.rpc_prefix, "/rpc/hello");
     let perms: Vec<&str> = m.permissions.iter().map(|p| p.name).collect();
-    assert_eq!(perms, ["hello:read", "hello:write"]);
+    assert_eq!(perms, ["hello:read", "hello:share", "hello:write"]);
     assert!(m.dependencies.is_empty());
 }

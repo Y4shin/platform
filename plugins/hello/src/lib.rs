@@ -28,16 +28,21 @@ mod proto {
 
 pub mod repo;
 
+use connectrpc::ConnectError;
+use junius_sdk::{GroupId, Principal, UserId};
+use uuid::Uuid;
+
 use proto::hello::v1 as pb;
 use proto::hello::v1::{
-    HelloService, HelloServiceExt, OwnedCreateGreetingRequestView, OwnedGreetRequestView,
-    OwnedListGreetingsRequestView,
+    HelloService, HelloServiceExt, NoteService, NoteServiceExt, OwnedCreateGreetingRequestView,
+    OwnedCreateNoteRequestView, OwnedGetNoteRequestView, OwnedGreetRequestView,
+    OwnedListGreetingsRequestView, OwnedListNotesRequestView, OwnedShareNoteRequestView,
 };
 // Wire message types, re-exported for tests and any in-process callers.
 pub use proto::hello::v1::{GreetRequest, GreetResponse};
 
 use crate::permissions::{HelloRead, HelloWrite};
-use crate::repo::{Greeting, HelloRepo, NewGreeting};
+use crate::repo::{Greeting, HelloRepo, NewGreeting, NewNote, NoteId, NoteRepo, NoteView};
 
 /// Convert a stored greeting into its proto wire form.
 fn greeting_to_proto(g: Greeting) -> pb::Greeting {
@@ -50,6 +55,33 @@ fn greeting_to_proto(g: Greeting) -> pb::Greeting {
     }
 }
 
+/// Convert a note view (with the viewer's server-computed flags) into proto.
+fn note_to_proto(n: NoteView) -> pb::Note {
+    pb::Note {
+        id: n.id.0.to_string(),
+        title: n.title,
+        body: n.body,
+        created: n.created.to_rfc3339(),
+        viewer_can_edit: n.viewer_can_edit,
+        viewer_can_share: n.viewer_can_share,
+        ..Default::default()
+    }
+}
+
+/// Parse a `(principal_kind, principal_id)` pair from a `ShareNote` request.
+fn parse_principal(kind: &str, id: &str) -> Result<Principal, ConnectError> {
+    let parse_uuid =
+        || Uuid::parse_str(id).map_err(|_| ConnectError::invalid_argument("invalid principal_id"));
+    match kind {
+        "user" => Ok(Principal::User(UserId(parse_uuid()?))),
+        "group" => Ok(Principal::Group(GroupId(parse_uuid()?))),
+        "public" => Ok(Principal::Public),
+        _ => Err(ConnectError::invalid_argument(
+            "principal_kind must be user, group, or public",
+        )),
+    }
+}
+
 /// Per-request state for the hello plugin: its repositories, typed on the
 /// permission witness `P`. `#[derive(PluginCtx)]` generates the extractor for
 /// `HelloCtx<P>`.
@@ -57,6 +89,8 @@ fn greeting_to_proto(g: Greeting) -> pb::Greeting {
 pub struct HelloState<P = ()> {
     #[repo]
     pub greetings: HelloRepo<P>,
+    #[repo]
+    pub notes: NoteRepo<P>,
 }
 
 /// The hello plugin's request context: state + caller + resources, proven to
@@ -144,6 +178,85 @@ impl HelloService for HelloRpc {
     }
 }
 
+/// Connect-RPC implementation of `hello.v1.NoteService` — the M08 per-resource
+/// access demo. Reads are filtered by `platform.user_can_access` in the repo;
+/// `CreateNote` records ownership; `ShareNote` delegates to the host's owner-
+/// checked `authz.share`.
+struct NoteRpc;
+
+impl NoteService for NoteRpc {
+    async fn list_notes(
+        &self,
+        ctx: RequestContext,
+        _request: OwnedListNotesRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListNotesResponse>> {
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead)>::from_rpc(&ctx)?;
+        let notes = hctx.state.notes.list().await?;
+        Ok(Response::new(pb::ListNotesResponse {
+            notes: notes.into_iter().map(note_to_proto).collect(),
+            ..Default::default()
+        }))
+    }
+
+    async fn get_note(
+        &self,
+        ctx: RequestContext,
+        request: OwnedGetNoteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::GetNoteResponse>> {
+        let id = Uuid::parse_str(request.id)
+            .map_err(|_| ConnectError::invalid_argument("invalid note id"))?;
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead)>::from_rpc(&ctx)?;
+        let note = hctx.state.notes.get(NoteId(id)).await?;
+        Ok(Response::new(pb::GetNoteResponse {
+            note: Some(note_to_proto(note)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn create_note(
+        &self,
+        ctx: RequestContext,
+        request: OwnedCreateNoteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateNoteResponse>> {
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead & HelloWrite)>::from_rpc(&ctx)?;
+        let note = hctx
+            .state
+            .notes
+            .create(
+                NewNote {
+                    title: request.title.to_string(),
+                    body: request.body.to_string(),
+                },
+                &hctx.resources.authz,
+            )
+            .await?;
+        Ok(Response::new(pb::CreateNoteResponse {
+            note: Some(note_to_proto(note)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn share_note(
+        &self,
+        ctx: RequestContext,
+        request: OwnedShareNoteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ShareNoteResponse>> {
+        let note_id = Uuid::parse_str(request.id)
+            .map_err(|_| ConnectError::invalid_argument("invalid note id"))?;
+        let principal = parse_principal(request.principal_kind, request.principal_id)?;
+        let hctx = HelloCtx::<junius_sdk::permissions!(HelloRead)>::from_rpc(&ctx)?;
+        let share = hctx
+            .resources
+            .authz
+            .share("hello:note", note_id, principal, request.permission, None)
+            .await?;
+        Ok(Response::new(pb::ShareNoteResponse {
+            share_id: share.id.to_string(),
+            ..Default::default()
+        }))
+    }
+}
+
 #[async_trait]
 impl Plugin for HelloPlugin {
     fn metadata(&self) -> &'static PluginMetadata {
@@ -157,8 +270,8 @@ impl Plugin for HelloPlugin {
     }
 
     fn rpc_routes(&self) -> Router {
-        Arc::new(HelloRpc)
-            .register(connectrpc::Router::new())
-            .into_axum_router()
+        let router = Arc::new(HelloRpc).register(connectrpc::Router::new());
+        let router = Arc::new(NoteRpc).register(router);
+        router.into_axum_router()
     }
 }
