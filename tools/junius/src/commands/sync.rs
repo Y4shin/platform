@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 use junius_manifest::{PlatformManifest, PluginManifest};
 use serde::Serialize;
 
-use crate::cli::{OutputFormat, SyncArgs};
+use crate::cli::OutputFormat;
+#[cfg(feature = "develop")]
+use crate::cli::SyncArgs;
 use crate::exit;
 use crate::markers;
 use crate::output::{self, Renderable};
@@ -22,6 +24,7 @@ const PLATFORM_CARGO_TOML: &str = "platform/Cargo.toml";
 const WORKSPACE_CARGO_TOML: &str = "Cargo.toml";
 const GENERATED_ROUTES_TS: &str = "platform/frontend/src/generated/routes.ts";
 const GENERATED_REGISTRY_TS: &str = "platform/frontend/src/generated/component-registry.ts";
+#[cfg(feature = "develop")]
 const DEFAULT_CONFIG: &str = "platform.toml";
 
 /// One plugin to register, in declaration order.
@@ -70,6 +73,7 @@ impl Renderable for SyncResult {
     }
 }
 
+#[cfg(feature = "develop")]
 pub fn run(args: &SyncArgs, format: OutputFormat) -> i32 {
     if args.plugin.is_some() {
         eprintln!("junius: sync --plugin scope is not yet implemented (planned for M09)");
@@ -80,86 +84,74 @@ pub fn run(args: &SyncArgs, format: OutputFormat) -> i32 {
         .config
         .clone()
         .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG));
-    let manifest = match load_platform_manifest(&config_path) {
+    // In-source `junius sync` runs with the source tree = the current directory.
+    run_in(Path::new("."), &config_path, args.dry_run, format)
+}
+
+/// Generate composition glue for `config_path`'s enabled plugins **into**
+/// `source_root` (the resolved platform source tree). `run` passes `.`; `build`
+/// passes the resolved/cached source root so it can compose from a deployment
+/// directory.
+pub(crate) fn run_in(
+    source_root: &Path,
+    config_path: &Path,
+    dry_run: bool,
+    format: OutputFormat,
+) -> i32 {
+    let manifest = match load_platform_manifest(config_path) {
         Ok(m) => m,
         Err(code) => return code,
     };
 
-    let plugins = match resolve_plugins(&manifest) {
+    let plugins = match resolve_plugins(&manifest, source_root) {
         Ok(p) => p,
         Err(code) => return code,
     };
 
     let mut changes = Vec::new();
 
-    let plugins_rs = render_plugins_rs(&plugins);
-    match apply_file(Path::new(GENERATED_PLUGINS_RS), &plugins_rs, args.dry_run) {
-        Ok(kind) => changes.push(FileChange {
-            path: GENERATED_PLUGINS_RS.into(),
-            kind,
-        }),
-        Err(code) => return code,
+    // (relative-path constant, rendered content) — written under `source_root`,
+    // but reported by their stable relative path.
+    let files: [(&str, String); 4] = [
+        (GENERATED_PLUGINS_RS, render_plugins_rs(&plugins)),
+        (
+            GENERATED_RPC_REQUIRES_RS,
+            render_rpc_requires_rs(&plugins, source_root),
+        ),
+        (GENERATED_ROUTES_TS, render_routes_ts(&plugins)),
+        (
+            GENERATED_REGISTRY_TS,
+            render_component_registry_ts(&plugins),
+        ),
+    ];
+    for (rel, content) in &files {
+        match apply_file(&source_root.join(rel), content, dry_run) {
+            Ok(kind) => changes.push(FileChange {
+                path: (*rel).into(),
+                kind,
+            }),
+            Err(code) => return code,
+        }
     }
 
-    let rpc_requires_rs = render_rpc_requires_rs(&plugins);
-    match apply_file(
-        Path::new(GENERATED_RPC_REQUIRES_RS),
-        &rpc_requires_rs,
-        args.dry_run,
-    ) {
-        Ok(kind) => changes.push(FileChange {
-            path: GENERATED_RPC_REQUIRES_RS.into(),
-            kind,
-        }),
-        Err(code) => return code,
+    let markers: [(&str, Vec<String>); 2] = [
+        (PLATFORM_CARGO_TOML, platform_cargo_lines(&plugins)),
+        (WORKSPACE_CARGO_TOML, workspace_cargo_lines(&plugins)),
+    ];
+    for (rel, body) in &markers {
+        match apply_marker_update(&source_root.join(rel), body, dry_run) {
+            Ok(kind) => changes.push(FileChange {
+                path: (*rel).into(),
+                kind,
+            }),
+            Err(code) => return code,
+        }
     }
 
-    match apply_marker_update(
-        Path::new(PLATFORM_CARGO_TOML),
-        &platform_cargo_lines(&plugins),
-        args.dry_run,
-    ) {
-        Ok(kind) => changes.push(FileChange {
-            path: PLATFORM_CARGO_TOML.into(),
-            kind,
-        }),
-        Err(code) => return code,
-    }
-
-    match apply_marker_update(
-        Path::new(WORKSPACE_CARGO_TOML),
-        &workspace_cargo_lines(&plugins),
-        args.dry_run,
-    ) {
-        Ok(kind) => changes.push(FileChange {
-            path: WORKSPACE_CARGO_TOML.into(),
-            kind,
-        }),
-        Err(code) => return code,
-    }
-
-    let routes_ts = render_routes_ts(&plugins);
-    match apply_file(Path::new(GENERATED_ROUTES_TS), &routes_ts, args.dry_run) {
-        Ok(kind) => changes.push(FileChange {
-            path: GENERATED_ROUTES_TS.into(),
-            kind,
-        }),
-        Err(code) => return code,
-    }
-
-    let registry_ts = render_component_registry_ts(&plugins);
-    match apply_file(Path::new(GENERATED_REGISTRY_TS), &registry_ts, args.dry_run) {
-        Ok(kind) => changes.push(FileChange {
-            path: GENERATED_REGISTRY_TS.into(),
-            kind,
-        }),
-        Err(code) => return code,
-    }
-
-    if let Err(code) = apply_rpc_barrels(&plugins, args.dry_run, &mut changes) {
+    if let Err(code) = apply_rpc_barrels(&plugins, source_root, dry_run, &mut changes) {
         return code;
     }
-    if let Err(code) = apply_consumer_registries(&plugins, args.dry_run, &mut changes) {
+    if let Err(code) = apply_consumer_registries(&plugins, source_root, dry_run, &mut changes) {
         return code;
     }
 
@@ -168,17 +160,22 @@ pub fn run(args: &SyncArgs, format: OutputFormat) -> i32 {
     let result = SyncResult {
         config: config_path.display().to_string(),
         plugins: plugins.iter().map(|p| p.name.clone()).collect(),
-        dry_run: args.dry_run,
+        dry_run,
         changes,
     };
     let _ = output::emit(format, &result);
 
     // Dry-run convention: exit 1 if changes would be written, 0 if everything
     // is already in sync. Lets CI use `junius sync --dry-run` as a drift check.
-    if args.dry_run && any_pending {
+    if dry_run && any_pending {
         return 1;
     }
     exit::OK
+}
+
+/// `<source_root>/plugins/<name>/proto` — where a plugin's `.proto` files live.
+fn plugin_proto_dir(source_root: &Path, plugin_name: &str) -> PathBuf {
+    source_root.join("plugins").join(plugin_name).join("proto")
 }
 
 // ---------------------------------------------------------------------------
@@ -207,10 +204,13 @@ fn load_platform_manifest(path: &Path) -> Result<PlatformManifest, i32> {
     Ok(manifest)
 }
 
-fn resolve_plugins(manifest: &PlatformManifest) -> Result<Vec<ResolvedPlugin>, i32> {
+fn resolve_plugins(
+    manifest: &PlatformManifest,
+    source_root: &Path,
+) -> Result<Vec<ResolvedPlugin>, i32> {
     let mut out = Vec::with_capacity(manifest.plugins.enabled.len());
     for name in &manifest.plugins.enabled {
-        let plugin_toml = PathBuf::from("plugins").join(name).join("plugin.toml");
+        let plugin_toml = source_root.join("plugins").join(name).join("plugin.toml");
         let src = std::fs::read_to_string(&plugin_toml).map_err(|e| {
             eprintln!("junius: cannot read {}: {e}", plugin_toml.display());
             exit::PARSE_ERROR
@@ -310,12 +310,12 @@ fn render_plugins_rs(plugins: &[ResolvedPlugin]) -> String {
 /// Render `platform/src/generated/rpc_requires.rs`: the `(service, method) ->
 /// required permissions` table the host's RPC guard enforces, scanned from each
 /// enabled plugin's `.proto` files.
-fn render_rpc_requires_rs(plugins: &[ResolvedPlugin]) -> String {
+fn render_rpc_requires_rs(plugins: &[ResolvedPlugin], source_root: &Path) -> String {
     let mut entries: Vec<(String, String, Vec<String>)> = Vec::new();
     // (service_fqn -> plugin), for the host's per-request RPC ctx injection.
     let mut services: Vec<(String, String)> = Vec::new();
     for p in plugins {
-        let proto_dir = PathBuf::from("plugins").join(&p.name).join("proto");
+        let proto_dir = plugin_proto_dir(source_root, &p.name);
         let mut files = Vec::new();
         collect_proto_files(&proto_dir, &mut files);
         files.sort();
@@ -548,10 +548,9 @@ fn rpc_barrel_path(plugin_name: &str) -> PathBuf {
 
 /// Whether a plugin ships any `.proto` files (and therefore has an RPC surface
 /// and a generated barrel). UI-only plugins have none.
-fn plugin_has_proto(plugin_name: &str) -> bool {
-    let proto_dir = PathBuf::from("plugins").join(plugin_name).join("proto");
+fn plugin_has_proto(source_root: &Path, plugin_name: &str) -> bool {
     let mut files = Vec::new();
-    collect_proto_files(&proto_dir, &mut files);
+    collect_proto_files(&plugin_proto_dir(source_root, plugin_name), &mut files);
     !files.is_empty()
 }
 
@@ -560,17 +559,22 @@ fn plugin_has_proto(plugin_name: &str) -> bool {
 /// have no generated `*_pb.ts` to re-export, so they are skipped.
 fn apply_rpc_barrels(
     plugins: &[ResolvedPlugin],
+    source_root: &Path,
     dry_run: bool,
     changes: &mut Vec<FileChange>,
 ) -> Result<(), i32> {
     for plugin in plugins {
-        if !plugin_has_proto(&plugin.name) {
+        if !plugin_has_proto(source_root, &plugin.name) {
             continue;
         }
-        let path = rpc_barrel_path(&plugin.name);
-        let kind = apply_file(&path, &render_rpc_barrel(plugin), dry_run)?;
+        let rel = rpc_barrel_path(&plugin.name);
+        let kind = apply_file(
+            &source_root.join(&rel),
+            &render_rpc_barrel(plugin, source_root),
+            dry_run,
+        )?;
         changes.push(FileChange {
-            path: path.display().to_string(),
+            path: rel.display().to_string(),
             kind,
         });
     }
@@ -582,6 +586,7 @@ fn apply_rpc_barrels(
 /// up. Only plugins whose declared dependencies expose components get one.
 fn apply_consumer_registries(
     plugins: &[ResolvedPlugin],
+    source_root: &Path,
     dry_run: bool,
     changes: &mut Vec<FileChange>,
 ) -> Result<(), i32> {
@@ -589,10 +594,10 @@ fn apply_consumer_registries(
         let Some(content) = render_consumer_registry_ts(plugin, plugins) else {
             continue;
         };
-        let path = consumer_registry_path(&plugin.name);
-        let kind = apply_file(&path, &content, dry_run)?;
+        let rel = consumer_registry_path(&plugin.name);
+        let kind = apply_file(&source_root.join(&rel), &content, dry_run)?;
         changes.push(FileChange {
-            path: path.display().to_string(),
+            path: rel.display().to_string(),
             kind,
         });
     }
@@ -612,8 +617,8 @@ struct ProtoServiceRef {
 /// `packages/generated/src/plugins/<x>/rpc.ts`. `buf generate` strips the module
 /// root (`plugins/<plugin>/proto`), so `.../proto/hello/v1/hello.proto` becomes
 /// `../../proto/hello/v1/hello_pb.js`.
-fn pb_module_path(plugin_name: &str, proto_file: &Path) -> Option<String> {
-    let root = PathBuf::from("plugins").join(plugin_name).join("proto");
+fn pb_module_path(source_root: &Path, plugin_name: &str, proto_file: &Path) -> Option<String> {
+    let root = plugin_proto_dir(source_root, plugin_name);
     let rel = proto_file.strip_prefix(&root).ok()?.to_str()?;
     let stem = rel.strip_suffix(".proto")?;
     Some(format!("../../proto/{stem}_pb.js"))
@@ -630,16 +635,13 @@ fn lower_first(s: &str) -> String {
 }
 
 /// All services (with methods + their pb module) declared by a plugin's protos.
-fn plugin_services(plugin_name: &str) -> Vec<ProtoServiceRef> {
+fn plugin_services(plugin_name: &str, source_root: &Path) -> Vec<ProtoServiceRef> {
     let mut files = Vec::new();
-    collect_proto_files(
-        &PathBuf::from("plugins").join(plugin_name).join("proto"),
-        &mut files,
-    );
+    collect_proto_files(&plugin_proto_dir(source_root, plugin_name), &mut files);
     files.sort();
     let mut out = Vec::new();
     for file in files {
-        let Some(pb_module) = pb_module_path(plugin_name, &file) else {
+        let Some(pb_module) = pb_module_path(source_root, plugin_name, &file) else {
             continue;
         };
         if let Ok(content) = std::fs::read_to_string(&file) {
@@ -660,14 +662,14 @@ fn plugin_services(plugin_name: &str) -> Vec<ProtoServiceRef> {
 /// `[dependencies.<dep>].rpc_methods`. An undeclared method isn't a key, so using
 /// it is a TS error. Built from protoc-gen-es `GenService.method.<name>`
 /// descriptors so `useQuery(rpc.Service.method, …)` still works.
-fn render_rpc_barrel(plugin: &ResolvedPlugin) -> String {
+fn render_rpc_barrel(plugin: &ResolvedPlugin, source_root: &Path) -> String {
     use std::collections::BTreeMap;
     // service name -> (pb module, sorted method set)
     let mut groups: BTreeMap<String, (String, std::collections::BTreeSet<String>)> =
         BTreeMap::new();
 
     // The plugin's own services expose every method.
-    for svc in plugin_services(&plugin.name) {
+    for svc in plugin_services(&plugin.name, source_root) {
         let entry = groups
             .entry(svc.name)
             .or_insert_with(|| (svc.pb_module.clone(), std::collections::BTreeSet::new()));
@@ -681,7 +683,7 @@ fn render_rpc_barrel(plugin: &ResolvedPlugin) -> String {
         if dep.rpc_methods.is_empty() {
             continue;
         }
-        let dep_services = plugin_services(dep_name);
+        let dep_services = plugin_services(dep_name, source_root);
         for spec in &dep.rpc_methods {
             let Some((service, method)) = spec.split_once('.') else {
                 continue;

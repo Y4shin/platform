@@ -83,6 +83,7 @@ http = { workspace = true }
 # Ephemeral Postgres for the auth integration tests (M06).
 testcontainers         = { workspace = true }
 testcontainers-modules = { workspace = true }
+tempfile               = { workspace = true }
 
 [lints]
 workspace = true

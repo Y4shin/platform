@@ -14,6 +14,17 @@ async fn main() -> anyhow::Result<()> {
     // so config loads first; the guard then outlives `run` so the OTLP export
     // pipelines flush on shutdown.
     let path = config_path();
+
+    // `--check-config`: parse + resolve the deployment config (incl. `env:`/
+    // `file:` secrets) and exit, without binding a socket or touching the
+    // database. The deployment-build CI smoke test runs this.
+    if check_config_requested() {
+        HostConfig::load_from_toml(&path)
+            .with_context(|| format!("loading host config from {}", path.display()))?;
+        println!("juniusd: config OK ({})", path.display());
+        return Ok(());
+    }
+
     let config = HostConfig::load_from_toml(&path)
         .with_context(|| format!("loading host config from {}", path.display()))?;
     let otel = config
@@ -48,4 +59,9 @@ fn config_path() -> PathBuf {
         return PathBuf::from(path);
     }
     PathBuf::from("platform.toml")
+}
+
+/// Whether `--check-config` was passed.
+fn check_config_requested() -> bool {
+    std::env::args().skip(1).any(|a| a == "--check-config")
 }

@@ -78,6 +78,7 @@ pub struct CheckArgs {
     pub plugin: Option<String>,
 }
 
+#[cfg(feature = "develop")]
 #[derive(clap::Args, Debug)]
 pub struct SyncArgs {
     /// Scope to a single plugin. (Not yet implemented — planned for M09.)
@@ -95,14 +96,32 @@ pub struct SyncArgs {
 }
 
 #[derive(clap::Args, Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent build flags, not a state machine"
+)]
 pub struct BuildArgs {
-    /// Build with optimisations enabled.
-    #[arg(long)]
-    pub release: bool,
-
     /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
     #[arg(long)]
     pub config: Option<PathBuf>,
+
+    /// Validate the deployment config (resolve source + check manifests) and
+    /// stop — no compile, no database.
+    #[arg(long)]
+    pub check_config: bool,
+
+    /// Rewrite `platform.lock` to match the resolved source instead of failing
+    /// on a mismatch (like `cargo update`).
+    #[arg(long)]
+    pub update_lock: bool,
+
+    /// Overwrite an existing `./platform` artifact.
+    #[arg(long)]
+    pub force: bool,
+
+    /// Use the cached git source as-is (skip `git fetch`).
+    #[arg(long)]
+    pub offline: bool,
 }
 
 #[cfg(feature = "develop")]
