@@ -12,7 +12,8 @@ env:
 vars:
   CONFIG: dev/platform.toml
   # Throwaway dev secrets (mirror dev/docker-compose.yml + dev/authentik/README).
-  DEV_SECRETS: OIDC_CLIENT_SECRET=dev-oidc-secret SESSION_KEY=dev-session-key ROLE_PW_SECRET=dev-role-pw-secret
+  # M10 adds MinIO creds + the storage token secret.
+  DEV_SECRETS: OIDC_CLIENT_SECRET=dev-oidc-secret SESSION_KEY=dev-session-key ROLE_PW_SECRET=dev-role-pw-secret MINIO_USER=minioadmin MINIO_PASS=minioadmin STORAGE_TOKEN_SECRET=dev-storage-token
 
 tasks:
   default:
@@ -86,6 +87,18 @@ tasks:
     desc: Verify the committed .sqlx cache is fresh (needs the dev DB + DATABASE_URL).
     cmds:
       - cargo sqlx prepare --workspace --check
+
+  # --- dev infra (the local backing services) -------------------------------
+
+  infra:up:
+    desc: Start the dev stack (Postgres, Authentik, RabbitMQ, MinIO, mailpit, LGTM).
+    cmds:
+      - docker compose -f dev/docker-compose.yml up -d
+
+  infra:down:
+    desc: Stop the dev stack (keeps volumes).
+    cmds:
+      - docker compose -f dev/docker-compose.yml down
 
   # --- dev convenience (wrap the junius CLI against dev/platform.toml) -------
 

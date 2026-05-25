@@ -22,6 +22,55 @@ role_password_secret   = "env:ROLE_PW_SECRET"
 # Vite forwards /api → juniusd (:18080). Must match a redirect_uri registered in
 # dev/authentik/blueprints/junius.yaml. Omit in prod to derive it from bind_addr.
 oidc_redirect_url      = "http://localhost:5173/api/auth/callback"
+# Job worker concurrency (M10).
+job_workers            = 4
+
+# --- M10 infra capabilities (see dev/docker-compose.yml for the local stack) ---
+
+# Jobs over RabbitMQ.
+[config.jobs]
+amqp_url = "amqp://guest:guest@localhost:5672/%2f"
+
+# Telemetry export to the Grafana LGTM stack (OTLP/gRPC).
+[config.otel]
+enabled  = true
+endpoint = "http://localhost:4317"
+
+# Audit-log retention (the host prune task deletes older rows).
+[config.audit]
+retention_days = 365
+
+# Email via the dev mailpit container (SMTP :1025, web UI :8025).
+[config.email]
+transport              = "mailpit"
+from_default           = "no-reply@local"
+allowed_sender_domains = ["local", "platform.example"]
+
+[config.email.mailpit]
+host = "localhost"
+port = 1025
+
+# Object storage via the dev MinIO container. MinIO is remapped to 9100/9101
+# because Authentik holds :9000. Secrets use env: indirection (see DEV_SECRETS
+# in Taskfile.yml).
+[config.storage]
+token_secret = "env:STORAGE_TOKEN_SECRET"
+
+[config.storage.buckets.main]
+endpoint       = "http://localhost:9100"
+region         = "us-east-1"
+bucket         = "platform-dev"
+access_key     = "env:MINIO_USER"
+secret_key     = "env:MINIO_PASS"
+use_path_style = true
+presigned_put  = true
+presigned_get  = true
+public_get     = false
+
+# Logical → physical bucket mapping. `junius check` requires every plugin's
+# declared logical bucket to appear here (STORAGE.BUCKET.UNMAPPED).
+[config.storage.mapping]
+"hello:attachments" = "main"
 
 # Per-plugin config/secrets. hello's `greeting` uses its declared default; the
 # api_key secret uses a literal dev value (prod would use env: indirection).

@@ -179,6 +179,18 @@ fn check_platform(path: &Path, src: &str, format: OutputFormat) -> i32 {
     // Cross-plugin rules (M09): dep/RPC declarations, cross-schema FK + @requires.
     crate::commands::cross_check::check_cross_plugin(&plugins, &mut validation);
 
+    // M10: every declared logical bucket must be mapped in [config.storage.mapping].
+    // Read the raw mapping table (no secret resolution needed).
+    let mapping_keys = manifest
+        .config
+        .get("storage")
+        .and_then(|v| v.as_table())
+        .and_then(|t| t.get("mapping"))
+        .and_then(|v| v.as_table())
+        .map(|t| t.keys().cloned().collect())
+        .unwrap_or_default();
+    crate::commands::cross_check::check_storage_mapping(&plugins, &mapping_keys, &mut validation);
+
     report(path, src, &validation, format)
 }
 

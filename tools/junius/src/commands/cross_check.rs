@@ -45,6 +45,31 @@ pub fn check_cross_plugin(
     }
 }
 
+/// `STORAGE.BUCKET.UNMAPPED` — every logical bucket a plugin declares
+/// (`[storage.buckets.<name>]`) must be mapped to a physical bucket in the
+/// deployment's `[config.storage.mapping]` as `"<plugin>:<logical>"`.
+pub fn check_storage_mapping(
+    plugins: &BTreeMap<String, PluginManifest>,
+    mapping_keys: &BTreeSet<String>,
+    report: &mut ValidationReport,
+) {
+    for (name, manifest) in plugins {
+        for logical in manifest.storage.buckets.keys() {
+            let key = format!("{name}:{logical}");
+            if !mapping_keys.contains(&key) {
+                err(
+                    report,
+                    "STORAGE.BUCKET.UNMAPPED",
+                    format!("storage.buckets.{logical}"),
+                    format!(
+                        "logical bucket \"{key}\" is not mapped to a physical bucket in [config.storage.mapping]"
+                    ),
+                );
+            }
+        }
+    }
+}
+
 /// schema name → the plugin that owns it (declares a table under it).
 fn build_schema_owner(plugins: &BTreeMap<String, PluginManifest>) -> BTreeMap<String, String> {
     let mut owner = BTreeMap::new();
@@ -387,4 +412,40 @@ fn regex_plugin() -> regex::Regex {
 )]
 fn regex_generated() -> regex::Regex {
     regex::Regex::new(r"@junius/generated/([a-z0-9_-]+)/").unwrap()
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests panic on unexpected failures")]
+mod tests {
+    use super::*;
+
+    fn manifest_with_bucket(name: &str, bucket: &str) -> PluginManifest {
+        let toml = format!(
+            "[plugin]\nname = \"{name}\"\ndisplay_name = \"X\"\nmanifest_schema = 1\n\
+             [storage.buckets.{bucket}]\n"
+        );
+        PluginManifest::parse(&toml).expect("valid manifest")
+    }
+
+    #[test]
+    fn unmapped_bucket_is_flagged_and_mapped_bucket_passes() {
+        let mut plugins = BTreeMap::new();
+        plugins.insert("hello".to_string(), manifest_with_bucket("hello", "attachments"));
+
+        // No mapping → violation.
+        let mut report = ValidationReport::default();
+        check_storage_mapping(&plugins, &BTreeSet::new(), &mut report);
+        assert!(
+            report.issues.iter().any(|i| i.code == "STORAGE.BUCKET.UNMAPPED"),
+            "expected STORAGE.BUCKET.UNMAPPED, got {:?}",
+            report.issues
+        );
+
+        // With the mapping → clean.
+        let mut mapped = BTreeSet::new();
+        mapped.insert("hello:attachments".to_string());
+        let mut report = ValidationReport::default();
+        check_storage_mapping(&plugins, &mapped, &mut report);
+        assert!(report.is_ok(), "mapped bucket should pass: {:?}", report.issues);
+    }
 }
