@@ -35,6 +35,7 @@ fn main() -> ExitCode {
         cli::Command::Dev(a) => commands::dev::run(&a),
         cli::Command::Migrate { subcommand } => commands::migrate::run(&subcommand),
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
+        cli::Command::Cache { subcommand } => commands::cache_cmd::run(&subcommand, args.format),
         #[cfg(feature = "develop")]
         cli::Command::New { subcommand } => commands::new::run(&subcommand, args.format),
     };

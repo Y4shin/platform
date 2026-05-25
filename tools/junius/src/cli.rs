@@ -58,6 +58,11 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: PluginCmd,
     },
+    /// Manage the junius source cache (`~/.cache/junius`).
+    Cache {
+        #[command(subcommand)]
+        subcommand: CacheCmd,
+    },
     /// Scaffold new plugins, components, RPC services, migrations, permissions.
     /// (Source-tree-only — gated behind the `develop` feature.)
     #[cfg(feature = "develop")]
@@ -176,6 +181,15 @@ pub enum PluginCmd {
         /// Path to platform.toml. Defaults to ./platform.toml.
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CacheCmd {
+    /// Evict cached git sources older than a duration (e.g. `30d`; `0d` = all).
+    Prune {
+        #[arg(long, default_value = "30d")]
+        older_than: String,
     },
 }
 

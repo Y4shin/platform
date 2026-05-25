@@ -1,0 +1,71 @@
+# Example deployment config. A *deployment* is a directory (its own repo, or a
+# working dir on a server) that picks which plugins ship and how they're
+# configured; the platform *source* lives elsewhere. This example points `source`
+# at the monorepo two levels up so it's runnable in-tree:
+#
+#   cd examples/example-deployment
+#   ../../target/release/junius build            # composes + builds ./platform
+#   ./platform --check-config --config platform.toml
+#
+# A real deployment pins a git source instead, e.g.:
+#   [source]
+#   repo = "git+https://github.com/your-org/junius.git"
+#   rev  = "v1.0.0"
+#
+# NOTE: with a local `path` source, `junius build` regenerates composition glue
+# *in that source tree*; use a git source for an isolated, reproducible build.
+
+[source]
+path = "../.."
+
+[plugins]
+enabled = ["hello", "greetings", "widgets"]
+
+# Secrets use `env:`/`file:` indirection so they aren't committed. Export the
+# `env:` vars (or mount the `file:` paths) before `junius build`/`./platform`.
+[config]
+database_url           = "postgres://platform_migrator:dev-only@localhost:5432/platform"
+oidc_issuer            = "http://localhost:9000/application/o/junius/"
+oidc_client_id         = "platform"
+oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
+session_encryption_key = "env:SESSION_KEY"
+role_password_secret   = "env:ROLE_PW_SECRET"
+job_workers            = 4
+
+[config.jobs]
+amqp_url = "amqp://guest:guest@localhost:5672/%2f"
+
+[config.otel]
+enabled  = true
+endpoint = "http://localhost:4317"
+
+[config.audit]
+retention_days = 365
+
+[config.email]
+transport              = "mailpit"
+from_default           = "no-reply@local"
+allowed_sender_domains = ["local", "platform.example"]
+
+[config.email.mailpit]
+host = "localhost"
+port = 1025
+
+[config.storage]
+token_secret = "env:STORAGE_TOKEN_SECRET"
+
+[config.storage.buckets.main]
+endpoint       = "http://localhost:9100"
+region         = "us-east-1"
+bucket         = "platform-dev"
+access_key     = "env:MINIO_USER"
+secret_key     = "env:MINIO_PASS"
+use_path_style = true
+
+[config.storage.mapping]
+"hello:attachments" = "main"
+
+# A file: secret — the value is read from ./secrets/hello_api_key at boot
+# (mount it via your secret manager; the dir is gitignored).
+[plugins.hello.secrets]
+api_key = "file:secrets/hello_api_key"

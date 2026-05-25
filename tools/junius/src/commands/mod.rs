@@ -1,4 +1,5 @@
 pub mod build;
+pub mod cache_cmd;
 pub mod check;
 pub mod cross_check;
 #[cfg(feature = "develop")]

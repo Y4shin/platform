@@ -1,0 +1,8 @@
+# The built deployment binary.
+/platform
+# Deployment secrets mounted at runtime (file: indirections).
+/secrets/
+# Generated lock. For a local `path` source pointed at the live monorepo the
+# content hash changes on every source edit, so it's not committed here; a real
+# (git-source) deployment commits platform.lock for reproducibility.
+/platform.lock
