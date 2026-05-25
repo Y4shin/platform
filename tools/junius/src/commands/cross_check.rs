@@ -430,13 +430,19 @@ mod tests {
     #[test]
     fn unmapped_bucket_is_flagged_and_mapped_bucket_passes() {
         let mut plugins = BTreeMap::new();
-        plugins.insert("hello".to_string(), manifest_with_bucket("hello", "attachments"));
+        plugins.insert(
+            "hello".to_string(),
+            manifest_with_bucket("hello", "attachments"),
+        );
 
         // No mapping → violation.
         let mut report = ValidationReport::default();
         check_storage_mapping(&plugins, &BTreeSet::new(), &mut report);
         assert!(
-            report.issues.iter().any(|i| i.code == "STORAGE.BUCKET.UNMAPPED"),
+            report
+                .issues
+                .iter()
+                .any(|i| i.code == "STORAGE.BUCKET.UNMAPPED"),
             "expected STORAGE.BUCKET.UNMAPPED, got {:?}",
             report.issues
         );
@@ -446,6 +452,10 @@ mod tests {
         mapped.insert("hello:attachments".to_string());
         let mut report = ValidationReport::default();
         check_storage_mapping(&plugins, &mapped, &mut report);
-        assert!(report.is_ok(), "mapped bucket should pass: {:?}", report.issues);
+        assert!(
+            report.is_ok(),
+            "mapped bucket should pass: {:?}",
+            report.issues
+        );
     }
 }
