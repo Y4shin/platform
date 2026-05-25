@@ -6,6 +6,7 @@
 //! handles land in later milestones (M06–M10) as fields on `PluginResources`.
 
 pub mod auth;
+pub mod authz;
 pub mod config;
 pub mod context;
 pub mod db;
@@ -20,6 +21,7 @@ pub mod telemetry;
 
 pub use junius_sdk_macros::{PluginCtx, impl_repository, permissions, plugin_metadata, repository};
 
+pub use authz::{Authz, Principal, ShareRecord};
 pub use context::{ApiError, BuildState, PluginContext};
 pub use permissions::{And, Has, Permission, PermissionList};
 pub use repo::{RepoPool, ScopedDb};

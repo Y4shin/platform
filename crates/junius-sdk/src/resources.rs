@@ -16,6 +16,7 @@ use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 
 use crate::auth::{AuditEmitter, Auth, User, Users};
+use crate::authz::Authz;
 use crate::config::PluginConfig;
 use crate::db::PluginDb;
 use crate::secrets::SecretStore;
@@ -34,6 +35,8 @@ pub struct PluginResources {
     pub users: Users,
     /// Audit-log writer.
     pub audit: AuditEmitter,
+    /// Per-resource ownership + sharing (caller attached per request).
+    pub authz: Authz,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
 }
@@ -47,9 +50,10 @@ impl PluginResources {
             config: ctx.config.clone(),
             telemetry: ctx.telemetry.clone(),
             db: ctx.db.clone(),
-            auth: ctx.auth.clone().with_user(user),
+            auth: ctx.auth.clone().with_user(user.clone()),
             users: ctx.users.clone(),
             audit: ctx.audit.clone(),
+            authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
             secrets: ctx.secrets.clone(),
         }
     }
@@ -79,11 +83,16 @@ pub struct PluginResourceCtx {
     auth: Auth,
     users: Users,
     audit: AuditEmitter,
+    authz: Authz,
     secrets: SecretStore,
 }
 
 impl PluginResourceCtx {
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one constructor arg per host-provided handle; assembled once at boot"
+    )]
     pub fn new(
         config: PluginConfig,
         telemetry: Telemetry,
@@ -91,6 +100,7 @@ impl PluginResourceCtx {
         auth: Auth,
         users: Users,
         audit: AuditEmitter,
+        authz: Authz,
         secrets: SecretStore,
     ) -> Self {
         Self {
@@ -100,6 +110,7 @@ impl PluginResourceCtx {
             auth,
             users,
             audit,
+            authz,
             secrets,
         }
     }

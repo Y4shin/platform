@@ -12,8 +12,8 @@ use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
 use hello_plugin::HelloPlugin;
 use junius_sdk::{
-    AuditEmitter, Auth, Plugin, PluginConfig, PluginDb, PluginResourceCtx, SecretStore, Telemetry,
-    Users,
+    AuditEmitter, Auth, Authz, Plugin, PluginConfig, PluginDb, PluginResourceCtx, SecretStore,
+    Telemetry, Users,
 };
 use junius_sdk::{GroupId, Membership, Role, RoleId, User, UserId};
 use sqlx::PgPool;
@@ -82,6 +82,7 @@ async fn greetings_route_enforces_hello_read() {
         Auth::new(pool.clone()),
         Users::new(pool.clone()),
         AuditEmitter::new(pool.clone()),
+        Authz::new(pool.clone()),
         SecretStore::default(),
     );
 

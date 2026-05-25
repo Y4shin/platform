@@ -186,6 +186,15 @@ impl From<RepoError> for connectrpc::ConnectError {
     }
 }
 
+impl From<crate::error::PluginError> for connectrpc::ConnectError {
+    fn from(err: crate::error::PluginError) -> Self {
+        match err {
+            crate::error::PluginError::PermissionDenied(msg) => Self::permission_denied(msg),
+            other => Self::internal(other.to_string()),
+        }
+    }
+}
+
 /// How a plugin's state struct builds itself from the per-request resources +
 /// caller. `#[derive(PluginCtx)]` implements this for the state (a local type);
 /// the blanket `FromRequestParts` impl below — owned here so the orphan rule is

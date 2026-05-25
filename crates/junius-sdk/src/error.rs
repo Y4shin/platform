@@ -12,6 +12,11 @@ pub enum PluginError {
     #[error("config error: {0}")]
     Config(String),
 
+    /// The caller is not permitted to perform the operation (e.g. sharing a
+    /// resource they don't own). Maps to 403 / `permission_denied`.
+    #[error("permission denied: {0}")]
+    PermissionDenied(String),
+
     /// A database operation failed (host-provided handles: `Auth`, `Users`,
     /// `AuditEmitter`).
     #[error("database error: {0}")]
