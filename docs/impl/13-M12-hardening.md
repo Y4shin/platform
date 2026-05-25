@@ -1,6 +1,36 @@
 # M12 — Hardening: Full `junius check` Ruleset + CI Schema Test + Schema Evolution
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Done (2026-05-25).
+
+## Reconciliation (as built)
+
+The plan below is the design; the shipped implementation differs in a few spots:
+
+- **`sqlparser` is 0.52** (not the 0.48 implied earlier); `SQL.PRIVATE_TABLE_ACCESS`
+  collects table references generically via its `visit_relations` visitor (the
+  `visitor` feature is now enabled), plus explicit FK `REFERENCES` targets the
+  visitor doesn't report inside `CREATE TABLE`.
+- **Repo-query SQL is extracted with `syn`** (not regex): plugin `src/*.rs` is
+  parsed and the SQL string is pulled from `query!`/`query_as!`/`query_scalar!`
+  (+ `_unchecked`) macros — `LitStr::value()` normalises raw/escaped/continued
+  strings.
+- **`SQL.EXPOSED.NO_BREAKING` type classification is conservative**: any column
+  type change is treated as breaking unless the target is an obvious widening
+  (`TEXT`, unbounded `VARCHAR`, `BIGINT`); the prior type isn't reconstructed.
+  The coordination check is the spec heuristic — a breaking change to an exposed
+  table is allowed only if every consumer that declares the table also ships a
+  migration in the same diff. It diffs against `--base` (default `main`,
+  `origin/main` in CI) and **no-ops outside a git repo** or when the base is
+  unresolvable.
+- **`SQLX.PREPARE_CHECK` runs in the `integration` job, not `check`** — it needs a
+  migrated live DB, so it follows `junius migrate up` against the job's Postgres
+  service.
+- **`MIGRATIONS.CHECKSUM` adds no new `junius check` code**: the runtime `junius
+  migrate up` already enforces checksums and now runs in the `integration` job
+  (Layer 2). The DB-connected static fast-path was not built.
+- **`junius check` diagnostics gained a doc link** derived from the rule ID; precise
+  `line:col` is deferred (`ValidationIssue` carries no span yet).
+- **Layer 3** (schema-snapshot diff) remains **deferred**, per the design's trigger.
 
 ## Goal
 
@@ -40,6 +70,7 @@ The rules below replace, extend, or formalise checks introduced in earlier miles
 
 #### Rule details — new in M12
 
+<a id="sql-private-table-access"></a>
 **`SQL.PRIVATE_TABLE_ACCESS`**
 
 Uses `sqlparser-rs` (already brought in at M09) to extract every schema-qualified table reference from every migration **and** from queries inside `#[impl_repository(...)]` blocks. For each reference of the form `<other_schema>.<table>` where `<other_schema>` is another plugin's name:
@@ -50,6 +81,7 @@ Uses `sqlparser-rs` (already brought in at M09) to extract every schema-qualifie
 
 Postgres role grants already make this fail at runtime; this static rule catches it at PR time.
 
+<a id="sql-exposed-no-breaking"></a>
 **`SQL.EXPOSED.NO_BREAKING`**
 
 For every PR / branch diff:
@@ -63,27 +95,37 @@ For every PR / branch diff:
 
 This is the design's "Layer 1" enforcement for schema evolution.
 
+> **As built:** added migrations are taken from `git diff --diff-filter=A
+> <base>...HEAD` ∪ untracked files; type changes are conservatively breaking
+> (see Reconciliation); a breaking change is rejected when a declaring consumer
+> has no migration in the same diff. No-ops outside a git repo.
+
+<a id="fe-exports-match-manifest"></a>
 **`FE.EXPORTS.MATCH_MANIFEST`**
 
 For each plugin with `[exposes.components.X]`, scan the plugin's `frontend/src/index.ts` for a named export `X`. Missing → fail. Present but pointing at a missing module → TypeScript catches that separately during type-check; we don't duplicate it.
 
 #### Rule details — extended in M12
 
+<a id="sql-crossref-requires"></a>
 **`SQL.CROSSREF_REQUIRES`** (extended)
 
 Previously only checked migration files. Now also checks queries inside `#[impl_repository]` blocks for cross-plugin table references — those don't need `@requires` (they're runtime), but they **do** need the consumer to have the dep declared, which is the existing `IMPORT.MANIFEST` rule. M12 makes the cross-validation explicit.
 
+<a id="migrations-checksum"></a>
 **`MIGRATIONS.CHECKSUM`** (extended)
 
-The check applies to `meta.migrations` rows only — there's no checksum row for unapplied migrations, since they haven't been run yet. M12 adds a fast-path: if running `junius check` against a deployment with a real DB connection, query `meta.migrations` and verify checksums; without a DB, this rule is a no-op (it runs in CI's Layer 2 instead).
+The check applies to `meta.migrations` rows only — there's no checksum row for unapplied migrations, since they haven't been run yet. **As built:** no new `junius check` code — the runtime `junius migrate up` enforces checksums (failing on `ChecksumMismatch`) and runs in the CI `integration` job, so Layer 2 covers this; the DB-connected static fast-path was not built.
 
+<a id="sqlx-prepare-check"></a>
 **`SQLX.PREPARE_CHECK`** (extended)
 
-`cargo sqlx prepare --check --workspace` runs in CI. Per-plugin `.sqlx/` cache dirs must be in sync.
+`cargo sqlx prepare --workspace --check` runs in CI's `integration` job (after `junius migrate up` against the Postgres service, since it needs the live schema). Per-plugin `.sqlx/` cache dirs must be in sync.
 
+<a id="proto-breaking"></a>
 **`PROTO.BREAKING`** (extended)
 
-The CI step uses the buf binary vendored by `junius` (M05). Runs against `--against '.git#branch=main'`. The vendoring ensures all developers + CI use the same buf version.
+`pnpm exec buf breaking` runs in the CI `check` job, `--against '.git#branch=main'` (the workflow checks out full history and pins a local `main` ref; locally `task buf:breaking` accepts an `AGAINST=` override).
 
 ### Layer 2: CI schema integration test
 
@@ -129,32 +171,52 @@ Per [../design/10-infrastructure-and-data.md](../design/10-infrastructure-and-da
 
 ### `junius check` output
 
-Every violation reports:
-- Rule ID (e.g. `SQL.NO_CROSS_CASCADE`).
-- File path + line/col.
-- One-sentence description.
-- Link: `https://github.com/<org>/junius/blob/main/docs/impl/13-M12-hardening.md#<rule-id>` (or local file path if running offline).
+Every violation reports its rule ID, the file/field path, a one-sentence
+description, and a doc pointer derived mechanically from the rule ID
+(`<RULE>` → `docs/impl/13-M12-hardening.md#<rule lowercased, . and _ → ->`).
+**As built:** the doc pointer is a `doc` field in `--format json` and a miette
+`help:` line in the plain rendering; precise `line:col` is deferred (the
+`ValidationIssue` type carries no source span yet).
 
 ```
-✖ SQL.PRIVATE_TABLE_ACCESS
-  plugins/greetings/src/repo/sample.rs:42:18
+SQL.PRIVATE_TABLE_ACCESS
 
-  Query references hello.greeting (not in hello's [exposes.tables]).
-  Either expose this table in hello/plugin.toml, or query an exposed table instead.
-
-  see docs/impl/13-M12-hardening.md#sql-private-table-access
+  × references hello.greeting, which "hello" does not expose ([exposes.tables])
+  │ (plugins/greetings)
+  help: see docs/impl/13-M12-hardening.md#sql-private-table-access
 ```
+
+<a id="rule-reference"></a>
+### Rule reference (anchors)
+
+The doc pointer resolves to the M12-rule sections above for the rules M12 adds
+or extends. The remaining cross-plugin and proto rules `junius check` emits
+anchor here:
+
+- <a id="dep-undeclared"></a>**`DEP.UNDECLARED`** — a frontend `@junius/plugin-<dep>` import or Rust `<dep>_plugin::` path needs a matching `[dependencies.<dep>]`.
+- <a id="rpc-undeclared"></a>**`RPC.UNDECLARED`** — each `[dependencies.<dep>].rpc_methods` entry must name a real `Service.Method` in `<dep>`'s proto.
+- <a id="sql-requires-missing"></a>**`SQL.REQUIRES.MISSING`** — a migration with a cross-schema FK must declare `-- @requires <owner>:<migration>`.
+- <a id="fk-cross-cascade"></a>**`FK.CROSS.CASCADE`** — a cross-plugin FK must not `ON DELETE/UPDATE CASCADE`.
+- <a id="fk-optional-nullable"></a>**`FK.OPTIONAL.NULLABLE`** — an FK into an *optional* dependency's schema must be nullable.
+- <a id="storage-bucket-unmapped"></a>**`STORAGE.BUCKET.UNMAPPED`** — every declared logical bucket must be mapped in `[config.storage.mapping]`.
+- <a id="proto-requires-undeclared"></a>**`PROTO.REQUIRES.UNDECLARED`** — every `option (platform.requires)` in a `.proto` must name a declared permission.
+
+Manifest-schema rules (single-plugin `junius check`) are listed in the table at
+the top of this doc; an unknown anchor simply lands at the top of this page.
 
 ### CI workflow consolidation
 
 The CI workflow (originating in M00, extended at every later milestone) is reorganised into four jobs that run in parallel:
 
-1. **`lint`** — `cargo fmt`, `cargo clippy`, `biome ci`, `buf lint`, `buf format --diff`.
-2. **`check`** — `cargo build --workspace`, `cargo test --workspace` (unit tests only — no DB), `junius check`, `cargo sqlx prepare --check --workspace`, `buf breaking`.
-3. **`integration`** — Layer 2: Postgres service container, `junius migrate up`, `cargo test` (integration tests), `playwright`.
-4. **`deployment`** — `junius build` from `examples/example-deployment/`, smoke-boot via `--check-config`.
+1. **`lint`** (`task ci:lint`) — `cargo fmt --check`, `cargo clippy`, the no-default-features CLI build, `biome ci`, `buf lint`, `buf format --diff`, `junius check`.
+2. **`check`** (`task ci:check`) — `cargo build --workspace`, the Rust + JS test suites, and `buf breaking` against `main`.
+3. **`integration`** (`task ci:integration`) — Layer 2: a Postgres service container, `junius migrate up` of the deployment via the CLI, then `cargo sqlx prepare --workspace --check` against the migrated schema.
+4. **`deployment`** (`task ci:deployment`) — `junius build --check-config` from `examples/example-deployment/`; the full build stays behind `JUNIUS_E2E`.
 
-A merge requires all four green.
+A merge requires all four green. **As built** differs from the original sketch:
+`cargo sqlx prepare --check` lives in `integration` (it needs a live migrated DB),
+not `check`; testcontainers integration tests run in `check` (they self-provision
+via the runner's Docker); Playwright stays gated behind `JUNIUS_E2E`.
 
 ## Scope (out)
 

@@ -22,7 +22,7 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M09** | ✅ | [Cross-plugin](10-M09-cross-plugin.md) | Required + optional inter-plugin deps; component registry; narrow RPC namespaces | Disabling `widgets` degrades the page gracefully |
 | **M10** | ✅ | [Infra capabilities](11-M10-infra-capabilities.md) | Jobs (RabbitMQ), Storage (S3-compatible), Email (lettre), Telemetry (OTel→LGTM); runtime capability gating | Job dispatched from RPC runs and sends an email |
 | **M11** | ✅ | [Deployment workflow](12-M11-deployment-workflow.md) | `[source]` resolution (git/path), `platform.lock`, source cache + `cache prune`, `file:` secrets, `plugin enable/disable`, example deployment dir, `develop`-feature CLI gating | Build a binary from outside the source repo |
-| **M12** | 🚧 | [Hardening](13-M12-hardening.md) | All `junius check` rules; CI schema test; breaking-change detection | CI fails on every deliberate violation |
+| **M12** | ✅ | [Hardening](13-M12-hardening.md) | Full `junius check` ruleset (private-table access, exposed-table breaking changes, FE export/manifest match); four-job CI with Postgres integration + `buf breaking` + `sqlx prepare --check` | CI fails on every deliberate violation |
 | **M13** | 🚧 | [Speakers plugin](14-M13-speakers-plugin.md) | First real domain plugin, end-to-end | Speakers CRUD works; `events` plugin reuses `SpeakerPicker` |
 
 **v0 cut** = end of M05. From there onward, every milestone adds depth (persistence, permissions, ownership, cross-plugin composition, etc.) rather than new top-level capability.
