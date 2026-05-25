@@ -4,36 +4,75 @@
 //!
 //! The concrete backends (lapin / aws-sdk-s3 / lettre / OpenTelemetry) live here
 //! in the host, **behind the SDK's vendor-neutral traits** — they never appear
-//! in `junius-sdk`. Later M10 stages add the job backend, object stores, and
-//! email transport members; Stage 1 is the skeleton + the metrics sink hook.
+//! in `junius-sdk`. Stage 3 added the metrics sink; Stage 4 adds email. Later
+//! stages add the job backend and object stores.
 
 use std::sync::Arc;
 
 use junius_manifest::ResolvedConfig;
-use junius_sdk::MetricSink;
+use junius_sdk::{Email, MetricSink, Transport};
 
 /// Shared, request-independent infra handles. Cheap to clone (members are
 /// `Arc`/`Clone`).
 #[derive(Clone, Default)]
 pub struct HostInfra {
-    /// Bridges plugin `Telemetry` metrics to the host's `OTel` meter. `None` until
-    /// `OTel` is wired (Stage 3) or when telemetry is disabled.
+    /// Bridges plugin `Telemetry` metrics to the host's `OTel` meter. `None` when
+    /// telemetry is disabled.
     pub metric_sink: Option<Arc<dyn MetricSink>>,
+    /// Outbound email transport + sender policy (`None` transport when no
+    /// `[config.email]`).
+    pub email: EmailInfra,
+}
+
+/// The deployment's email transport + sender policy, shared across plugins.
+#[derive(Clone, Default)]
+pub struct EmailInfra {
+    /// The concrete transport, or `None` when email is unconfigured.
+    pub transport: Option<Arc<dyn Transport>>,
+    /// Default `from` address used when a message omits one.
+    pub from_default: Arc<str>,
+    /// Domains a plugin-supplied `from` is allowed to use.
+    pub allowed_domains: Arc<[String]>,
 }
 
 impl HostInfra {
-    /// Build the host infra from the resolved deployment config. The `OTel` metric
-    /// sink is constructed in [`telemetry::init_telemetry`](crate::telemetry::init_telemetry)
-    /// (it needs the meter) and threaded in here. Later stages populate the
-    /// job/storage/email members.
+    /// Build the host infra from the resolved deployment config. The `OTel`
+    /// metric sink is constructed in
+    /// [`telemetry::init_telemetry`](crate::telemetry::init_telemetry) (it needs
+    /// the meter) and threaded in here. Later stages populate the job/storage
+    /// members.
     #[allow(
         clippy::unused_async,
         reason = "later stages await backend client construction"
     )]
     pub async fn build(
-        _resolved: &ResolvedConfig,
+        resolved: &ResolvedConfig,
         metric_sink: Option<Arc<dyn MetricSink>>,
     ) -> anyhow::Result<Self> {
-        Ok(Self { metric_sink })
+        let email = match &resolved.email {
+            Some(cfg) => EmailInfra {
+                transport: Some(crate::email::build_transport(cfg)?),
+                from_default: Arc::from(cfg.from_default.as_str()),
+                allowed_domains: Arc::from(cfg.allowed_sender_domains.clone()),
+            },
+            None => EmailInfra::default(),
+        };
+        Ok(Self { metric_sink, email })
+    }
+
+    /// Build the per-plugin [`Email`] handle, gated on `capabilities`.
+    #[must_use]
+    pub fn email_handle(
+        &self,
+        plugin_name: &'static str,
+        capabilities: &'static [&'static str],
+    ) -> Email {
+        Email::new(
+            self.email.transport.clone(),
+            self.email.from_default.clone(),
+            self.email.allowed_domains.clone(),
+            plugin_name,
+            capabilities,
+        )
     }
 }

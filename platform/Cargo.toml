@@ -40,6 +40,11 @@ opentelemetry-otlp             = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
 tracing-opentelemetry          = { workspace = true }
 
+# Email transports (host-only): SMTP/mailpit via lettre; Resend via reqwest.
+lettre = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+
 # DB + auth (M06)
 sqlx          = { workspace = true }
 uuid          = { workspace = true }

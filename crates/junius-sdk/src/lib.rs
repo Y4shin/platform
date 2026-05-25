@@ -10,6 +10,7 @@ pub mod authz;
 pub mod config;
 pub mod context;
 pub mod db;
+pub mod email;
 pub mod error;
 pub mod metadata;
 pub mod permissions;
@@ -33,6 +34,7 @@ pub use auth::{
 };
 pub use config::PluginConfig;
 pub use db::PluginDb;
+pub use email::{Attachment, Email, EmailMessage, Transport, TransportError};
 pub use error::{PluginError, RepoError};
 pub use metadata::{
     DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,

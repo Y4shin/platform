@@ -19,6 +19,7 @@ use crate::auth::{AuditEmitter, Auth, User, Users};
 use crate::authz::Authz;
 use crate::config::PluginConfig;
 use crate::db::PluginDb;
+use crate::email::Email;
 use crate::error::PluginError;
 use crate::secrets::SecretStore;
 use crate::telemetry::Telemetry;
@@ -27,10 +28,6 @@ use crate::telemetry::Telemetry;
 /// plugin's declared `[requires].capabilities`. Gated handles (`email`, `jobs`,
 /// `storage`) call this at method entry; `db`/`audit` are ungated (already
 /// enforced by the per-plugin Postgres role + compile-time `Has<P>`).
-#[allow(
-    dead_code,
-    reason = "called by the gated email/jobs/storage handles from Stage 4 onward"
-)]
 pub(crate) fn require_capability(
     caps: &[&'static str],
     needed: &'static str,
@@ -57,6 +54,8 @@ pub struct PluginResources {
     pub audit: AuditEmitter,
     /// Per-resource ownership + sharing (caller attached per request).
     pub authz: Authz,
+    /// Outbound email (gated on `email.send`).
+    pub email: Email,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
     /// The plugin's declared `[requires].capabilities` (for runtime gating of
@@ -77,6 +76,7 @@ impl PluginResources {
             users: ctx.users.clone(),
             audit: ctx.audit.clone(),
             authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
+            email: ctx.email.clone(),
             secrets: ctx.secrets.clone(),
             capabilities: ctx.capabilities,
         }
@@ -114,6 +114,7 @@ pub struct PluginResourceCtx {
     users: Users,
     audit: AuditEmitter,
     authz: Authz,
+    email: Email,
     secrets: SecretStore,
     capabilities: &'static [&'static str],
 }
@@ -132,6 +133,7 @@ impl PluginResourceCtx {
         users: Users,
         audit: AuditEmitter,
         authz: Authz,
+        email: Email,
         secrets: SecretStore,
         capabilities: &'static [&'static str],
     ) -> Self {
@@ -143,6 +145,7 @@ impl PluginResourceCtx {
             users,
             audit,
             authz,
+            email,
             secrets,
             capabilities,
         }

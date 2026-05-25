@@ -48,6 +48,10 @@ opentelemetry-otlp            = { version = "0.32", default-features = false, fe
 opentelemetry-appender-tracing = "0.32"
 tracing-opentelemetry         = "0.33"
 
+# Email transport (host-only — never in junius-sdk). SMTP via lettre with
+# rustls; the Resend/log transports use reqwest/tracing already in the tree.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1-rustls-tls"] }
+
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
@@ -76,12 +80,14 @@ sqlparser     = "0.52"
 sha2          = "0.10"
 hmac          = "0.12"
 aes-gcm       = "0.10"
+base64        = "0.22"
 rand          = "0.8"
 tower-cookies = { version = "0.11", features = ["private"] }
 openidconnect = { version = "3", default-features = false, features = ["reqwest", "rustls-tls"] }
 
-# Integration testing against ephemeral Postgres (M06, dev-only)
-testcontainers         = "0.23"
+# Integration testing against ephemeral Postgres/RabbitMQ/MinIO/mailpit
+# (M06/M10, dev-only). `http_wait` lets GenericImage wait on an HTTP endpoint.
+testcontainers         = { version = "0.23", features = ["http_wait"] }
 testcontainers-modules = { version = "0.11", features = ["postgres"] }
 
 # Workspace crates

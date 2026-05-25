@@ -7,6 +7,7 @@ pub mod auth;
 pub mod boot;
 pub mod config;
 pub mod db;
+pub mod email;
 pub mod generated;
 pub mod infra;
 pub mod plugin_registry;
