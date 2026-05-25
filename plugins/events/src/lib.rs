@@ -1,15 +1,17 @@
-//! `events` — the events plugin (M13). Stage 1 establishes the plugin shape: a
-//! plain `GET /ping` HTTP route and a permission-free Connect `Ping` RPC, plus
-//! the `events` schema + `event` table (migrations). The domain surface (event
-//! CRUD with user/group ownership + visibility, invites, sign-ups, iCalendar
-//! feeds) lands in later stages.
+//! `events` — the events plugin (M13). The first real domain plugin: events that
+//! belong to a **user or a group** and are **private or public**, with per-instance
+//! access control (public events bypass the ACL on read; private ones are gated by
+//! ownership/shares). Stage 6 ships the event domain core — `EventRepo` CRUD and a
+//! permission-gated `EventService`. Invites, sign-ups, the public invite page,
+//! iCalendar feeds, and the confirmation-email job land in later stages.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{Router, routing::get};
-use connectrpc::{Encodable, RequestContext, Response, ServiceResult};
-use junius_sdk::{Plugin, PluginMetadata};
+use connectrpc::{ConnectError, Encodable, RequestContext, Response, ServiceResult};
+use junius_sdk::{GroupId, Plugin, PluginContext, PluginCtx, PluginMetadata, Principal, UserId};
+use uuid::Uuid;
 
 junius_sdk::plugin_metadata!();
 
@@ -26,7 +28,33 @@ mod proto {
     include!(concat!(env!("OUT_DIR"), "/_connectrpc.rs"));
 }
 
-use proto::events::v1::{EventService, EventServiceExt, OwnedPingRequestView, PingResponse};
+pub mod domain;
+pub mod repo;
+
+use chrono::{DateTime, Utc};
+
+use crate::domain::{EventId, OwnerKind, Visibility};
+use crate::permissions::{EventsRead, EventsShare, EventsWrite};
+use crate::repo::{EventRepo, EventUpdate, EventView, NewEvent};
+
+use proto::events::v1 as pb;
+use proto::events::v1::{
+    EventService, EventServiceExt, OwnedCreateEventRequestView, OwnedDeleteEventRequestView,
+    OwnedGetEventRequestView, OwnedListEventsRequestView, OwnedShareEventRequestView,
+    OwnedUpdateEventRequestView,
+};
+
+/// Per-request state for the events plugin: its repositories, typed on the
+/// permission witness `P`. `#[derive(PluginCtx)]` generates the extractor.
+#[derive(PluginCtx)]
+pub struct EventState<P = ()> {
+    #[repo]
+    pub events: EventRepo<P>,
+}
+
+/// The events plugin's request context: state + caller + resources, proven to
+/// hold the permissions in `P`.
+pub type EventCtx<P = ()> = PluginContext<EventState<P>, P>;
 
 pub struct EventsPlugin;
 
@@ -43,19 +71,238 @@ impl Default for EventsPlugin {
     }
 }
 
-/// Connect-RPC service marker. Stage 1 exposes only the permission-free `Ping`.
+/// Connect-RPC implementation of `events.v1.EventService`. Each handler builds a
+/// typed `EventCtx<P>` from the request context (`from_rpc`), which re-checks the
+/// witness and yields the permission-gated repository; the host's RPC guard also
+/// enforces each method's `(platform.v1.requires)` before the handler runs.
 struct EventRpc;
 
 impl EventService for EventRpc {
-    async fn ping(
+    async fn list_events(
         &self,
-        _ctx: RequestContext,
-        _request: OwnedPingRequestView,
-    ) -> ServiceResult<impl Encodable<PingResponse>> {
-        Ok(Response::new(PingResponse {
-            message: "events ok".to_string(),
+        ctx: RequestContext,
+        _request: OwnedListEventsRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListEventsResponse>> {
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let events = ectx.state.events.list().await?;
+        Ok(Response::new(pb::ListEventsResponse {
+            events: events.into_iter().map(event_to_proto).collect(),
             ..Default::default()
         }))
+    }
+
+    async fn get_event(
+        &self,
+        ctx: RequestContext,
+        request: OwnedGetEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::GetEventResponse>> {
+        let id = EventId(parse_uuid(request.id, "id")?);
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let event = ectx.state.events.get(id).await?;
+        Ok(Response::new(pb::GetEventResponse {
+            event: Some(event_to_proto(event)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn create_event(
+        &self,
+        ctx: RequestContext,
+        request: OwnedCreateEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let caller = ectx
+            .user
+            .as_ref()
+            .map(|u| u.id)
+            .ok_or_else(|| ConnectError::unauthenticated("authentication required"))?;
+        // Resolve + authorize the owner: a user event is owned by the caller; a
+        // group event requires the caller to belong to that group.
+        let owner = match request.owner_kind {
+            "user" | "" => Principal::User(caller),
+            "group" => {
+                let gid = GroupId(parse_uuid(request.owner_id, "owner_id")?);
+                if !ectx.resources.groups.is_member(gid, caller).await? {
+                    return Err(ConnectError::permission_denied(
+                        "you must be a member of the owning group",
+                    ));
+                }
+                Principal::Group(gid)
+            }
+            _ => {
+                return Err(ConnectError::invalid_argument(
+                    "owner_kind must be \"user\" or \"group\"",
+                ));
+            }
+        };
+        let new = NewEvent {
+            title: require_nonempty(request.title, "title")?,
+            description: optional(request.description),
+            location: optional(request.location),
+            starts_at: parse_rfc3339(request.starts_at, "starts_at")?,
+            ends_at: parse_optional_rfc3339(request.ends_at)?,
+            all_day: request.all_day,
+            visibility: parse_visibility(request.visibility)?,
+        };
+        let created = ectx
+            .state
+            .events
+            .create(new, owner, &ectx.resources.authz)
+            .await?;
+        Ok(Response::new(pb::CreateEventResponse {
+            event: Some(event_to_proto(created)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn update_event(
+        &self,
+        ctx: RequestContext,
+        request: OwnedUpdateEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::UpdateEventResponse>> {
+        let id = EventId(parse_uuid(request.id, "id")?);
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let update = EventUpdate {
+            title: require_nonempty(request.title, "title")?,
+            description: optional(request.description),
+            location: optional(request.location),
+            starts_at: parse_rfc3339(request.starts_at, "starts_at")?,
+            ends_at: parse_optional_rfc3339(request.ends_at)?,
+            all_day: request.all_day,
+            visibility: parse_visibility(request.visibility)?,
+        };
+        let updated = ectx.state.events.update(id, update).await?;
+        Ok(Response::new(pb::UpdateEventResponse {
+            event: Some(event_to_proto(updated)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn delete_event(
+        &self,
+        ctx: RequestContext,
+        request: OwnedDeleteEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::DeleteEventResponse>> {
+        let id = EventId(parse_uuid(request.id, "id")?);
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        ectx.state.events.delete(id).await?;
+        Ok(Response::new(pb::DeleteEventResponse::default()))
+    }
+
+    async fn share_event(
+        &self,
+        ctx: RequestContext,
+        request: OwnedShareEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ShareEventResponse>> {
+        let event_id = parse_uuid(request.id, "id")?;
+        let principal = parse_principal(request.principal_kind, request.principal_id)?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsShare)>::from_rpc(&ctx)?;
+        let share = ectx
+            .resources
+            .authz
+            .share(
+                "events:event",
+                event_id,
+                principal,
+                request.permission,
+                None,
+            )
+            .await?;
+        Ok(Response::new(pb::ShareEventResponse {
+            share_id: share.id.to_string(),
+            ..Default::default()
+        }))
+    }
+}
+
+/// Convert an event view (with the viewer's server-computed flags) into proto.
+fn event_to_proto(e: EventView) -> pb::Event {
+    let (owner_kind, owner_id) = match e.owner_kind {
+        OwnerKind::User => ("user", e.owning_user_id),
+        OwnerKind::Group => ("group", e.owning_group_id),
+    };
+    let visibility = match e.visibility {
+        Visibility::Private => "private",
+        Visibility::Public => "public",
+    };
+    pb::Event {
+        id: e.id.to_string(),
+        title: e.title,
+        description: e.description.unwrap_or_default(),
+        location: e.location.unwrap_or_default(),
+        starts_at: e.starts_at.to_rfc3339(),
+        ends_at: e.ends_at.map(|t| t.to_rfc3339()).unwrap_or_default(),
+        all_day: e.all_day,
+        visibility: visibility.to_string(),
+        owner_kind: owner_kind.to_string(),
+        owner_id: owner_id.map(|u| u.to_string()).unwrap_or_default(),
+        viewer_can_edit: e.viewer_can_edit,
+        viewer_can_share: e.viewer_can_share,
+        ..Default::default()
+    }
+}
+
+/// Parse a UUID request field, mapping a parse failure to `invalid_argument`.
+fn parse_uuid(value: &str, field: &str) -> Result<Uuid, ConnectError> {
+    Uuid::parse_str(value).map_err(|_| ConnectError::invalid_argument(format!("invalid {field}")))
+}
+
+/// An empty proto string field becomes `None`; anything else `Some`.
+fn optional(value: &str) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
+/// Require a non-empty (after trim) string field.
+fn require_nonempty(value: &str, field: &str) -> Result<String, ConnectError> {
+    if value.trim().is_empty() {
+        Err(ConnectError::invalid_argument(format!(
+            "{field} is required"
+        )))
+    } else {
+        Ok(value.to_string())
+    }
+}
+
+/// Parse an RFC 3339 timestamp request field.
+fn parse_rfc3339(value: &str, field: &str) -> Result<DateTime<Utc>, ConnectError> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|d| d.with_timezone(&Utc))
+        .map_err(|_| ConnectError::invalid_argument(format!("invalid {field} (expected RFC 3339)")))
+}
+
+/// Parse an optional RFC 3339 timestamp: empty → `None`.
+fn parse_optional_rfc3339(value: &str) -> Result<Option<DateTime<Utc>>, ConnectError> {
+    if value.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(parse_rfc3339(value, "ends_at")?))
+    }
+}
+
+/// Parse a visibility request field; empty defaults to `private`.
+fn parse_visibility(value: &str) -> Result<Visibility, ConnectError> {
+    match value {
+        "public" => Ok(Visibility::Public),
+        "private" | "" => Ok(Visibility::Private),
+        _ => Err(ConnectError::invalid_argument(
+            "visibility must be \"private\" or \"public\"",
+        )),
+    }
+}
+
+/// Parse a `(principal_kind, principal_id)` pair from a `ShareEvent` request.
+fn parse_principal(kind: &str, id: &str) -> Result<Principal, ConnectError> {
+    match kind {
+        "user" => Ok(Principal::User(UserId(parse_uuid(id, "principal_id")?))),
+        "group" => Ok(Principal::Group(GroupId(parse_uuid(id, "principal_id")?))),
+        "public" => Ok(Principal::Public),
+        _ => Err(ConnectError::invalid_argument(
+            "principal_kind must be user, group, or public",
+        )),
     }
 }
 

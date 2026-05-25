@@ -1,7 +1,8 @@
-// Events plugin RPC surface. Stage 1 ships a permission-free `Ping` to prove the
-// proto/build/Connect-RPC path end-to-end; Stage 4 adds the gated event CRUD
-// methods (`option (platform.v1.requires)`), enforced by the host RPC guard +
-// the typed permission witness in each handler.
+// Events plugin RPC surface (M13 Stage 6). The event domain core: CRUD over
+// user-/group-owned, private/public events, plus owner-checked sharing. Every
+// method is permission-gated via `option (platform.v1.requires)`, enforced by the
+// host RPC guard *and* the typed permission witness each handler builds. (Invite
+// and calendar services arrive in later stages, in their own proto files.)
 syntax = "proto3";
 
 package events.v1;
@@ -9,11 +10,107 @@ package events.v1;
 import "platform/v1/annotations.proto";
 
 service EventService {
-  rpc Ping(PingRequest) returns (PingResponse);
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+  rpc CreateEvent(CreateEventRequest) returns (CreateEventResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc UpdateEvent(UpdateEventRequest) returns (UpdateEventResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc DeleteEvent(DeleteEventRequest) returns (DeleteEventResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  // The owner-only check is enforced host-side in authz.share; the caller just
+  // needs read access to the event.
+  rpc ShareEvent(ShareEventRequest) returns (ShareEventResponse) {
+    option (platform.v1.requires) = "events:read,events:share";
+  }
 }
 
-message PingRequest {}
+message Event {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string location = 4;
+  string starts_at = 5; // RFC 3339
+  string ends_at = 6; // RFC 3339, empty if unset (single instant)
+  bool all_day = 7;
+  string visibility = 8; // "private" | "public"
+  string owner_kind = 9; // "user" | "group"
+  string owner_id = 10; // owning user or group UUID
+  // Server-computed viewer capabilities (from platform.user_can_access); the
+  // frontend must never recompute these.
+  bool viewer_can_edit = 20;
+  bool viewer_can_share = 21;
+}
 
-message PingResponse {
-  string message = 1;
+message ListEventsRequest {}
+
+message ListEventsResponse {
+  repeated Event events = 1;
+}
+
+message GetEventRequest {
+  string id = 1;
+}
+
+message GetEventResponse {
+  Event event = 1;
+}
+
+// Owner: owner_kind "user" makes the caller the owner (owner_id is ignored);
+// owner_kind "group" requires owner_id to be a group the caller belongs to.
+message CreateEventRequest {
+  string title = 1;
+  string description = 2;
+  string location = 3;
+  string starts_at = 4; // RFC 3339
+  string ends_at = 5; // RFC 3339, empty for a single instant
+  bool all_day = 6;
+  string visibility = 7; // "private" (default) | "public"
+  string owner_kind = 8; // "user" | "group"
+  string owner_id = 9; // group UUID when owner_kind = "group"
+}
+
+message CreateEventResponse {
+  Event event = 1;
+}
+
+// Updates the event's content + visibility (publish = private→public). Ownership
+// is immutable.
+message UpdateEventRequest {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string location = 4;
+  string starts_at = 5; // RFC 3339
+  string ends_at = 6; // RFC 3339, empty for a single instant
+  bool all_day = 7;
+  string visibility = 8; // "private" | "public"
+}
+
+message UpdateEventResponse {
+  Event event = 1;
+}
+
+message DeleteEventRequest {
+  string id = 1;
+}
+
+message DeleteEventResponse {}
+
+message ShareEventRequest {
+  string id = 1;
+  string principal_kind = 2; // "user" | "group" | "public"
+  string principal_id = 3; // user/group UUID; empty for "public"
+  string permission = 4; // e.g. "events:read"
+}
+
+message ShareEventResponse {
+  string share_id = 1;
 }

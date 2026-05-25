@@ -9,6 +9,11 @@ import { EventService } from '../../proto/events/v1/events_pb.js';
 
 export const rpc = {
   EventService: {
-    ping: EventService.method.ping,
+    createEvent: EventService.method.createEvent,
+    deleteEvent: EventService.method.deleteEvent,
+    getEvent: EventService.method.getEvent,
+    listEvents: EventService.method.listEvents,
+    shareEvent: EventService.method.shareEvent,
+    updateEvent: EventService.method.updateEvent,
   },
 };

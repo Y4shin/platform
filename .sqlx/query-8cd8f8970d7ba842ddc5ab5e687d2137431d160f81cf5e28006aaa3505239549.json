@@ -1,0 +1,126 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n              e.id, e.title, e.description, e.location, e.starts_at, e.ends_at, e.all_day,\n              e.visibility      AS \"visibility: Visibility\",\n              e.owner_kind      AS \"owner_kind: OwnerKind\",\n              e.owning_user_id, e.owning_group_id, e.created_at, e.updated_at,\n              platform.user_can_access('events:event', e.id, $1, 'events:write') AS \"viewer_can_edit!\",\n              platform.user_can_access('events:event', e.id, $1, 'events:share') AS \"viewer_can_share!\"\n            FROM events.event e\n            WHERE e.visibility = 'public'\n               OR platform.user_can_access('events:event', e.id, $1, 'events:read')\n            ORDER BY e.starts_at, e.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "location",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "starts_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "ends_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "all_day",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "events.visibility",
+            "kind": {
+              "Enum": [
+                "private",
+                "public"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "owner_kind: OwnerKind",
+        "type_info": {
+          "Custom": {
+            "name": "events.owner_kind",
+            "kind": {
+              "Enum": [
+                "user",
+                "group"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "owning_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "owning_group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "viewer_can_edit!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "viewer_can_share!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "8cd8f8970d7ba842ddc5ab5e687d2137431d160f81cf5e28006aaa3505239549"
+}

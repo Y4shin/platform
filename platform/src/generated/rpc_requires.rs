@@ -5,6 +5,28 @@
 /// method's `option (platform.requires)`. The host RPC guard enforces these.
 pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
     (
+        "events.v1.EventService",
+        "CreateEvent",
+        &["events:read", "events:write"],
+    ),
+    (
+        "events.v1.EventService",
+        "DeleteEvent",
+        &["events:read", "events:write"],
+    ),
+    ("events.v1.EventService", "GetEvent", &["events:read"]),
+    ("events.v1.EventService", "ListEvents", &["events:read"]),
+    (
+        "events.v1.EventService",
+        "ShareEvent",
+        &["events:read", "events:share"],
+    ),
+    (
+        "events.v1.EventService",
+        "UpdateEvent",
+        &["events:read", "events:write"],
+    ),
+    (
         "greetings.v1.GreetingService",
         "CreateGreeting",
         &["greetings:read", "greetings:write"],

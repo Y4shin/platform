@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM events.event e\n            WHERE e.id = $1\n              AND platform.user_can_access('events:event', e.id, $2, 'events:write')\n            RETURNING e.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c40da32a6adf39193bce9b7572b1b6446513699084dac1afb6b6a7c9dd295a78"
+}

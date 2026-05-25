@@ -1,0 +1,143 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO events.event\n              (title, description, location, starts_at, ends_at, all_day, visibility,\n               owner_kind, owning_user_id, owning_group_id)\n            VALUES ($1, $2, $3, $4, $5, $6, $7::events.visibility,\n                    $8::events.owner_kind, $9, $10)\n            RETURNING\n              id, title, description, location, starts_at, ends_at, all_day,\n              visibility   AS \"visibility: Visibility\",\n              owner_kind   AS \"owner_kind: OwnerKind\",\n              owning_user_id, owning_group_id, created_at, updated_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "location",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "starts_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "ends_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "all_day",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "visibility: Visibility",
+        "type_info": {
+          "Custom": {
+            "name": "events.visibility",
+            "kind": {
+              "Enum": [
+                "private",
+                "public"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "owner_kind: OwnerKind",
+        "type_info": {
+          "Custom": {
+            "name": "events.owner_kind",
+            "kind": {
+              "Enum": [
+                "user",
+                "group"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "owning_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "owning_group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Bool",
+        {
+          "Custom": {
+            "name": "events.visibility",
+            "kind": {
+              "Enum": [
+                "private",
+                "public"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "events.owner_kind",
+            "kind": {
+              "Enum": [
+                "user",
+                "group"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ae6d70999519e38067e752f340853c6823c821e70336b992a208e028e6b90a76"
+}
