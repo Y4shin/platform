@@ -33,6 +33,13 @@ thiserror          = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# OTel export — host-only; bridges `tracing` spans/logs + the metrics sink to LGTM.
+opentelemetry                  = { workspace = true }
+opentelemetry_sdk              = { workspace = true }
+opentelemetry-otlp             = { workspace = true }
+opentelemetry-appender-tracing = { workspace = true }
+tracing-opentelemetry          = { workspace = true }
+
 # DB + auth (M06)
 sqlx          = { workspace = true }
 uuid          = { workspace = true }

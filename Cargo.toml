@@ -39,6 +39,14 @@ thiserror = "2"
 # Observability
 tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# OpenTelemetry export (host-only — never in junius-sdk). One co-released 0.32
+# set (tracing-opentelemetry tracks one minor ahead, 0.33). OTLP over gRPC/tonic
+# to the Grafana LGTM stack (:4317); traces + logs + metrics.
+opentelemetry                 = "0.32"
+opentelemetry_sdk             = { version = "0.32", features = ["rt-tokio"] }
+opentelemetry-otlp            = { version = "0.32", default-features = false, features = ["grpc-tonic", "trace", "metrics", "logs"] }
+opentelemetry-appender-tracing = "0.32"
+tracing-opentelemetry         = "0.33"
 
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }

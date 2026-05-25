@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use axum::{Extension, Router};
-use junius_sdk::{Plugin, PluginResourceCtx};
+use junius_sdk::{MetricSink, Plugin, PluginResourceCtx};
 use sqlx::PgPool;
 
 use crate::auth::{self, AuthState};
@@ -144,7 +144,11 @@ fn base_app() -> Router {
 
 /// Boot the platform end-to-end: connect the DB, build per-plugin pools and auth
 /// state, run `on_startup`, serve until Ctrl-C, then run `on_shutdown`.
-pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::Result<()> {
+pub async fn run(
+    config: HostConfig,
+    plugins: Vec<Box<dyn Plugin>>,
+    metric_sink: Option<Arc<dyn MetricSink>>,
+) -> anyhow::Result<()> {
     let resolved = config.resolved.as_ref().ok_or_else(|| {
         anyhow::anyhow!("no [config] loaded; juniusd needs --config or JUNIUS_CONFIG")
     })?;
@@ -160,8 +164,8 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         .await?;
 
     // Host-global infra clients (job backend, object stores, email transport,
-    // OTel meter) — built once, shared across plugins via `build_ctx`.
-    let infra = HostInfra::build(resolved).await?;
+    // OTel metric sink) — built once, shared across plugins via `build_ctx`.
+    let infra = HostInfra::build(resolved, metric_sink).await?;
 
     boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins, &infra).await?;
 

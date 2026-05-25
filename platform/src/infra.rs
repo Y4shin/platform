@@ -22,13 +22,18 @@ pub struct HostInfra {
 }
 
 impl HostInfra {
-    /// Build the host infra from the resolved deployment config. Stage 1 is a
-    /// skeleton; later stages populate the job/storage/email/otel members.
+    /// Build the host infra from the resolved deployment config. The `OTel` metric
+    /// sink is constructed in [`telemetry::init_telemetry`](crate::telemetry::init_telemetry)
+    /// (it needs the meter) and threaded in here. Later stages populate the
+    /// job/storage/email members.
     #[allow(
         clippy::unused_async,
         reason = "later stages await backend client construction"
     )]
-    pub async fn build(_resolved: &ResolvedConfig) -> anyhow::Result<Self> {
-        Ok(Self::default())
+    pub async fn build(
+        _resolved: &ResolvedConfig,
+        metric_sink: Option<Arc<dyn MetricSink>>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self { metric_sink })
     }
 }

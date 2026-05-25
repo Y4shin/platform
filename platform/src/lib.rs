@@ -12,6 +12,7 @@ pub mod infra;
 pub mod plugin_registry;
 pub mod rpc_guard;
 pub mod server;
+pub mod telemetry;
 
 #[cfg(feature = "embed-frontend")]
 mod static_assets;

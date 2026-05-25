@@ -28,6 +28,8 @@ chrono = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 tower = { workspace = true }
+# Capturing subscriber for the telemetry span/log tagging tests.
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true

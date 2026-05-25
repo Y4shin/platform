@@ -1,21 +1,30 @@
-//! `juniusd` — the Junius host binary. Constructs the host config, loads the
-//! generated plugin registry, initialises tracing, and hands off to
-//! `platform::server::run`.
+//! `juniusd` — the Junius host binary. Constructs the host config, initialises
+//! telemetry (fmt logging + optional OTLP export), loads the generated plugin
+//! registry, and hands off to `platform::server::run`.
 
 use std::path::PathBuf;
 
 use anyhow::Context as _;
 use platform::config::HostConfig;
-use tracing_subscriber::EnvFilter;
+use platform::telemetry::init_telemetry;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    init_tracing();
+    // Order: config → telemetry → plugins → run. Telemetry needs `[config.otel]`,
+    // so config loads first; the guard then outlives `run` so the OTLP export
+    // pipelines flush on shutdown.
     let path = config_path();
     let config = HostConfig::load_from_toml(&path)
         .with_context(|| format!("loading host config from {}", path.display()))?;
+    let otel = config
+        .resolved
+        .as_ref()
+        .map(|r| r.otel.clone())
+        .unwrap_or_default();
+    let (_telemetry_guard, metric_sink) = init_telemetry(&otel)?;
+
     let plugins = platform::generated::plugins::plugins();
-    platform::server::run(config, plugins).await
+    platform::server::run(config, plugins, metric_sink).await
 }
 
 /// Resolve the deployment config path: `--config <path>`, else `$JUNIUS_CONFIG`,
@@ -39,14 +48,4 @@ fn config_path() -> PathBuf {
         return PathBuf::from(path);
     }
     PathBuf::from("platform.toml")
-}
-
-fn init_tracing() {
-    // `RUST_LOG` is the standard tracing developer-debug knob (see
-    // `platform::config` for the policy on env reads).
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .try_init();
 }
