@@ -39,31 +39,13 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
-      - name: Rust — fmt
-        run: nix develop --command cargo fmt --check
-
-      - name: Rust — clippy
-        run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Rust — build
-        run: nix develop --command cargo build --workspace
-
-      - name: Rust — tests
-        run: nix develop --command cargo test --workspace
-        env:
-          INSTA_UPDATE: "no"
-
       - name: JS — install
         run: nix develop --command pnpm install --frozen-lockfile
 
-      - name: JS — biome
-        run: nix develop --command pnpm exec biome ci
-
-      - name: JS — typecheck
-        run: nix develop --command pnpm run typecheck
-
-      - name: Buf — lint
-        run: nix develop --command pnpm exec buf lint
-
-      - name: Buf — format check
-        run: nix develop --command pnpm exec buf format --diff --exit-code
+      # Single entry point: the same `task ci` developers run locally
+      # (fmt-check, clippy, junius check, cargo+vitest tests, biome, buf
+      # lint/format). See Taskfile.yml.
+      - name: CI gate (task ci)
+        run: nix develop --command task ci
+        env:
+          INSTA_UPDATE: "no"

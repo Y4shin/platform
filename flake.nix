@@ -51,6 +51,10 @@
               # query cache that the repository `query!` macros check against in
               # CI (SQLX_OFFLINE=true).
               pkgs.sqlx-cli
+
+              # `task` (go-task) runs the repo's many verification surfaces
+              # (cargo, vitest, biome, buf, junius check) from one Taskfile.
+              pkgs.go-task
             ];
 
             shellHook = ''

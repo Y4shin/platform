@@ -1,0 +1,103 @@
+# Junius dev tasks. Run inside `nix develop` (tools are on PATH).
+#   task            — list tasks
+#   task test       — run the whole test suite
+#   task ci         — the full CI gate
+#   task fmt        — apply all formatters
+version: "3"
+
+env:
+  # Repository `query!` macros check against the committed `.sqlx/` offline cache.
+  SQLX_OFFLINE: "true"
+
+vars:
+  CONFIG: dev/platform.toml
+  # Throwaway dev secrets (mirror dev/docker-compose.yml + dev/authentik/README).
+  DEV_SECRETS: OIDC_CLIENT_SECRET=dev-oidc-secret SESSION_KEY=dev-session-key ROLE_PW_SECRET=dev-role-pw-secret
+
+tasks:
+  default:
+    desc: List available tasks.
+    cmds:
+      - task --list-all
+    silent: true
+
+  # --- tests ----------------------------------------------------------------
+
+  test:
+    desc: Run the whole test suite (Rust + JS + E2E).
+    cmds:
+      - task: test:rust
+      - task: test:js
+      - task: test:e2e
+
+  test:rust:
+    desc: Rust workspace tests (testcontainers integration tests need Docker).
+    cmds:
+      - cargo test --workspace
+
+  test:js:
+    desc: Frontend unit tests (vitest) + TypeScript typecheck.
+    cmds:
+      - pnpm test
+      - pnpm run typecheck
+
+  test:e2e:
+    desc: Playwright browser E2E (wired in M09 Stage E).
+    cmds:
+      - echo "task test:e2e — Playwright lands in M09 Stage E"
+
+  # --- format / lint --------------------------------------------------------
+
+  fmt:
+    desc: Apply all formatters (Rust, TS/JS, proto).
+    cmds:
+      - cargo fmt
+      - pnpm exec biome format --write .
+      - pnpm exec buf format -w
+
+  lint:
+    desc: Lint everything (clippy, biome, buf, junius check).
+    cmds:
+      - cargo clippy --workspace --all-targets -- -D warnings
+      - pnpm exec biome ci
+      - pnpm exec buf lint
+      - cargo run -q -p junius -- check --manifest {{.CONFIG}}
+
+  # --- gates ----------------------------------------------------------------
+
+  ci:
+    desc: Full CI gate (formatting, lint, tests, buf format).
+    aliases: [check]
+    cmds:
+      - cargo fmt --check
+      - task: lint
+      - task: test:rust
+      - task: test:js
+      - pnpm exec buf format --diff --exit-code
+
+  sqlx:check:
+    desc: Verify the committed .sqlx cache is fresh (needs the dev DB + DATABASE_URL).
+    cmds:
+      - cargo sqlx prepare --workspace --check
+
+  # --- dev convenience (wrap the junius CLI against dev/platform.toml) -------
+
+  sync:
+    desc: Regenerate composition glue from the deployment config.
+    cmds:
+      - "{{.DEV_SECRETS}} cargo run -q -p junius -- sync --config {{.CONFIG}}"
+
+  migrate:
+    desc: Apply host + plugin migrations to the dev database.
+    cmds:
+      - "{{.DEV_SECRETS}} cargo run -q -p junius -- migrate up --config {{.CONFIG}}"
+
+  dev:
+    desc: Run the host (juniusd) + Vite dev server.
+    cmds:
+      - "{{.DEV_SECRETS}} cargo run -q -p junius -- dev --config {{.CONFIG}}"
+
+  build:
+    desc: Build the self-contained deployment binary.
+    cmds:
+      - "{{.DEV_SECRETS}} cargo run -q -p junius -- build --config {{.CONFIG}}"
