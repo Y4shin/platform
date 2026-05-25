@@ -11,4 +11,4 @@ mod signup;
 
 pub use event::{EventRepo, EventUpdate, EventView, NewEvent};
 pub use invite::{Invite, InviteConfig, InvitePage, InviteRepo, SignupRow};
-pub use signup::{SignupError, SignupRepo};
+pub use signup::{SignupError, SignupOutcome, SignupRepo};

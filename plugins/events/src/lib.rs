@@ -12,7 +12,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::{Router, routing::get};
 use connectrpc::{ConnectError, Encodable, RequestContext, Response, ServiceResult};
-use junius_sdk::{GroupId, Plugin, PluginContext, PluginCtx, PluginMetadata, Principal, UserId};
+use junius_sdk::{
+    EmailMessage, GroupId, Job, JobHandler, Plugin, PluginContext, PluginCtx, PluginError,
+    PluginMetadata, PluginResources, Principal, UserId,
+};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 junius_sdk::plugin_metadata!();
@@ -447,7 +451,7 @@ impl InviteService for InviteRpc {
         request: OwnedSignupRequestView,
     ) -> ServiceResult<impl Encodable<pb::SignupResponse>> {
         let ectx = EventCtx::<()>::from_rpc(&ctx)?;
-        let (id, status) = ectx
+        let outcome = ectx
             .state
             .signups
             .signup(
@@ -456,9 +460,30 @@ impl InviteService for InviteRpc {
                 nonempty(request.guest_email),
             )
             .await?;
+        // Recipient: a logged-in caller uses their directory identity; a guest the
+        // submitted fields. Enqueue the confirmation best-effort — a missing job
+        // backend must not fail the sign-up.
+        let (recipient_email, recipient_name) = match ectx.user.as_ref() {
+            Some(u) => (u.email.clone(), u.display_name.clone()),
+            None => (
+                request.guest_email.to_string(),
+                request.guest_name.to_string(),
+            ),
+        };
+        if !recipient_email.is_empty() {
+            let job = SendSignupConfirmation {
+                signup_id: outcome.id.to_string(),
+                event_title: outcome.event_title.clone(),
+                recipient_email,
+                recipient_name,
+            };
+            if let Err(e) = ectx.resources.jobs.enqueue(job).await {
+                tracing::warn!(error = %e, "failed to enqueue events.send_signup_confirmation");
+            }
+        }
         Ok(Response::new(pb::SignupResponse {
-            signup_id: id.to_string(),
-            status: status.as_str().to_string(),
+            signup_id: outcome.id.to_string(),
+            status: outcome.status.as_str().to_string(),
             ..Default::default()
         }))
     }
@@ -558,6 +583,46 @@ fn is_unique_violation(e: &sqlx::Error) -> bool {
         .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
 }
 
+/// Background job (M10): email a sign-up confirmation. Enqueued by the `Signup`
+/// handler; run out-of-band by the host job worker, which sends it via the gated
+/// `email.send` capability.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendSignupConfirmation {
+    pub signup_id: String,
+    pub event_title: String,
+    pub recipient_email: String,
+    pub recipient_name: String,
+}
+
+impl Job for SendSignupConfirmation {
+    const NAME: &'static str = "events.send_signup_confirmation";
+}
+
+/// Handler for [`SendSignupConfirmation`] — runs in the worker with the plugin's
+/// own resources, emailing the attendee via the gated `email.send` capability.
+async fn send_signup_confirmation_handler(
+    job: SendSignupConfirmation,
+    resources: PluginResources,
+) -> Result<(), PluginError> {
+    let name = if job.recipient_name.trim().is_empty() {
+        "there"
+    } else {
+        job.recipient_name.trim()
+    };
+    resources
+        .email
+        .send(EmailMessage {
+            to: vec![job.recipient_email],
+            subject: format!("You're signed up: {}", job.event_title),
+            body_text: format!(
+                "Hi {name},\n\nYou're confirmed for \"{}\".\n\nSee you there!",
+                job.event_title
+            ),
+            ..Default::default()
+        })
+        .await
+}
+
 #[async_trait]
 impl Plugin for EventsPlugin {
     fn metadata(&self) -> &'static PluginMetadata {
@@ -571,5 +636,11 @@ impl Plugin for EventsPlugin {
     fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
         let router = Arc::new(EventRpc).register(router);
         Arc::new(InviteRpc).register(router)
+    }
+
+    fn jobs(&self) -> Vec<JobHandler> {
+        vec![JobHandler::new::<SendSignupConfirmation, _, _>(
+            send_signup_confirmation_handler,
+        )]
     }
 }

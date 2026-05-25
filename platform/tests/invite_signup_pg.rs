@@ -212,8 +212,9 @@ async fn invites_and_signups_via_role_events() {
         Err(SignupError::InvalidGuest(_))
     ));
     // Bob signs up (slot 2/2).
-    let (_, status) = bob_signups.signup("pub-slug", None, None).await.unwrap();
-    assert!(matches!(status, SignupStatus::Going));
+    let outcome = bob_signups.signup("pub-slug", None, None).await.unwrap();
+    assert!(matches!(outcome.status, SignupStatus::Going));
+    assert_eq!(outcome.event_title, "Public party");
     // Carol is refused — slots full.
     assert!(matches!(
         carol_signups.signup("pub-slug", None, None).await,

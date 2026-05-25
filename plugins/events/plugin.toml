@@ -23,3 +23,9 @@ public_routes = true
 [exposes.tables.event]
 schema = "events"
 description = "Events (public ones are world-readable; private ones gated by ownership)."
+
+# Capabilities (M10). A sign-up enqueues a confirmation-email job (job.enqueue);
+# the worker sends it via the email transport (email.send). Both handles are gated
+# on these declarations.
+[requires]
+capabilities = ["email.send", "job.enqueue"]

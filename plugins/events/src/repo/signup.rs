@@ -58,6 +58,17 @@ impl From<SignupError> for connectrpc::ConnectError {
     }
 }
 
+/// The result of a successful sign-up: the new (or reactivated) row plus the
+/// event id + title, so the caller can enqueue a confirmation email without a
+/// second query.
+#[derive(Debug, Clone)]
+pub struct SignupOutcome {
+    pub id: Uuid,
+    pub status: SignupStatus,
+    pub event_id: Uuid,
+    pub event_title: String,
+}
+
 /// Fail with [`SignupError::Full`] when the invite's slot limit is reached.
 /// Called inside the sign-up transaction (under the invite row lock), only on the
 /// paths that add a going row.
@@ -95,13 +106,15 @@ impl<P> SignupRepo<P> {
         slug: &str,
         guest_name: Option<&str>,
         guest_email: Option<&str>,
-    ) -> Result<(Uuid, SignupStatus), SignupError> {
+    ) -> Result<SignupOutcome, SignupError> {
         let viewer = self.user().map(|u| u.id.0);
         let mut tx = self.pool().begin().await?;
-        // Resolve + lock the invite, enforcing event read-access.
+        // Resolve + lock the invite, enforcing event read-access. The event id +
+        // title come along for the confirmation email the caller enqueues.
         let inv = sqlx::query!(
             r#"
-            SELECT i.id, i.signup_enabled, i.signup_open, i.slot_limit
+            SELECT i.id, i.signup_enabled, i.signup_open, i.slot_limit,
+                   e.id AS event_id, e.title AS event_title
             FROM events.invite i
             JOIN events.event e ON e.id = i.event_id
             WHERE i.slug = $1
@@ -184,7 +197,12 @@ impl<P> SignupRepo<P> {
             .await?
         };
         tx.commit().await?;
-        Ok((id, SignupStatus::Going))
+        Ok(SignupOutcome {
+            id,
+            status: SignupStatus::Going,
+            event_id: inv.event_id,
+            event_title: inv.event_title,
+        })
     }
 
     /// **Ungated public write**: the logged-in caller opts out of (cancels) their
