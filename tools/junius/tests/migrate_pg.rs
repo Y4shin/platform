@@ -80,6 +80,12 @@ fn config(database_url: String) -> ResolvedConfig {
         role_password_secret: ROLE_SECRET.into(),
         bind_addr: None,
         oidc_redirect_url: None,
+        jobs: None,
+        job_workers: 4,
+        email: None,
+        otel: junius_manifest::OtelConfig::default(),
+        audit: junius_manifest::AuditConfig::default(),
+        storage: None,
     }
 }
 

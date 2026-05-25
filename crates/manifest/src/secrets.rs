@@ -16,6 +16,10 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use crate::error::SecretError;
+use crate::infra_config::{
+    AuditConfig, EmailConfig, JobsConfig, OtelConfig, StorageConfig, parse_audit, parse_email,
+    parse_job_workers, parse_jobs, parse_otel, parse_storage,
+};
 
 /// A parsed `[config]` value: either a literal or an environment indirection.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +73,20 @@ pub struct ResolvedConfig {
     /// `junius dev` it points at the Vite origin (`:5173`) so the whole login
     /// round-trip — including the callback — flows through the single dev origin.
     pub oidc_redirect_url: Option<String>,
+
+    // --- M10 infra sections (all optional; absent = capability unconfigured) ---
+    /// `[config.jobs]` — message-broker connection for the job queue.
+    pub jobs: Option<JobsConfig>,
+    /// `[config].job_workers` — worker concurrency (default 4).
+    pub job_workers: u16,
+    /// `[config.email]` — outbound email transport + sender policy.
+    pub email: Option<EmailConfig>,
+    /// `[config.otel]` — OpenTelemetry export (default disabled).
+    pub otel: OtelConfig,
+    /// `[config.audit]` — audit retention policy (default 365 days).
+    pub audit: AuditConfig,
+    /// `[config.storage]` — physical buckets + logical→physical mapping.
+    pub storage: Option<StorageConfig>,
 }
 
 fn required(
@@ -107,6 +125,11 @@ pub fn resolve_config(
     raw: &BTreeMap<String, toml::Value>,
     lookup: &impl Fn(&str) -> Option<String>,
 ) -> Result<ResolvedConfig, SecretError> {
+    // The M10 section parsers navigate nested sub-tables, so work over a
+    // `toml::value::Table` view of the `[config]` map.
+    let cfg: toml::value::Table = raw.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let dyn_lookup: &dyn Fn(&str) -> Option<String> = lookup;
+
     Ok(ResolvedConfig {
         database_url: required(raw, "database_url", lookup)?,
         oidc_issuer: required(raw, "oidc_issuer", lookup)?,
@@ -116,6 +139,12 @@ pub fn resolve_config(
         role_password_secret: required(raw, "role_password_secret", lookup)?,
         bind_addr: optional(raw, "bind_addr", lookup)?,
         oidc_redirect_url: optional(raw, "oidc_redirect_url", lookup)?,
+        jobs: parse_jobs(&cfg, dyn_lookup)?,
+        job_workers: parse_job_workers(&cfg),
+        email: parse_email(&cfg, dyn_lookup)?,
+        otel: parse_otel(&cfg),
+        audit: parse_audit(&cfg),
+        storage: parse_storage(&cfg, dyn_lookup)?,
     })
 }
 

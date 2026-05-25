@@ -3,6 +3,7 @@
 
 pub mod error;
 pub mod grants;
+pub mod infra_config;
 pub mod platform;
 pub mod plugin;
 pub mod secrets;
@@ -11,6 +12,10 @@ pub mod validate;
 pub use error::{ManifestError, SecretError, Severity, ValidationIssue, ValidationReport};
 pub use grants::{
     DepGrant, RoleGrant, compute_grants, derive_role_password, emit_grant_sql, role_name,
+};
+pub use infra_config::{
+    AuditConfig, EmailConfig, JobsConfig, MailpitConfig, OtelConfig, PhysicalBucket, ResendConfig,
+    SmtpConfig, StorageConfig,
 };
 pub use platform::{PlatformManifest, PluginsConfig, SourceConfig};
 pub use plugin::{
