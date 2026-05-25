@@ -4,7 +4,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use junius_sdk::{GroupId, Groups};
+use junius_sdk::{GroupId, Groups, PluginError, UserId};
 use sqlx::PgPool;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::ImageExt;
@@ -22,8 +22,23 @@ async fn apply_migrations(pool: &PgPool) {
     }
 }
 
-/// Seed a "Committee" group with a "member" role and two users; return its id.
-async fn seed_group(pool: &PgPool) -> Uuid {
+/// Insert a user and return its id.
+async fn seed_user(pool: &PgPool, sub: &str, email: &str, name: &str) -> Uuid {
+    sqlx::query_scalar(
+        "INSERT INTO platform.user (oidc_sub, email, display_name) \
+         VALUES ($1, $2, $3) RETURNING id",
+    )
+    .bind(sub)
+    .bind(email)
+    .bind(name)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Seed a "Committee" group with a "member" role and two members (Alice, Bob).
+/// Returns `(group_id, alice_id)` — Alice serves as an authorized caller.
+async fn seed_group(pool: &PgPool) -> (Uuid, Uuid) {
     let group_id: Uuid = sqlx::query_scalar(
         "INSERT INTO platform.group (name, description) \
          VALUES ('Committee', 'The organising committee') RETURNING id",
@@ -38,20 +53,15 @@ async fn seed_group(pool: &PgPool) -> Uuid {
     .fetch_one(pool)
     .await
     .unwrap();
+    let mut alice_id = Uuid::nil();
     for (sub, email, name) in [
         ("sub-alice", "alice@local", "Alice"),
         ("sub-bob", "bob@local", "Bob"),
     ] {
-        let user_id: Uuid = sqlx::query_scalar(
-            "INSERT INTO platform.user (oidc_sub, email, display_name) \
-             VALUES ($1, $2, $3) RETURNING id",
-        )
-        .bind(sub)
-        .bind(email)
-        .bind(name)
-        .fetch_one(pool)
-        .await
-        .unwrap();
+        let user_id = seed_user(pool, sub, email, name).await;
+        if name == "Alice" {
+            alice_id = user_id;
+        }
         sqlx::query(
             "INSERT INTO platform.group_membership (user_id, group_id, role_id) \
              VALUES ($1, $2, $3)",
@@ -63,7 +73,7 @@ async fn seed_group(pool: &PgPool) -> Uuid {
         .await
         .unwrap();
     }
-    group_id
+    (group_id, alice_id)
 }
 
 #[tokio::test]
@@ -82,7 +92,9 @@ async fn groups_accessor_resolves_and_enumerates() {
     .await
     .unwrap();
     apply_migrations(&pool).await;
-    let group_id = seed_group(&pool).await;
+    let (group_id, alice_id) = seed_group(&pool).await;
+    // Carol exists but is not a member of the Committee.
+    let carol_id = seed_user(&pool, "sub-carol", "carol@local", "Carol").await;
 
     let groups = Groups::new(pool.clone());
 
@@ -103,20 +115,42 @@ async fn groups_accessor_resolves_and_enumerates() {
         .expect("found");
     assert_eq!(by_id.name, "Committee");
 
-    // members lists both users (ordered by display_name), with their role.
-    let members = groups.members(GroupId(group_id)).await.unwrap();
+    // is_member reflects membership.
+    assert!(
+        groups
+            .is_member(GroupId(group_id), UserId(alice_id))
+            .await
+            .unwrap()
+    );
+    assert!(
+        !groups
+            .is_member(GroupId(group_id), UserId(carol_id))
+            .await
+            .unwrap()
+    );
+
+    // members (authorized): a member caller (Alice) sees both users, ordered by
+    // display_name, with their role.
+    let members = groups
+        .members(GroupId(group_id), UserId(alice_id))
+        .await
+        .unwrap();
     assert_eq!(members.len(), 2);
     assert_eq!(members[0].user.display_name, "Alice");
     assert_eq!(members[1].user.display_name, "Bob");
     assert_eq!(members[0].role.name, "member");
 
-    // Unknown name / id are None / empty.
+    // A non-member caller (Carol) is denied the roster — no disclosure.
+    assert!(matches!(
+        groups.members(GroupId(group_id), UserId(carol_id)).await,
+        Err(PluginError::PermissionDenied(_))
+    ));
+
+    // Unknown name resolves to None; an unknown group denies any caller (they are
+    // not a member of a group that does not exist).
     assert!(groups.by_name("Nope").await.unwrap().is_none());
-    assert!(
-        groups
-            .members(GroupId(Uuid::nil()))
-            .await
-            .unwrap()
-            .is_empty()
-    );
+    assert!(matches!(
+        groups.members(GroupId(Uuid::nil()), UserId(alice_id)).await,
+        Err(PluginError::PermissionDenied(_))
+    ));
 }

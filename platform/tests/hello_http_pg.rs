@@ -75,21 +75,21 @@ async fn greetings_route_enforces_hello_read() {
     sqlx::raw_sql(HELLO_MIGRATION).execute(&pool).await.unwrap();
 
     // The per-plugin context the host normally attaches per request.
-    let ctx = PluginResourceCtx::new(
-        PluginConfig::empty(),
-        Telemetry::new("hello"),
-        PluginDb::new(pool.clone(), "hello"),
-        Auth::new(pool.clone()),
-        Users::new(pool.clone()),
-        Groups::new(pool.clone()),
-        AuditEmitter::new(pool.clone()),
-        Authz::new(pool.clone()),
-        Email::disabled("hello", &[]),
-        Jobs::disabled("hello", &[]),
-        PluginStorage::empty("hello", &[]),
-        SecretStore::default(),
-        &[],
-    );
+    let ctx = PluginResourceCtx {
+        config: PluginConfig::empty(),
+        telemetry: Telemetry::new("hello"),
+        db: PluginDb::new(pool.clone(), "hello"),
+        auth: Auth::new(pool.clone()),
+        users: Users::new(pool.clone()),
+        groups: Groups::new(pool.clone()),
+        audit: AuditEmitter::new(pool.clone()),
+        authz: Authz::new(pool.clone()),
+        email: Email::disabled("hello", &[]),
+        jobs: Jobs::disabled("hello", &[]),
+        storage: PluginStorage::empty("hello", &[]),
+        secrets: SecretStore::default(),
+        capabilities: &[],
+    };
 
     let get = |with_user: Option<User>| {
         let mut app = HelloPlugin::new().routes().layer(Extension(ctx.clone()));

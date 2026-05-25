@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { User } from '../types.js';
-import { AuthProvider, useAuth } from './AuthProvider.js';
+import { AuthProvider, goToLoginUnlessPublic, useAuth } from './AuthProvider.js';
 
 function UserView() {
   const { user, isAuthenticated } = useAuth();
@@ -135,5 +135,28 @@ describe('AuthProvider', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(() => render(<UserView />)).toThrow(/AuthProvider/);
     spy.mockRestore();
+  });
+});
+
+describe('goToLoginUnlessPublic', () => {
+  it('redirects (and reports it) on a private path', () => {
+    // window.location.pathname is '/p/hello' from the outer beforeEach.
+    expect(goToLoginUnlessPublic(['/i/events'])).toBe(true);
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(String(assign.mock.calls[0]?.[0])).toContain('/api/auth/login?return_to=');
+  });
+
+  it('does not redirect on a login-optional path', () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { pathname: '/i/events/abc123', search: '', assign },
+    });
+    expect(goToLoginUnlessPublic(['/i/events'])).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it('redirects when no public prefixes are configured', () => {
+    expect(goToLoginUnlessPublic()).toBe(true);
+    expect(assign).toHaveBeenCalledTimes(1);
   });
 });

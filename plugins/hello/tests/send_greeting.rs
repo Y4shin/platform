@@ -44,21 +44,21 @@ async fn send_greeting_job_emails_via_capability() {
         "hello",
         CAPS,
     );
-    let ctx = PluginResourceCtx::new(
-        PluginConfig::empty(),
-        Telemetry::new("hello"),
-        PluginDb::new(pool.clone(), "hello"),
-        Auth::new(pool.clone()),
-        Users::new(pool.clone()),
-        Groups::new(pool.clone()),
-        AuditEmitter::new(pool.clone()),
-        Authz::new(pool.clone()),
+    let ctx = PluginResourceCtx {
+        config: PluginConfig::empty(),
+        telemetry: Telemetry::new("hello"),
+        db: PluginDb::new(pool.clone(), "hello"),
+        auth: Auth::new(pool.clone()),
+        users: Users::new(pool.clone()),
+        groups: Groups::new(pool.clone()),
+        audit: AuditEmitter::new(pool.clone()),
+        authz: Authz::new(pool.clone()),
         email,
-        Jobs::disabled("hello", CAPS),
-        PluginStorage::empty("hello", CAPS),
-        SecretStore::default(),
-        CAPS,
-    );
+        jobs: Jobs::disabled("hello", CAPS),
+        storage: PluginStorage::empty("hello", CAPS),
+        secrets: SecretStore::default(),
+        capabilities: CAPS,
+    };
     let resources = PluginResources::from_ctx(&ctx, None);
 
     // Dispatch the registered handler by its job name.

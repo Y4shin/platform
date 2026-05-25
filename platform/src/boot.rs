@@ -23,21 +23,21 @@ pub fn build_ctx(
     runtime: &PluginRuntime,
     infra: &HostInfra,
 ) -> PluginResourceCtx {
-    PluginResourceCtx::new(
-        runtime.config.clone(),
-        Telemetry::with_sink(meta.name, infra.metric_sink.clone()),
+    PluginResourceCtx {
+        config: runtime.config.clone(),
+        telemetry: Telemetry::with_sink(meta.name, infra.metric_sink.clone()),
         db,
-        Auth::new(platform_pool.clone()),
-        Users::new(platform_pool.clone()),
-        Groups::new(platform_pool.clone()),
-        AuditEmitter::new(platform_pool.clone()),
-        Authz::new(platform_pool.clone()),
-        infra.email_handle(meta.name, meta.capabilities),
-        infra.jobs_handle(platform_pool, meta.name, meta.capabilities),
-        infra.storage_handle(platform_pool, meta.name, meta.capabilities),
-        runtime.secrets.clone(),
-        meta.capabilities,
-    )
+        auth: Auth::new(platform_pool.clone()),
+        users: Users::new(platform_pool.clone()),
+        groups: Groups::new(platform_pool.clone()),
+        audit: AuditEmitter::new(platform_pool.clone()),
+        authz: Authz::new(platform_pool.clone()),
+        email: infra.email_handle(meta.name, meta.capabilities),
+        jobs: infra.jobs_handle(platform_pool, meta.name, meta.capabilities),
+        storage: infra.storage_handle(platform_pool, meta.name, meta.capabilities),
+        secrets: runtime.secrets.clone(),
+        capabilities: meta.capabilities,
+    }
 }
 
 /// Run `on_startup` for every plugin in registration order. Fails on the first

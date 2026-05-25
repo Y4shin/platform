@@ -116,60 +116,27 @@ impl PluginResources {
 /// Request-independent per-plugin handles, assembled once by the host and
 /// attached to the plugin's router as an `Extension`. The `auth` handle here is
 /// caller-less; the extractor attaches the current user.
+///
+/// All fields are `pub` and there is **no constructor**: callers build it with a
+/// named-field struct literal (`PluginResourceCtx { config, telemetry, .. }`).
+/// That is deliberate — adding or renaming a host handle then becomes a
+/// *compile error* at every construction site, whereas a positional constructor
+/// silently shifted args and a builder would let a forgotten field compile.
 #[derive(Clone)]
 pub struct PluginResourceCtx {
-    config: PluginConfig,
-    telemetry: Telemetry,
-    db: PluginDb,
-    auth: Auth,
-    users: Users,
-    groups: Groups,
-    audit: AuditEmitter,
-    authz: Authz,
-    email: Email,
-    jobs: Jobs,
-    storage: PluginStorage,
-    secrets: SecretStore,
-    capabilities: &'static [&'static str],
-}
-
-impl PluginResourceCtx {
-    #[must_use]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "one constructor arg per host-provided handle; assembled once at boot"
-    )]
-    pub fn new(
-        config: PluginConfig,
-        telemetry: Telemetry,
-        db: PluginDb,
-        auth: Auth,
-        users: Users,
-        groups: Groups,
-        audit: AuditEmitter,
-        authz: Authz,
-        email: Email,
-        jobs: Jobs,
-        storage: PluginStorage,
-        secrets: SecretStore,
-        capabilities: &'static [&'static str],
-    ) -> Self {
-        Self {
-            config,
-            telemetry,
-            db,
-            auth,
-            users,
-            groups,
-            audit,
-            authz,
-            email,
-            jobs,
-            storage,
-            secrets,
-            capabilities,
-        }
-    }
+    pub config: PluginConfig,
+    pub telemetry: Telemetry,
+    pub db: PluginDb,
+    pub auth: Auth,
+    pub users: Users,
+    pub groups: Groups,
+    pub audit: AuditEmitter,
+    pub authz: Authz,
+    pub email: Email,
+    pub jobs: Jobs,
+    pub storage: PluginStorage,
+    pub secrets: SecretStore,
+    pub capabilities: &'static [&'static str],
 }
 
 impl<S: Send + Sync> FromRequestParts<S> for PluginResources {

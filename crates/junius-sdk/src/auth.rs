@@ -234,8 +234,39 @@ impl Groups {
         }))
     }
 
-    /// Enumerate a group's members (e.g. for group sign-up pre-fill).
-    pub async fn members(&self, id: GroupId) -> Result<Vec<GroupMember>, PluginError> {
+    /// Whether `user` is a member of `group`.
+    pub async fn is_member(&self, group: GroupId, user: UserId) -> Result<bool, PluginError> {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM platform.group_membership \
+             WHERE group_id = $1 AND user_id = $2)",
+        )
+        .bind(group.0)
+        .bind(user.0)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(exists)
+    }
+
+    /// Enumerate a group's members (e.g. for group sign-up pre-fill),
+    /// **authorization-checked**: `as_caller` must themselves be a member of
+    /// `group`, otherwise this returns [`PluginError::PermissionDenied`] without
+    /// disclosing the roster.
+    ///
+    /// Unlike [`by_name`](Self::by_name)/[`by_id`](Self::by_id) (open directory
+    /// lookups that return only a group's name/description, mirroring
+    /// [`Users::lookup`]), `members` exposes every member's email — the sensitive
+    /// directory path — so it is gated on the caller's own membership rather than
+    /// left open on the platform pool.
+    pub async fn members(
+        &self,
+        group: GroupId,
+        as_caller: UserId,
+    ) -> Result<Vec<GroupMember>, PluginError> {
+        if !self.is_member(group, as_caller).await? {
+            return Err(PluginError::PermissionDenied(format!(
+                "user {as_caller} is not a member of group {group}"
+            )));
+        }
         let rows = sqlx::query(
             "SELECT u.id, u.email, u.display_name, r.id AS role_id, r.name AS role_name \
              FROM platform.group_membership m \
@@ -243,7 +274,7 @@ impl Groups {
              JOIN platform.group_role r ON r.id = m.role_id \
              WHERE m.group_id = $1 ORDER BY u.display_name",
         )
-        .bind(id.0)
+        .bind(group.0)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows

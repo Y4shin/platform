@@ -1,6 +1,12 @@
 export type { AuthProviderProps } from './auth/AuthProvider.js';
 
-export { AuthProvider, goToLogin, isPublicPath, useAuth } from './auth/AuthProvider.js';
+export {
+  AuthProvider,
+  goToLogin,
+  goToLoginUnlessPublic,
+  isPublicPath,
+  useAuth,
+} from './auth/AuthProvider.js';
 export { useIsAuthenticated } from './auth/useIsAuthenticated.js';
 export { useCurrentUser, useUser } from './auth/useUser.js';
 export { requirePermissions } from './permissions/requirePermissions.js';

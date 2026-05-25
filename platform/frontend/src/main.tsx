@@ -1,7 +1,7 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { AuthProvider, ComponentRegistryProvider, goToLogin, isPublicPath } from '@junius/sdk';
+import { AuthProvider, ComponentRegistryProvider, goToLoginUnlessPublic } from '@junius/sdk';
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
@@ -13,16 +13,14 @@ import './styles.css';
 
 // When any query fails with an unauthenticated RPC error (expired/absent
 // session), send the browser to login — except on a public (login-optional)
-// path, where an Unauthenticated RPC is expected and must not redirect.
-// AuthProvider applies the same allowlist to the initial /api/me check.
+// path, where an Unauthenticated RPC is expected and must not redirect. The
+// redirect decision is the shared goToLoginUnlessPublic helper, the same one
+// AuthProvider's initial /api/me check uses, so both honour one allowlist.
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
-      if (
-        ConnectError.from(error).code === Code.Unauthenticated &&
-        !isPublicPath(PUBLIC_ROUTE_PREFIXES)
-      ) {
-        goToLogin();
+      if (ConnectError.from(error).code === Code.Unauthenticated) {
+        goToLoginUnlessPublic(PUBLIC_ROUTE_PREFIXES);
       }
     },
   }),

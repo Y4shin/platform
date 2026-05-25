@@ -50,11 +50,6 @@ export function AuthProvider({ user: override, publicPaths, children }: AuthProv
     if (hasOverride) {
       return;
     }
-    const redirectIfPrivate = () => {
-      if (!isPublicPath(publicPaths)) {
-        goToLogin();
-      }
-    };
     let cancelled = false;
     fetchMe()
       .then((fetched) => {
@@ -66,13 +61,13 @@ export function AuthProvider({ user: override, publicPaths, children }: AuthProv
           setStatus('authed');
         } else {
           setStatus('unauth');
-          redirectIfPrivate();
+          goToLoginUnlessPublic(publicPaths);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setStatus('unauth');
-          redirectIfPrivate();
+          goToLoginUnlessPublic(publicPaths);
         }
       });
     return () => {
@@ -111,6 +106,23 @@ export function isPublicPath(publicPaths?: string[]): boolean {
 export function goToLogin(): void {
   const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
   window.location.assign(`/api/auth/login?return_to=${returnTo}`);
+}
+
+/**
+ * The single "should an unauthenticated state send us to login?" decision,
+ * consulted by *every* redirect path (AuthProvider's initial `/api/me`, and the
+ * app's `queryClient.onError` for `Unauthenticated` RPCs). It redirects unless
+ * the current path is login-optional; centralizing it means a new public-route
+ * surface can't be allow-listed in one place and forgotten in the other.
+ *
+ * Returns whether it redirected (handy for tests / short-circuiting).
+ */
+export function goToLoginUnlessPublic(publicPaths?: string[]): boolean {
+  if (isPublicPath(publicPaths)) {
+    return false;
+  }
+  goToLogin();
+  return true;
 }
 
 interface WireRole {

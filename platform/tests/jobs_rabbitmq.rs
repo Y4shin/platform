@@ -104,21 +104,21 @@ async fn jobs_round_trip_and_dead_letter() {
         Err(PluginError::External(anyhow::anyhow!("always fails")))
     });
 
-    let ctx = PluginResourceCtx::new(
-        PluginConfig::empty(),
-        Telemetry::new("testjobs"),
-        PluginDb::new(pool.clone(), "testjobs"),
-        Auth::new(pool.clone()),
-        Users::new(pool.clone()),
-        Groups::new(pool.clone()),
-        AuditEmitter::new(pool.clone()),
-        Authz::new(pool.clone()),
-        Email::disabled("testjobs", &[]),
-        Jobs::disabled("testjobs", &[]),
-        PluginStorage::empty("testjobs", &[]),
-        SecretStore::default(),
-        &["job.enqueue"],
-    );
+    let ctx = PluginResourceCtx {
+        config: PluginConfig::empty(),
+        telemetry: Telemetry::new("testjobs"),
+        db: PluginDb::new(pool.clone(), "testjobs"),
+        auth: Auth::new(pool.clone()),
+        users: Users::new(pool.clone()),
+        groups: Groups::new(pool.clone()),
+        audit: AuditEmitter::new(pool.clone()),
+        authz: Authz::new(pool.clone()),
+        email: Email::disabled("testjobs", &[]),
+        jobs: Jobs::disabled("testjobs", &[]),
+        storage: PluginStorage::empty("testjobs", &[]),
+        secrets: SecretStore::default(),
+        capabilities: &["job.enqueue"],
+    };
     let mut registry = JobRegistry::new();
     registry.register_plugin(vec![ok_handler, fail_handler], &ctx);
 
