@@ -5,15 +5,42 @@
 #   task fmt        — apply all formatters
 version: "3"
 
-env:
-  # Repository `query!` macros check against the committed `.sqlx/` offline cache.
-  SQLX_OFFLINE: "true"
-
 vars:
   CONFIG: dev/platform.toml
   # Throwaway dev secrets (mirror dev/docker-compose.yml + dev/authentik/README).
   # M10 adds MinIO creds + the storage token secret.
   DEV_SECRETS: OIDC_CLIENT_SECRET=dev-oidc-secret SESSION_KEY=dev-session-key ROLE_PW_SECRET=dev-role-pw-secret MINIO_USER=minioadmin MINIO_PASS=minioadmin STORAGE_TOKEN_SECRET=dev-storage-token
+
+  # Machine capacity, probed once at startup. The fetch command is chosen by OS.
+  # Logical CPUs (threads): nproc (Linux) / sysctl (macOS) / env var (Windows).
+  AVAILABLE_THREADS:
+    sh: >-
+      {{if eq OS "darwin"}}sysctl -n hw.logicalcpu{{else if eq OS "windows"}}echo $NUMBER_OF_PROCESSORS{{else}}nproc{{end}}
+  # Total physical RAM in MB: /proc/meminfo (Linux) / sysctl (macOS) /
+  # CIM (Windows).
+  TOTAL_RAM_MB:
+    sh: >-
+      {{if eq OS "darwin"}}echo $(( $(sysctl -n hw.memsize) / 1048576 )){{else if eq OS "windows"}}powershell -NoProfile -Command "[math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB)"{{else}}awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo{{end}}
+
+env:
+  # Repository `query!` macros check against the committed `.sqlx/` offline cache.
+  SQLX_OFFLINE: "true"
+
+  # Estimate how many parallel jobs cargo can run without OOMing: budget ~60% of
+  # total RAM as peak build usage, at ~2 GB per job, capped at the thread count
+  # (min 1). Heavy debug/link jobs are memory-hungry, so on low-RAM / WSL boxes
+  # this throttles parallelism while still using every core when RAM allows.
+  # Override by exporting CARGO_BUILD_JOBS before running task.
+  CARGO_BUILD_JOBS:
+    sh: |
+      threads={{.AVAILABLE_THREADS}}
+      total_mb={{.TOTAL_RAM_MB}}
+      peak_mb=$((total_mb * 60 / 100))
+      by_ram=$((peak_mb / 2048))
+      jobs=$threads
+      if [ "$by_ram" -lt "$jobs" ]; then jobs=$by_ram; fi
+      if [ "$jobs" -lt 1 ]; then jobs=1; fi
+      echo "$jobs"
 
 tasks:
   default:
