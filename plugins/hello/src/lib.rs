@@ -7,9 +7,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use axum::{Router, routing::get};
+use axum::{Json, Router, routing::get};
 use connectrpc::{Encodable, RequestContext, Response, ServiceResult};
-use junius_sdk::{Plugin, PluginMetadata};
+use junius_sdk::{ApiError, Plugin, PluginContext, PluginCtx, PluginMetadata};
 
 junius_sdk::plugin_metadata!();
 
@@ -31,6 +31,30 @@ pub mod repo;
 use proto::hello::v1::{HelloService, HelloServiceExt, OwnedGreetRequestView};
 // Wire message types, re-exported for tests and any in-process callers.
 pub use proto::hello::v1::{GreetRequest, GreetResponse};
+
+use crate::permissions::HelloRead;
+use crate::repo::{Greeting, HelloRepo};
+
+/// Per-request state for the hello plugin: its repositories, typed on the
+/// permission witness `P`. `#[derive(PluginCtx)]` generates the extractor for
+/// `HelloCtx<P>`.
+#[derive(PluginCtx)]
+pub struct HelloState<P = ()> {
+    #[repo]
+    pub greetings: HelloRepo<P>,
+}
+
+/// The hello plugin's request context: state + caller + resources, proven to
+/// hold the permissions in `P`.
+pub type HelloCtx<P = ()> = PluginContext<HelloState<P>, P>;
+
+/// `GET /h/hello/greetings` — list greetings. Requires `hello:read`, enforced by
+/// extracting `HelloCtx<permissions!(HelloRead)>`.
+async fn list_greetings(
+    ctx: HelloCtx<junius_sdk::permissions!(HelloRead)>,
+) -> Result<Json<Vec<Greeting>>, ApiError> {
+    Ok(Json(ctx.state.greetings.list().await?))
+}
 
 pub struct HelloPlugin;
 
@@ -77,7 +101,9 @@ impl Plugin for HelloPlugin {
     }
 
     fn routes(&self) -> Router {
-        Router::new().route("/ping", get(|| async { "pong" }))
+        Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .route("/greetings", get(list_greetings))
     }
 
     fn rpc_routes(&self) -> Router {

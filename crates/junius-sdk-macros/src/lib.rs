@@ -10,6 +10,7 @@
 //!
 //! The `Repository`/`PluginCtx` derives arrive later in M07.
 
+mod ctx;
 mod expand;
 mod repo;
 
@@ -79,4 +80,14 @@ pub fn repository(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn impl_repository(attr: TokenStream, item: TokenStream) -> TokenStream {
     repo::impl_repository(attr.into(), item.into()).into()
+}
+
+/// Derive the per-request Axum extractor for a plugin's state struct. On
+/// `#[derive(PluginCtx)] struct HelloState<P = ()> { #[repo] greetings:
+/// HelloRepo<P> }` it generates a `Clone` impl and `FromRequestParts` for
+/// `PluginContext<HelloState<P>, P>` (resolve resources + caller from
+/// extensions, check `P`, build the repos). Only `#[repo]` fields are supported.
+#[proc_macro_derive(PluginCtx, attributes(repo))]
+pub fn plugin_ctx(input: TokenStream) -> TokenStream {
+    ctx::derive(input.into()).into()
 }

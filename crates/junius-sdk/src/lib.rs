@@ -7,6 +7,7 @@
 
 pub mod auth;
 pub mod config;
+pub mod context;
 pub mod db;
 pub mod error;
 pub mod metadata;
@@ -17,8 +18,9 @@ pub mod resources;
 pub mod secrets;
 pub mod telemetry;
 
-pub use junius_sdk_macros::{impl_repository, permissions, plugin_metadata, repository};
+pub use junius_sdk_macros::{PluginCtx, impl_repository, permissions, plugin_metadata, repository};
 
+pub use context::{ApiError, BuildState, PluginContext};
 pub use permissions::{And, Has, Permission, PermissionList};
 pub use repo::{RepoPool, ScopedDb};
 
