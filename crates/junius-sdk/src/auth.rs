@@ -200,7 +200,6 @@ impl AuditEmitter {
 /// has no session-resolved user.
 pub struct CurrentUser(pub User);
 
-#[async_trait::async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for CurrentUser {
     type Rejection = Response;
 
@@ -217,7 +216,6 @@ impl<S: Send + Sync> FromRequestParts<S> for CurrentUser {
 /// Extractor for the optional authenticated caller; never rejects.
 pub struct MaybeUser(pub Option<User>);
 
-#[async_trait::async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for MaybeUser {
     type Rejection = std::convert::Infallible;
 

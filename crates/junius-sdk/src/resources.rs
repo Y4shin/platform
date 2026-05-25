@@ -105,7 +105,6 @@ impl PluginResourceCtx {
     }
 }
 
-#[async_trait::async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for PluginResources {
     type Rejection = Response;
 

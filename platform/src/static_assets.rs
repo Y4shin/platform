@@ -22,7 +22,7 @@ struct Assets;
 ///   client-side routing handles it.
 pub fn router() -> Router {
     Router::new()
-        .route("/assets/*path", get(serve_asset))
+        .route("/assets/{*path}", get(serve_asset))
         .fallback(get(spa_fallback))
 }
 
