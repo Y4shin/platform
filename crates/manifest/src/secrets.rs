@@ -6,13 +6,17 @@
 //! file. Recognized indirection schemes are `env:` (and, reserved for later,
 //! `vault:`); any other value is a literal.
 //!
-//! This module is IO-free: [`SecretRef::resolve`] takes a lookup closure so the
-//! manifest crate never reads the environment itself. The CLI and host pass a
-//! `std::env::var`-backed closure (each with the narrow `disallowed_methods`
-//! allow); tests pass a fake map. Keeping resolution here — consumed by both the
-//! migration runner and the host — is what guarantees they agree on values.
+//! Environment resolution is IO-free: [`SecretRef::resolve`] takes a lookup
+//! closure so the manifest crate never reads the environment itself. The CLI and
+//! host pass a `std::env::var`-backed closure (each with the narrow
+//! `disallowed_methods` allow); tests pass a fake map. The `file:` scheme does
+//! read the filesystem; [`SecretRef::resolve_with`] takes an injectable file
+//! reader so the env path stays pure and tests can fake file reads. Keeping
+//! resolution here — consumed by both the migration runner and the host — is
+//! what guarantees they agree on values.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::error::SecretError;
@@ -21,11 +25,15 @@ use crate::infra_config::{
     parse_job_workers, parse_jobs, parse_otel, parse_storage,
 };
 
-/// A parsed `[config]` value: either a literal or an environment indirection.
+/// A parsed `[config]` value: a literal, an environment indirection, or a file
+/// indirection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SecretRef {
     Literal(String),
     Env(String),
+    /// `file:PATH` — the value is the (newline-trimmed) contents of a file, e.g. a
+    /// Kubernetes/Docker mounted secret.
+    File(PathBuf),
 }
 
 impl FromStr for SecretRef {
@@ -37,8 +45,13 @@ impl FromStr for SecretRef {
                 return Err(SecretError::EmptyTarget);
             }
             Ok(Self::Env(var.to_string()))
+        } else if let Some(path) = s.strip_prefix("file:") {
+            if path.is_empty() {
+                return Err(SecretError::EmptyTarget);
+            }
+            Ok(Self::File(PathBuf::from(path)))
         } else if s.starts_with("vault:") {
-            // Reserved indirection scheme; resolution deferred (see design §10).
+            // Reserved indirection scheme; real Vault integration is out of scope.
             Err(SecretError::UnsupportedScheme("vault".to_string()))
         } else {
             Ok(Self::Literal(s.to_string()))
@@ -48,11 +61,27 @@ impl FromStr for SecretRef {
 
 impl SecretRef {
     /// Resolve to the concrete value. `lookup` reads an environment variable
-    /// (returning `None` when unset); literals ignore it.
+    /// (returning `None` when unset); `file:` reads from the real filesystem.
     pub fn resolve(&self, lookup: &impl Fn(&str) -> Option<String>) -> Result<String, SecretError> {
+        self.resolve_with(lookup, &|path| std::fs::read_to_string(path))
+    }
+
+    /// Like [`resolve`](Self::resolve) but with an injectable file reader, so the
+    /// env path stays IO-free and tests can fake `file:` reads.
+    pub fn resolve_with(
+        &self,
+        lookup: &impl Fn(&str) -> Option<String>,
+        read_file: &impl Fn(&Path) -> std::io::Result<String>,
+    ) -> Result<String, SecretError> {
         match self {
             Self::Literal(value) => Ok(value.clone()),
             Self::Env(var) => lookup(var).ok_or_else(|| SecretError::EnvMissing(var.clone())),
+            Self::File(path) => {
+                let raw = read_file(path)
+                    .map_err(|e| SecretError::FileRead(path.clone(), e.to_string()))?;
+                // Trim trailing newlines only (mounted secrets often end in one).
+                Ok(raw.trim_end_matches(['\r', '\n']).to_string())
+            }
         }
     }
 }
@@ -167,6 +196,28 @@ mod tests {
             "env:FOO".parse::<SecretRef>().unwrap(),
             SecretRef::Env("FOO".to_string())
         );
+    }
+
+    #[test]
+    fn parses_and_resolves_file_scheme() {
+        assert_eq!(
+            "file:/run/secrets/db".parse::<SecretRef>().unwrap(),
+            SecretRef::File("/run/secrets/db".into())
+        );
+        assert!(matches!(
+            "file:".parse::<SecretRef>(),
+            Err(SecretError::EmptyTarget)
+        ));
+        // Resolve via an injected reader; trailing newline is trimmed.
+        let r = "file:/run/secrets/db".parse::<SecretRef>().unwrap();
+        let read = |_: &std::path::Path| Ok("s3cr3t\n".to_string());
+        assert_eq!(r.resolve_with(&no_env(), &read).unwrap(), "s3cr3t");
+        // A read error surfaces as FileRead.
+        let bad = |_: &std::path::Path| Err(std::io::Error::other("nope"));
+        assert!(matches!(
+            r.resolve_with(&no_env(), &bad),
+            Err(SecretError::FileRead(_, _))
+        ));
     }
 
     #[test]

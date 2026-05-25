@@ -15,10 +15,12 @@ pub enum SecretError {
     NotAString(String),
     #[error("secret reference uses an unsupported scheme {0:?}")]
     UnsupportedScheme(String),
-    #[error("`env:` secret reference has an empty variable name")]
+    #[error("secret reference has an empty target (e.g. `env:` or `file:` with nothing after)")]
     EmptyTarget,
     #[error("environment variable {0:?} (referenced by config) is not set")]
     EnvMissing(String),
+    #[error("could not read secret file {0:?}: {1}")]
+    FileRead(std::path::PathBuf, String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
