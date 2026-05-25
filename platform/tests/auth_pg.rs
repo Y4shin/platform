@@ -104,6 +104,7 @@ async fn api_me_round_trip_and_logout() {
         &pool,
         &std::collections::BTreeMap::new(),
         auth_state,
+        &platform::infra::HostInfra::default(),
     );
 
     // /api/me with a valid session cookie → 200 + camelCase nested JSON.

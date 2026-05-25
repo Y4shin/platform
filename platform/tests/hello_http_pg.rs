@@ -84,6 +84,7 @@ async fn greetings_route_enforces_hello_read() {
         AuditEmitter::new(pool.clone()),
         Authz::new(pool.clone()),
         SecretStore::default(),
+        &[],
     );
 
     let get = |with_user: Option<User>| {

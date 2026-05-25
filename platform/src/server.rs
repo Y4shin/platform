@@ -12,6 +12,7 @@ use crate::auth::{self, AuthState};
 use crate::boot;
 use crate::config::{HostConfig, PluginRuntime};
 use crate::db::{DbBootstrap, PluginPools};
+use crate::infra::HostInfra;
 
 /// Compose the host base + plugin routes **without** database-backed services.
 /// Plugin routes/RPC that need `PluginResources` will 500 (no context attached);
@@ -30,15 +31,22 @@ pub fn build_app_with_services(
     platform_pool: &PgPool,
     runtimes: &BTreeMap<String, PluginRuntime>,
     auth_state: AuthState,
+    infra: &HostInfra,
 ) -> Router {
-    let http = compose_http(plugins, Some((pools, platform_pool, runtimes)));
+    let http = compose_http(plugins, Some((pools, platform_pool, runtimes, infra)));
 
     // All plugins' Connect services are folded into one router under `/rpc`. Two
     // layers run before dispatch (inside the session middleware, so
     // `Extension<User>` is set): `inject_ctx` attaches the right plugin's
     // `PluginResourceCtx` (by service FQN) for the handler, and the permission
     // guard rejects unauthorized calls.
-    let ctx_map = Arc::new(build_ctx_map(plugins, pools, platform_pool, runtimes));
+    let ctx_map = Arc::new(build_ctx_map(
+        plugins,
+        pools,
+        platform_pool,
+        runtimes,
+        infra,
+    ));
     let rpc = build_rpc(plugins)
         .layer(axum::middleware::from_fn(
             crate::rpc_guard::require_permissions,
@@ -66,16 +74,21 @@ pub fn build_app_with_services(
 /// per-plugin `PluginResourceCtx` as an `Extension` when `services` is provided.
 fn compose_http(
     plugins: &[Box<dyn Plugin>],
-    services: Option<(&PluginPools, &PgPool, &BTreeMap<String, PluginRuntime>)>,
+    services: Option<(
+        &PluginPools,
+        &PgPool,
+        &BTreeMap<String, PluginRuntime>,
+        &HostInfra,
+    )>,
 ) -> Router {
     let mut http = Router::new();
     for plugin in plugins {
         let metadata = plugin.metadata();
         let mut plugin_http = plugin.routes();
-        if let Some((pools, platform_pool, runtimes)) = services {
+        if let Some((pools, platform_pool, runtimes, infra)) = services {
             if let Some(db) = pools.get(metadata.name) {
                 let runtime = runtimes.get(metadata.name).cloned().unwrap_or_default();
-                let ctx = boot::build_ctx(metadata.name, db, platform_pool, &runtime);
+                let ctx = boot::build_ctx(metadata, db, platform_pool, &runtime, infra);
                 plugin_http = plugin_http.layer(Extension(ctx));
             } else {
                 tracing::error!(plugin = metadata.name, "no DB pool; resources unavailable");
@@ -103,15 +116,16 @@ fn build_ctx_map(
     pools: &PluginPools,
     platform_pool: &PgPool,
     runtimes: &BTreeMap<String, PluginRuntime>,
+    infra: &HostInfra,
 ) -> HashMap<String, PluginResourceCtx> {
     let mut map = HashMap::new();
     for plugin in plugins {
-        let name = plugin.metadata().name;
-        if let Some(db) = pools.get(name) {
-            let runtime = runtimes.get(name).cloned().unwrap_or_default();
+        let meta = plugin.metadata();
+        if let Some(db) = pools.get(meta.name) {
+            let runtime = runtimes.get(meta.name).cloned().unwrap_or_default();
             map.insert(
-                name.to_string(),
-                boot::build_ctx(name, db, platform_pool, &runtime),
+                meta.name.to_string(),
+                boot::build_ctx(meta, db, platform_pool, &runtime, infra),
             );
         }
     }
@@ -145,7 +159,11 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         )
         .await?;
 
-    boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins).await?;
+    // Host-global infra clients (job backend, object stores, email transport,
+    // OTel meter) — built once, shared across plugins via `build_ctx`.
+    let infra = HostInfra::build(resolved).await?;
+
+    boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins, &infra).await?;
 
     // Browser-facing OIDC callback. When `oidc_redirect_url` is configured (e.g.
     // the Vite `:5173` origin under `junius dev`, so the callback flows through
@@ -166,6 +184,7 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         &platform_pool,
         &config.plugins,
         auth_state,
+        &infra,
     );
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
@@ -181,6 +200,6 @@ pub async fn run(config: HostConfig, plugins: Vec<Box<dyn Plugin>>) -> anyhow::R
         .with_graceful_shutdown(shutdown)
         .await?;
 
-    boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins).await;
+    boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins, &infra).await;
     Ok(())
 }

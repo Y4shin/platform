@@ -8,6 +8,7 @@ pub mod boot;
 pub mod config;
 pub mod db;
 pub mod generated;
+pub mod infra;
 pub mod plugin_registry;
 pub mod rpc_guard;
 pub mod server;

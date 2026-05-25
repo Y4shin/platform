@@ -22,9 +22,10 @@ pub mod telemetry;
 pub use junius_sdk_macros::{PluginCtx, impl_repository, permissions, plugin_metadata, repository};
 
 pub use authz::{Authz, Principal, ShareRecord};
-pub use context::{ApiError, BuildState, PluginContext};
+pub use context::{ApiError, BuildState, PluginContext, system_context};
 pub use permissions::{And, Has, Permission, PermissionList};
 pub use repo::{RepoPool, ScopedDb};
+pub use telemetry::MetricSink;
 
 pub use auth::{
     AuditEmitter, Auth, CurrentUser, GroupId, MaybeUser, Membership, Role, RoleId, User,

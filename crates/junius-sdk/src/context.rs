@@ -195,6 +195,22 @@ impl From<crate::error::PluginError> for connectrpc::ConnectError {
     }
 }
 
+/// Build a **privileged, caller-less** context for system work (e.g. background
+/// jobs) — no HTTP/RPC caller to authenticate. The witness `P` is chosen by the
+/// caller (typically matching the state's `S` parameter): since `BuildState::build`
+/// performs no permission check (only `FromRequestParts`/`from_rpc` do), the
+/// resulting context runs with the authority of `P`. An under-powered `P` is a
+/// compile error at the call site (the repo method isn't nameable), not a runtime
+/// bypass. Plugins usually expose a `MyCtx::system(res)` alias over this.
+#[must_use]
+pub fn system_context<S, P>(resources: &PluginResources) -> PluginContext<S, P>
+where
+    S: BuildState,
+{
+    let state = S::build(resources, None);
+    PluginContext::__new(state, None, resources.clone())
+}
+
 /// How a plugin's state struct builds itself from the per-request resources +
 /// caller. `#[derive(PluginCtx)]` implements this for the state (a local type);
 /// the blanket `FromRequestParts` impl below — owned here so the orphan rule is

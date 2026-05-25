@@ -19,8 +19,28 @@ use crate::auth::{AuditEmitter, Auth, User, Users};
 use crate::authz::Authz;
 use crate::config::PluginConfig;
 use crate::db::PluginDb;
+use crate::error::PluginError;
 use crate::secrets::SecretStore;
 use crate::telemetry::Telemetry;
+
+/// Fail with [`PluginError::CapabilityNotDeclared`] unless `needed` is in the
+/// plugin's declared `[requires].capabilities`. Gated handles (`email`, `jobs`,
+/// `storage`) call this at method entry; `db`/`audit` are ungated (already
+/// enforced by the per-plugin Postgres role + compile-time `Has<P>`).
+#[allow(
+    dead_code,
+    reason = "called by the gated email/jobs/storage handles from Stage 4 onward"
+)]
+pub(crate) fn require_capability(
+    caps: &[&'static str],
+    needed: &'static str,
+) -> Result<(), PluginError> {
+    if caps.contains(&needed) {
+        Ok(())
+    } else {
+        Err(PluginError::CapabilityNotDeclared(needed))
+    }
+}
 
 /// Everything a plugin handler is handed for the current request.
 #[derive(Clone)]
@@ -39,6 +59,9 @@ pub struct PluginResources {
     pub authz: Authz,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
+    /// The plugin's declared `[requires].capabilities` (for runtime gating of
+    /// `email`/`jobs`/`storage` handles).
+    pub(crate) capabilities: &'static [&'static str],
 }
 
 impl PluginResources {
@@ -55,6 +78,7 @@ impl PluginResources {
             audit: ctx.audit.clone(),
             authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
             secrets: ctx.secrets.clone(),
+            capabilities: ctx.capabilities,
         }
     }
 
@@ -62,6 +86,12 @@ impl PluginResources {
     #[must_use]
     pub fn db(&self) -> &PluginDb {
         &self.db
+    }
+
+    /// Whether the plugin declared `cap` in its manifest `[requires].capabilities`.
+    #[must_use]
+    pub fn has_capability(&self, cap: &str) -> bool {
+        self.capabilities.contains(&cap)
     }
 
     /// The plugin's resolved secrets. The codegen'd `Secrets::new(...)` wraps
@@ -85,6 +115,7 @@ pub struct PluginResourceCtx {
     audit: AuditEmitter,
     authz: Authz,
     secrets: SecretStore,
+    capabilities: &'static [&'static str],
 }
 
 impl PluginResourceCtx {
@@ -102,6 +133,7 @@ impl PluginResourceCtx {
         audit: AuditEmitter,
         authz: Authz,
         secrets: SecretStore,
+        capabilities: &'static [&'static str],
     ) -> Self {
         Self {
             config,
@@ -112,6 +144,7 @@ impl PluginResourceCtx {
             audit,
             authz,
             secrets,
+            capabilities,
         }
     }
 }
@@ -129,5 +162,22 @@ impl<S: Send + Sync> FromRequestParts<S> for PluginResources {
         })?;
         let user = parts.extensions.get::<User>().cloned();
         Ok(PluginResources::from_ctx(ctx, user))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn require_capability_gates_on_declaration() {
+        let caps: &[&'static str] = &["email.send", "storage.read"];
+        assert!(require_capability(caps, "email.send").is_ok());
+        assert!(matches!(
+            require_capability(caps, "job.enqueue"),
+            Err(PluginError::CapabilityNotDeclared("job.enqueue"))
+        ));
+        // Empty set denies everything.
+        assert!(require_capability(&[], "email.send").is_err());
     }
 }
