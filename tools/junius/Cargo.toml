@@ -44,6 +44,8 @@ sqlparser = { workspace = true }
 
 # Source resolution (M11): blake3 content hashes for platform.lock.
 blake3 = { workspace = true }
+# Comment-preserving platform.toml edits (`junius plugin enable/disable`).
+toml_edit = { workspace = true }
 
 [dev-dependencies]
 insta      = { workspace = true }

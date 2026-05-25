@@ -102,6 +102,8 @@ base64        = "0.22"
 blake3        = "1"
 # Temp dirs for CLI tests (source-resolution git fixtures, hashing trees).
 tempfile      = "3"
+# Comment-preserving edits to platform.toml (`junius plugin enable/disable`).
+toml_edit     = "0.22"
 rand          = "0.8"
 tower-cookies = { version = "0.11", features = ["private"] }
 openidconnect = { version = "3", default-features = false, features = ["reqwest", "rustls-tls"] }

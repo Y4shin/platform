@@ -161,10 +161,22 @@ pub enum PluginCmd {
     },
     /// Show a plugin's manifest summary.
     Info { name: String },
-    /// Add a plugin to platform.toml. (Stub — lands in M11.)
-    Enable { name: String },
-    /// Remove a plugin from platform.toml. (Stub — lands in M11.)
-    Disable { name: String },
+    /// Add a plugin to a deployment's `[plugins].enabled` (verifying its
+    /// required dependencies are enabled) and re-sync.
+    Enable {
+        name: String,
+        /// Path to platform.toml. Defaults to ./platform.toml.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+    /// Remove a plugin from `[plugins].enabled` (refusing if another enabled
+    /// plugin requires it) and re-sync.
+    Disable {
+        name: String,
+        /// Path to platform.toml. Defaults to ./platform.toml.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
 }
 
 #[cfg(feature = "develop")]
