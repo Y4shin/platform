@@ -10,6 +10,7 @@ pub mod db;
 pub mod email;
 pub mod generated;
 pub mod infra;
+pub mod jobs;
 pub mod plugin_registry;
 pub mod rpc_guard;
 pub mod server;

@@ -52,6 +52,16 @@ tracing-opentelemetry         = "0.33"
 # rustls; the Resend/log transports use reqwest/tracing already in the tree.
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1-rustls-tls"] }
 
+# Job queue over RabbitMQ (host-only — never in junius-sdk; the SDK speaks the
+# `JobBackend` trait). lapin is the AMQP client; deadpool-lapin pools publisher
+# connections; tokio-util gives the worker its CancellationToken.
+# lapin 3 (not 4) to match deadpool-lapin 0.13, which pins lapin ^3; sharing one
+# lapin major keeps the publisher pool + worker channel on the same types.
+lapin          = "3"
+deadpool-lapin = "0.13"
+futures-lite   = "2"
+tokio-util     = { version = "0.7", features = ["rt"] }
+
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
@@ -88,7 +98,7 @@ openidconnect = { version = "3", default-features = false, features = ["reqwest"
 # Integration testing against ephemeral Postgres/RabbitMQ/MinIO/mailpit
 # (M06/M10, dev-only). `http_wait` lets GenericImage wait on an HTTP endpoint.
 testcontainers         = { version = "0.23", features = ["http_wait"] }
-testcontainers-modules = { version = "0.11", features = ["postgres"] }
+testcontainers-modules = { version = "0.11", features = ["postgres", "rabbitmq", "minio"] }
 
 # Workspace crates
 junius-manifest    = { path = "crates/manifest" }

@@ -7,6 +7,7 @@ use axum::routing::get;
 use axum::{Extension, Router};
 use junius_sdk::{MetricSink, Plugin, PluginResourceCtx};
 use sqlx::PgPool;
+use tokio_util::sync::CancellationToken;
 
 use crate::auth::{self, AuthState};
 use crate::boot;
@@ -169,6 +170,19 @@ pub async fn run(
 
     boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins, &infra).await?;
 
+    // Background job worker: consume each plugin's jobs with that plugin's own
+    // (caller-less) resources. Cancelled first on shutdown so in-flight jobs drain
+    // before the HTTP server and plugin `on_shutdown` hooks run.
+    let worker_cancel = CancellationToken::new();
+    let worker = spawn_worker(
+        &plugins,
+        &pools,
+        &platform_pool,
+        &config,
+        &infra,
+        &worker_cancel,
+    );
+
     // Browser-facing OIDC callback. When `oidc_redirect_url` is configured (e.g.
     // the Vite `:5173` origin under `junius dev`, so the callback flows through
     // the single dev origin), use it verbatim; otherwise derive it from the
@@ -195,15 +209,69 @@ pub async fn run(
     let local_addr = listener.local_addr()?;
     tracing::info!(addr = %local_addr, "juniusd listening");
 
-    let shutdown = async {
-        let _ = tokio::signal::ctrl_c().await;
-        tracing::info!("juniusd shutting down");
+    let shutdown = {
+        let worker_cancel = worker_cancel.clone();
+        async move {
+            let _ = tokio::signal::ctrl_c().await;
+            tracing::info!("juniusd shutting down");
+            // Stop consuming + drain in-flight jobs before HTTP/lifecycle teardown.
+            worker_cancel.cancel();
+        }
     };
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown)
         .await?;
 
+    // The worker was signalled in `shutdown`; await its drain before lifecycle hooks.
+    if let Some(handle) = worker {
+        if let Err(e) = handle.await {
+            tracing::error!(error = %e, "job worker task panicked");
+        }
+    }
+
     boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins, &infra).await;
     Ok(())
+}
+
+/// Build the job registry from the plugins and spawn the worker. Returns `None`
+/// when no broker is configured or no plugin registers jobs.
+fn spawn_worker(
+    plugins: &[Box<dyn Plugin>],
+    pools: &PluginPools,
+    platform_pool: &PgPool,
+    config: &HostConfig,
+    infra: &HostInfra,
+    cancel: &CancellationToken,
+) -> Option<tokio::task::JoinHandle<()>> {
+    let pool = infra.jobs.pool.clone()?;
+    let mut registry = crate::jobs::worker::JobRegistry::new();
+    for plugin in plugins {
+        let meta = plugin.metadata();
+        let handlers = plugin.jobs();
+        if handlers.is_empty() {
+            continue;
+        }
+        let Some(db) = pools.get(meta.name) else {
+            tracing::error!(plugin = meta.name, "no DB pool; skipping job handlers");
+            continue;
+        };
+        let runtime = config.plugins.get(meta.name).cloned().unwrap_or_default();
+        let ctx = boot::build_ctx(meta, db, platform_pool, &runtime, infra);
+        registry.register_plugin(handlers, &ctx);
+    }
+    if registry.is_empty() {
+        return None;
+    }
+
+    let platform_pool = platform_pool.clone();
+    let prefetch = config.resolved.as_ref().map_or(4, |r| r.job_workers);
+    let cancel = cancel.clone();
+    Some(tokio::spawn(async move {
+        if let Err(e) =
+            crate::jobs::worker::run_worker(pool, registry, platform_pool, prefetch, cancel).await
+        {
+            tracing::error!(error = %e, "job worker exited with error");
+        }
+    }))
 }

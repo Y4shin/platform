@@ -10,7 +10,8 @@
 use std::sync::Arc;
 
 use junius_manifest::ResolvedConfig;
-use junius_sdk::{Email, MetricSink, Transport};
+use junius_sdk::{Email, JobBackend, Jobs, MetricSink, Transport};
+use sqlx::PgPool;
 
 /// Shared, request-independent infra handles. Cheap to clone (members are
 /// `Arc`/`Clone`).
@@ -22,6 +23,16 @@ pub struct HostInfra {
     /// Outbound email transport + sender policy (`None` transport when no
     /// `[config.email]`).
     pub email: EmailInfra,
+    /// Job broker backend + connection pool (`None` when no `[config.jobs]`).
+    pub jobs: JobsInfra,
+}
+
+/// The deployment's job broker: the publish backend (for `enqueue`) + the
+/// connection pool the worker consumes on.
+#[derive(Clone, Default)]
+pub struct JobsInfra {
+    pub backend: Option<Arc<dyn JobBackend>>,
+    pub pool: Option<deadpool_lapin::Pool>,
 }
 
 /// The deployment's email transport + sender policy, shared across plugins.
@@ -39,12 +50,8 @@ impl HostInfra {
     /// Build the host infra from the resolved deployment config. The `OTel`
     /// metric sink is constructed in
     /// [`telemetry::init_telemetry`](crate::telemetry::init_telemetry) (it needs
-    /// the meter) and threaded in here. Later stages populate the job/storage
+    /// the meter) and threaded in here. Later stages populate the storage
     /// members.
-    #[allow(
-        clippy::unused_async,
-        reason = "later stages await backend client construction"
-    )]
     pub async fn build(
         resolved: &ResolvedConfig,
         metric_sink: Option<Arc<dyn MetricSink>>,
@@ -57,7 +64,21 @@ impl HostInfra {
             },
             None => EmailInfra::default(),
         };
-        Ok(Self { metric_sink, email })
+        let jobs = match &resolved.jobs {
+            Some(cfg) => {
+                let (pool, backend) = crate::jobs::build(&cfg.amqp_url).await?;
+                JobsInfra {
+                    backend: Some(backend),
+                    pool: Some(pool),
+                }
+            }
+            None => JobsInfra::default(),
+        };
+        Ok(Self {
+            metric_sink,
+            email,
+            jobs,
+        })
     }
 
     /// Build the per-plugin [`Email`] handle, gated on `capabilities`.
@@ -71,6 +92,23 @@ impl HostInfra {
             self.email.transport.clone(),
             self.email.from_default.clone(),
             self.email.allowed_domains.clone(),
+            plugin_name,
+            capabilities,
+        )
+    }
+
+    /// Build the per-plugin [`Jobs`] handle, gated on `capabilities`. Uses the
+    /// host `platform_pool` for the `meta.job_run` bookkeeping rows.
+    #[must_use]
+    pub fn jobs_handle(
+        &self,
+        platform_pool: &PgPool,
+        plugin_name: &'static str,
+        capabilities: &'static [&'static str],
+    ) -> Jobs {
+        Jobs::new(
+            self.jobs.backend.clone(),
+            self.jobs.backend.as_ref().map(|_| platform_pool.clone()),
             plugin_name,
             capabilities,
         )

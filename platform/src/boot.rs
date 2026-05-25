@@ -32,6 +32,7 @@ pub fn build_ctx(
         AuditEmitter::new(platform_pool.clone()),
         Authz::new(platform_pool.clone()),
         infra.email_handle(meta.name, meta.capabilities),
+        infra.jobs_handle(platform_pool, meta.name, meta.capabilities),
         runtime.secrets.clone(),
         meta.capabilities,
     )

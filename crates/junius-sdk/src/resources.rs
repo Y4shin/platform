@@ -21,6 +21,7 @@ use crate::config::PluginConfig;
 use crate::db::PluginDb;
 use crate::email::Email;
 use crate::error::PluginError;
+use crate::jobs::Jobs;
 use crate::secrets::SecretStore;
 use crate::telemetry::Telemetry;
 
@@ -56,6 +57,8 @@ pub struct PluginResources {
     pub authz: Authz,
     /// Outbound email (gated on `email.send`).
     pub email: Email,
+    /// Background-job enqueue (gated on `job.enqueue`).
+    pub jobs: Jobs,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
     /// The plugin's declared `[requires].capabilities` (for runtime gating of
@@ -77,6 +80,7 @@ impl PluginResources {
             audit: ctx.audit.clone(),
             authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
             email: ctx.email.clone(),
+            jobs: ctx.jobs.clone(),
             secrets: ctx.secrets.clone(),
             capabilities: ctx.capabilities,
         }
@@ -115,6 +119,7 @@ pub struct PluginResourceCtx {
     audit: AuditEmitter,
     authz: Authz,
     email: Email,
+    jobs: Jobs,
     secrets: SecretStore,
     capabilities: &'static [&'static str],
 }
@@ -134,6 +139,7 @@ impl PluginResourceCtx {
         audit: AuditEmitter,
         authz: Authz,
         email: Email,
+        jobs: Jobs,
         secrets: SecretStore,
         capabilities: &'static [&'static str],
     ) -> Self {
@@ -146,6 +152,7 @@ impl PluginResourceCtx {
             audit,
             authz,
             email,
+            jobs,
             secrets,
             capabilities,
         }

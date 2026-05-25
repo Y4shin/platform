@@ -6,6 +6,7 @@
 use axum::Router;
 
 use crate::error::PluginError;
+use crate::jobs::JobHandler;
 use crate::metadata::PluginMetadata;
 use crate::resources::PluginResources;
 
@@ -48,5 +49,10 @@ pub trait Plugin: Send + Sync + 'static {
         Ok(())
     }
 
-    // `jobs()` lands in M10 alongside the background job system.
+    /// Background-job handlers the plugin registers (M10). The host worker
+    /// dispatches each by its [`Job::NAME`](crate::jobs::Job::NAME) with the
+    /// plugin's own (caller-less) [`PluginResources`]. Default: none.
+    fn jobs(&self) -> Vec<JobHandler> {
+        Vec::new()
+    }
 }
