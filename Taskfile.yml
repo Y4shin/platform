@@ -36,6 +36,11 @@ tasks:
     cmds:
       - cargo test --workspace
 
+  test:rust:unit:
+    desc: DB-less Rust unit tests only (lib + bin targets; no testcontainers).
+    cmds:
+      - cargo test --workspace --lib --bins
+
   test:js:
     desc: Frontend unit tests (vitest) + TypeScript typecheck.
     cmds:
@@ -74,10 +79,15 @@ tasks:
       - pnpm exec buf lint
       - cargo run -q -p junius -- check --manifest {{.CONFIG}}
 
+  buf:breaking:
+    desc: Detect breaking proto changes against a git ref (default the `main` branch).
+    cmds:
+      - pnpm exec buf breaking --against '{{.AGAINST | default ".git#branch=main"}}'
+
   # --- gates ----------------------------------------------------------------
 
   ci:
-    desc: Full CI gate (formatting, lint, tests, buf format).
+    desc: Full local CI gate (formatting, lint, tests, buf format).
     aliases: [check]
     cmds:
       - cargo fmt --check
@@ -85,6 +95,38 @@ tasks:
       - task: test:rust
       - task: test:js
       - pnpm exec buf format --diff --exit-code
+
+  # --- CI jobs (mirror the four parallel GitHub Actions jobs) ----------------
+  # `task ci` above runs everything serially for local use; CI runs these
+  # slices in parallel. `ci:integration` needs a Postgres + DATABASE_URL +
+  # DEV_SECRETS (the workflow provides them); the others are infra-free.
+
+  ci:lint:
+    desc: Static checks — fmt, clippy, no-default build, biome, buf lint/format.
+    cmds:
+      - cargo fmt --check
+      - task: lint
+      - pnpm exec buf format --diff --exit-code
+
+  ci:check:
+    desc: Build + Rust tests + JS tests + buf breaking.
+    cmds:
+      - cargo build --workspace
+      - task: test:rust
+      - task: test:js
+      - task: buf:breaking
+
+  ci:integration:
+    desc: Layer 2 — migrate the example deployment + verify the .sqlx cache.
+    cmds:
+      - "{{.DEV_SECRETS}} cargo run -q -p junius -- migrate up --config {{.CONFIG}}"
+      - task: sqlx:check
+
+  ci:deployment:
+    desc: Validate the example deployment build (resolve + config, no compile).
+    cmds:
+      - cargo build -p junius --release
+      - cd examples/example-deployment && ../../target/release/junius build --check-config
 
   sqlx:check:
     desc: Verify the committed .sqlx cache is fresh (needs the dev DB + DATABASE_URL).
