@@ -11,7 +11,6 @@ export {
   useHasPermission,
 } from './permissions/useHasPermission.js';
 export type {
-  ComponentRegistry,
   ComponentRegistryProviderProps,
   ComponentRegistryValue,
 } from './registry/ComponentRegistryProvider.js';

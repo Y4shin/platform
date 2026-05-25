@@ -1,4 +1,5 @@
-import type { ComponentRegistry } from './ComponentRegistryProvider.js';
+import type { ComponentType } from 'react';
+
 import { useComponentRegistry } from './ComponentRegistryProvider.js';
 
 /**
@@ -6,14 +7,12 @@ import { useComponentRegistry } from './ComponentRegistryProvider.js';
  * `undefined` if the producing plugin is disabled (optional-dep semantics) or
  * the key isn't registered; consumers should fall back to a sensible default.
  *
- * The key is constrained to `keyof ComponentRegistry`, which `junius sync`
- * augments per consumer from its declared dependencies' `[exposes.components]`
- * — so a typo or an undeclared cross-plugin component is a compile error, and
- * the return type is the exact component type.
+ * This is the **untyped** lookup. Plugins get a key-checked, precisely-typed
+ * `useComponent` from their generated `src/generated/component-registry.ts`
+ * (emitted by `junius sync` from their declared dependencies' exposed
+ * components), which wraps this.
  */
-export function useComponent<K extends keyof ComponentRegistry>(
-  key: K,
-): ComponentRegistry[K] | undefined {
-  const registry = useComponentRegistry() as Record<string, unknown>;
-  return registry[key as string] as ComponentRegistry[K] | undefined;
+export function useComponent(key: string): ComponentType<unknown> | undefined {
+  const registry = useComponentRegistry() as Record<string, ComponentType<unknown> | undefined>;
+  return registry[key];
 }

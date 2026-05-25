@@ -8,6 +8,7 @@ members = [
     "crates/manifest",
     # >>> junius managed start
     "plugins/hello",
+    "plugins/greetings",
     "plugins/widgets",
     # <<< junius managed end
 ]

@@ -1,5 +1,5 @@
 {
-  "name": "@junius/plugin-hello",
+  "name": "@junius/plugin-greetings",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,14 +7,15 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./lib/*": "./src/lib/*.tsx"
+    ".": "./src/index.ts"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.5.0",
     "@connectrpc/connect-query": "^2.0.0",
     "@junius/design": "workspace:*",
     "@junius/generated": "workspace:*",
+    "@junius/plugin-hello": "workspace:*",
+    "@junius/plugin-widgets": "workspace:*",
     "@junius/sdk": "workspace:*"
   },
   "peerDependencies": {

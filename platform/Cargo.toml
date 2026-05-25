@@ -51,6 +51,7 @@ mime_guess = { workspace = true, optional = true }
 
 # >>> junius managed start
 hello-plugin = { path = "../plugins/hello" }
+greetings-plugin = { path = "../plugins/greetings" }
 widgets-plugin = { path = "../plugins/widgets" }
 # <<< junius managed end
 

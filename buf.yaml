@@ -2,6 +2,7 @@ version: v2
 modules:
   - path: proto
   - path: plugins/hello/proto
+  - path: plugins/greetings/proto
 lint:
   use:
     - STANDARD

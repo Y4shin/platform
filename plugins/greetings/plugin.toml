@@ -1,0 +1,29 @@
+[plugin]
+name = "greetings"
+display_name = "Greetings"
+description = "Cross-plugin demo: builds on hello's templates + RPC and widgets' VenuePicker."
+manifest_schema = 1
+
+# A *required* dependency on hello. We use its `greeting_template` table from SQL
+# (the grants step GRANTs role_greetings SELECT on hello.greeting_template) and
+# call its `Greet` RPC from the frontend (declared so `junius check`'s
+# RPC.UNDECLARED rule + the narrow rpc-namespace codegen permit it).
+[dependencies.hello]
+optional = false
+tables = ["greeting_template"]
+rpc_methods = ["HelloService.Greet"]
+
+# An *optional* dependency on widgets. We consume its `VenuePicker` component at
+# runtime via the registry, falling back to a free-text input when widgets is
+# disabled. No tables/RPC (widgets is UI-only).
+[dependencies.widgets]
+optional = true
+
+[permissions]
+"greetings:read" = "Read greetings."
+"greetings:write" = "Create greetings."
+
+# This plugin's own table.
+[exposes.tables.greeting]
+schema = "greetings"
+description = "Greetings composed from a hello template + an optional venue."

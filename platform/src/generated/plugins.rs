@@ -8,6 +8,7 @@ use junius_sdk::Plugin;
 pub fn plugins() -> Vec<Box<dyn Plugin>> {
     vec![
         Box::new(hello_plugin::HelloPlugin::new()),
+        Box::new(greetings_plugin::GreetingsPlugin::new()),
         Box::new(widgets_plugin::WidgetsPlugin::new()),
     ]
 }

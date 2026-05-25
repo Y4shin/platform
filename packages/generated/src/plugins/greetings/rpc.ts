@@ -5,18 +5,15 @@
 // cross-plugin methods declared in [dependencies.<dep>].rpc_methods.
 // An undeclared method is not a key here → a type error on use.
 
-import { HelloService, NoteService } from '../../proto/hello/v1/hello_pb.js';
+import { GreetingService } from '../../proto/greetings/v1/greetings_pb.js';
+import { HelloService } from '../../proto/hello/v1/hello_pb.js';
 
 export const rpc = {
-  HelloService: {
-    createGreeting: HelloService.method.createGreeting,
-    greet: HelloService.method.greet,
-    listGreetings: HelloService.method.listGreetings,
+  GreetingService: {
+    createGreeting: GreetingService.method.createGreeting,
+    listGreetings: GreetingService.method.listGreetings,
   },
-  NoteService: {
-    createNote: NoteService.method.createNote,
-    getNote: NoteService.method.getNote,
-    listNotes: NoteService.method.listNotes,
-    shareNote: NoteService.method.shareNote,
+  HelloService: {
+    greet: HelloService.method.greet,
   },
 };

@@ -5,6 +5,16 @@
 /// method's `option (platform.requires)`. The host RPC guard enforces these.
 pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
     (
+        "greetings.v1.GreetingService",
+        "CreateGreeting",
+        &["greetings:read", "greetings:write"],
+    ),
+    (
+        "greetings.v1.GreetingService",
+        "ListGreetings",
+        &["greetings:read"],
+    ),
+    (
         "hello.v1.HelloService",
         "CreateGreeting",
         &["hello:read", "hello:write"],
@@ -23,6 +33,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `service_fqn` -> owning plugin, so the host attaches the right
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("greetings.v1.GreetingService", "greetings"),
     ("hello.v1.HelloService", "hello"),
     ("hello.v1.NoteService", "hello"),
 ];

@@ -1,0 +1,45 @@
+// Greetings plugin RPC surface (M09). A cross-plugin consumer: it stores
+// greetings built from a hello `greeting_template` (NOT NULL cross-plugin FK) and
+// an optional venue. Methods are gated by `option (platform.v1.requires)`,
+// enforced by the host RPC guard + the typed witness in each handler.
+syntax = "proto3";
+
+package greetings.v1;
+
+import "platform/v1/annotations.proto";
+
+service GreetingService {
+  rpc ListGreetings(ListGreetingsRequest) returns (ListGreetingsResponse) {
+    option (platform.v1.requires) = "greetings:read";
+  }
+
+  rpc CreateGreeting(CreateGreetingRequest) returns (CreateGreetingResponse) {
+    option (platform.v1.requires) = "greetings:read,greetings:write";
+  }
+}
+
+message Greeting {
+  string id = 1;
+  string template_id = 2;
+  string template_name = 3;
+  string recipient = 4;
+  string venue = 5; // empty when no venue was chosen
+  string message = 6; // rendered from the template body
+  string created = 7; // RFC 3339 timestamp
+}
+
+message ListGreetingsRequest {}
+
+message ListGreetingsResponse {
+  repeated Greeting greetings = 1;
+}
+
+message CreateGreetingRequest {
+  string template_name = 1; // resolved to a hello.greeting_template row server-side
+  string recipient = 2;
+  string venue = 3; // optional
+}
+
+message CreateGreetingResponse {
+  Greeting greeting = 1;
+}

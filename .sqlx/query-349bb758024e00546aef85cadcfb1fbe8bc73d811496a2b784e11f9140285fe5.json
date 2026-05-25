@@ -1,0 +1,60 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH tpl AS (\n                SELECT id, name, body FROM hello.greeting_template WHERE name = $1\n            ),\n            inserted AS (\n                INSERT INTO greetings.greeting (template_id, recipient, venue)\n                SELECT id, $2, $3 FROM tpl\n                RETURNING id, template_id, recipient, venue, created\n            )\n            SELECT i.id AS \"id!\", i.template_id AS \"template_id!\",\n                   i.recipient AS \"recipient!\", i.venue, i.created AS \"created!\",\n                   tpl.name AS \"template_name!\", tpl.body AS \"template_body!\"\n            FROM inserted i\n            CROSS JOIN tpl\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "template_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "recipient!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "venue",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "created!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "template_name!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "template_body!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "349bb758024e00546aef85cadcfb1fbe8bc73d811496a2b784e11f9140285fe5"
+}

@@ -5,6 +5,7 @@ import { createRoute } from '@tanstack/react-router';
 
 import { rootRoute } from '../router/root.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
+import { buildRoutes as buildGreetings } from '@junius/plugin-greetings';
 import { buildRoutes as buildWidgets } from '@junius/plugin-widgets';
 
 const indexRoute = createRoute({
@@ -19,6 +20,12 @@ const helloParent = createRoute({
 });
 helloParent.addChildren(buildHello(helloParent));
 
+const greetingsParent = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/p/greetings',
+});
+greetingsParent.addChildren(buildGreetings(greetingsParent));
+
 const widgetsParent = createRoute({
   getParentRoute: () => rootRoute,
   path: '/p/widgets',
@@ -28,5 +35,6 @@ widgetsParent.addChildren(buildWidgets(widgetsParent));
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   helloParent,
+  greetingsParent,
   widgetsParent,
 ]);

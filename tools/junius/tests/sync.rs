@@ -18,12 +18,15 @@ fn sync_with_hello_writes_expected_files() {
     make_repo(tmp.path(), &["hello"]);
 
     // hello is an RPC-bearing plugin: a `proto/` dir makes `sync` emit its RPC
-    // barrel. UI-only plugins (no `proto/`) get none — see `widgets`.
+    // barrel (the narrow `rpc` namespace). UI-only plugins (no `proto/`) get
+    // none — see `widgets`.
     let proto_dir = tmp.path().join("plugins/hello/proto/hello/v1");
     fs::create_dir_all(&proto_dir).unwrap();
     fs::write(
         proto_dir.join("hello.proto"),
-        "syntax = \"proto3\";\npackage hello.v1;\n",
+        "syntax = \"proto3\";\npackage hello.v1;\n\
+         service HelloService {\n  rpc Greet(GreetRequest) returns (GreetResponse);\n}\n\
+         message GreetRequest {}\nmessage GreetResponse {}\n",
     )
     .unwrap();
 
@@ -56,6 +59,53 @@ fn sync_with_hello_writes_expected_files() {
     )
     .unwrap();
     insta::assert_snapshot!("rpc_barrel_hello", rpc_barrel);
+}
+
+#[test]
+fn sync_narrow_rpc_barrel_includes_declared_cross_plugin_method() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["hello", "greetings"]);
+
+    // hello exposes HelloService.Greet (+ a non-declared method).
+    let hello_proto = tmp.path().join("plugins/hello/proto/hello/v1");
+    fs::create_dir_all(&hello_proto).unwrap();
+    fs::write(
+        hello_proto.join("hello.proto"),
+        "syntax = \"proto3\";\npackage hello.v1;\n\
+         service HelloService {\n  rpc Greet(G) returns (G);\n  rpc CreateGreeting(G) returns (G);\n}\n\
+         message G {}\n",
+    )
+    .unwrap();
+
+    // greetings has its own service and declares a dep on hello's Greet only.
+    let greet_proto = tmp.path().join("plugins/greetings/proto/greetings/v1");
+    fs::create_dir_all(&greet_proto).unwrap();
+    fs::write(
+        greet_proto.join("greetings.proto"),
+        "syntax = \"proto3\";\npackage greetings.v1;\n\
+         service GreetingService {\n  rpc ListGreetings(G) returns (G);\n}\nmessage G {}\n",
+    )
+    .unwrap();
+    fs::write(
+        tmp.path().join("plugins/greetings/plugin.toml"),
+        "[plugin]\nname = \"greetings\"\ndisplay_name = \"Greetings\"\nmanifest_schema = 1\n\
+         [dependencies.hello]\nrpc_methods = [\"HelloService.Greet\"]\n",
+    )
+    .unwrap();
+
+    cmd_in(tmp.path()).args(["sync"]).assert().success();
+
+    let barrel = fs::read_to_string(
+        tmp.path()
+            .join("packages/generated/src/plugins/greetings/rpc.ts"),
+    )
+    .unwrap();
+    // Own service + only the declared cross-plugin method.
+    assert!(barrel.contains("listGreetings: GreetingService.method.listGreetings"));
+    assert!(barrel.contains("greet: HelloService.method.greet"));
+    // The undeclared hello method must not leak into greetings' namespace.
+    assert!(!barrel.contains("createGreeting"));
+    assert!(barrel.contains("import { HelloService } from '../../proto/hello/v1/hello_pb.js';"));
 }
 
 #[test]

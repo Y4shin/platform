@@ -1,13 +1,13 @@
 import { useQuery } from '@connectrpc/connect-query';
 import { Card, Stack } from '@junius/design';
-import { HelloService } from '@junius/generated/hello/rpc';
+import { rpc } from '@junius/generated/hello/rpc';
 import { useUser } from '@junius/sdk';
 
 export function HelloPage() {
   const user = useUser();
   const name = user?.displayName ?? 'world';
 
-  const { data, error, isPending } = useQuery(HelloService.method.greet, { name });
+  const { data, error, isPending } = useQuery(rpc.HelloService.greet, { name });
 
   return (
     <Stack gap="md">
