@@ -25,7 +25,6 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M12** | ✅ | [Hardening](13-M12-hardening.md) | Full `junius check` ruleset (private-table access, exposed-table breaking changes, FE export/manifest match); four-job CI with Postgres integration + `buf breaking` + `sqlx prepare --check` | CI fails on every deliberate violation |
 | **M13** | 🚧 | [Events plugin](14-M13-events-plugin.md) | First real domain plugin, end-to-end | Events CRUD with user/group ownership, public/private visibility, sign-up invite pages, and revocable iCalendar export/feeds |
 | **M14** | 🚧 ★ | [Internationalization](16-M14-internationalization.md) | Real i18n: frontend translation seam + a chosen library, backend locale for emails/iCalendar/errors, locale negotiation + per-user preference, extraction/check tooling, retrofit of existing plugins | Switch locale → UI **and** emails/calendar render translated |
-| **M15** | 🚧 | [Plugin authoring DX & SDK hardening](17-M15-plugin-authoring-dx.md) | Follow-up from the M13 friction triage: change-safe `PluginResourceCtx` construction, authorization-checked `Groups` directory + name uniqueness, centralized login-redirect decision | Adding an SDK handle is a compile error at all call sites; group rosters need authorization |
 
 **v0 cut** = end of M05. From there onward, every milestone adds depth (persistence, permissions, ownership, cross-plugin composition, etc.) rather than new top-level capability.
 

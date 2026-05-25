@@ -14,11 +14,13 @@ becomes scaffold-only and needs no `platform.toml`, since dev-facing commands
 that don't deploy an instance shouldn't require a deployment config; `sync`
 fully wires a plugin: buf.yaml + buf generate, host frontend workspace dep,
 rustfmt-clean output, backend-only opt-out). The SDK/host-ergonomics + Groups
-authorization + FE redirect items (rows tagged Stage 2/3, B/C/D) are **deferred
-to [M15](17-M15-plugin-authoring-dx.md)**, with the constraint that the
-`PluginResourceCtx` fix must be **compile-time-checked** (named-field struct
-literal, not a builder). The two "fixed this stage" rows (group directory,
-public routes) are done.
+authorization + FE redirect items (rows tagged Stage 2/3, B/C/D) are folded into
+**M13 Stage 5** (pulled forward *before* the domain build so the events plugin
+calls the final `Groups` API once, not twice — C is the one the plugin actually
+consumes; B/D are host/SDK-internal but cheap to finalize alongside). Constraint:
+the `PluginResourceCtx` fix (B) must be **compile-time-checked** — a named-field
+**struct literal**, not a builder. The two "fixed this stage" rows (group
+directory, public routes) are done.
 
 | Date | Stage | Area | Annoyance / missing feature | Severity | Proposed fix |
 |------|-------|------|-----------------------------|----------|--------------|
