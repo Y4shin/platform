@@ -15,6 +15,8 @@
 //!   nullable (so the row survives the dependency being absent).
 //! - `FK.CROSS.CASCADE` — an FK across a plugin boundary must not `ON DELETE/UPDATE
 //!   CASCADE` (one plugin must not silently delete another's rows).
+//! - `FE.EXPORTS.MATCH_MANIFEST` — every `[exposes.components.X]` must have a
+//!   matching named export `X` in the plugin's `frontend/src/index.ts`.
 //!
 //! Migration SQL is parsed with `sqlparser` (`PostgreSQL` dialect). FK detection
 //! covers inline (`col … REFERENCES other.table`) and table-level constraints;
@@ -42,6 +44,7 @@ pub fn check_cross_plugin(
         check_dep_imports(name, manifest, plugins, report);
         check_rpc_methods(name, manifest, report);
         check_migrations(name, manifest, &schema_owner, report);
+        check_fe_exports(name, manifest, report);
     }
 }
 
@@ -203,6 +206,79 @@ fn plugin_proto_services(plugin: &str) -> Vec<(String, Vec<String>)> {
     for file in files {
         if let Ok(content) = std::fs::read_to_string(&file) {
             out.extend(scan_proto_service_methods(&content));
+        }
+    }
+    out
+}
+
+// --- FE.EXPORTS.MATCH_MANIFEST -----------------------------------------------
+
+/// Every component a plugin declares in `[exposes.components]` must be a named
+/// export of its `frontend/src/index.ts` (a wrong module path is left to the TS
+/// type-check). Plugins with no exposed components are skipped.
+fn check_fe_exports(name: &str, manifest: &PluginManifest, report: &mut ValidationReport) {
+    if manifest.exposes.components.is_empty() {
+        return;
+    }
+    let index = PathBuf::from("plugins")
+        .join(name)
+        .join("frontend")
+        .join("src")
+        .join("index.ts");
+    let path = format!("plugins/{name}/frontend/src/index.ts");
+    let Ok(content) = std::fs::read_to_string(&index) else {
+        for comp in manifest.exposes.components.keys() {
+            err(
+                report,
+                "FE.EXPORTS.MATCH_MANIFEST",
+                path.clone(),
+                format!(
+                    "component {comp:?} is declared in [exposes.components] but {path} is missing or unreadable"
+                ),
+            );
+        }
+        return;
+    };
+    let exported = scan_named_exports(&content);
+    for comp in manifest.exposes.components.keys() {
+        if !exported.contains(comp) {
+            err(
+                report,
+                "FE.EXPORTS.MATCH_MANIFEST",
+                path.clone(),
+                format!(
+                    "component {comp:?} is declared in [exposes.components] but not exported from index.ts"
+                ),
+            );
+        }
+    }
+}
+
+/// Collect the value-level named exports from an `index.ts`: the names inside
+/// `export { … }` (handling `A as B` → `B`, multiline), skipping type-only
+/// exports (`export type { … }` and inline `type X`).
+fn scan_named_exports(content: &str) -> BTreeSet<String> {
+    let re = regex_named_export();
+    let mut out = BTreeSet::new();
+    for caps in re.captures_iter(content) {
+        if caps.get(1).is_some() {
+            continue; // `export type { … }`
+        }
+        for entry in caps[2].split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+            // Inline type export inside a value export list: `export { type X }`.
+            if entry.split_whitespace().next() == Some("type") {
+                continue;
+            }
+            // `Name as Alias` exports `Alias`; otherwise the name itself.
+            let exported = match entry.split_once(" as ") {
+                Some((_, alias)) => alias.trim(),
+                None => entry,
+            };
+            out.insert(exported.to_string());
         }
     }
     out
@@ -412,6 +488,15 @@ fn regex_plugin() -> regex::Regex {
 )]
 fn regex_generated() -> regex::Regex {
     regex::Regex::new(r"@junius/generated/([a-z0-9_-]+)/").unwrap()
+}
+
+#[allow(
+    clippy::unwrap_used,
+    reason = "compile-constant regexes are known-valid"
+)]
+fn regex_named_export() -> regex::Regex {
+    // `export { … }` (group 2 = body); group 1 present means `export type { … }`.
+    regex::Regex::new(r"export\s+(type\s+)?\{([^}]*)\}").unwrap()
 }
 
 #[cfg(test)]

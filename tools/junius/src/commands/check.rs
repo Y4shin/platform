@@ -26,6 +26,21 @@ struct IssueJson {
     code: &'static str,
     path: String,
     message: String,
+    /// Pointer to the rule's documentation (derived from `code`).
+    doc: String,
+}
+
+/// Map a rule ID to its anchor in the M12 rule reference, e.g.
+/// `SQL.PRIVATE_TABLE_ACCESS` → `docs/impl/13-M12-hardening.md#sql-private-table-access`.
+fn doc_link(code: &str) -> String {
+    let anchor: String = code
+        .chars()
+        .map(|c| match c {
+            '.' | '_' => '-',
+            other => other.to_ascii_lowercase(),
+        })
+        .collect();
+    format!("docs/impl/13-M12-hardening.md#{anchor}")
 }
 
 impl Renderable for CheckResult {
@@ -37,8 +52,8 @@ impl Renderable for CheckResult {
             for issue in &self.issues {
                 writeln!(
                     w,
-                    "  [{}] {} at {}: {}",
-                    issue.severity, issue.code, issue.path, issue.message
+                    "  [{}] {} at {}: {} (see {})",
+                    issue.severity, issue.code, issue.path, issue.message, issue.doc
                 )?;
             }
             Ok(())
@@ -206,6 +221,7 @@ fn report(path: &Path, src: &str, report: &ValidationReport, format: OutputForma
             code: i.code,
             path: i.path.clone(),
             message: i.message.clone(),
+            doc: doc_link(i.code),
         })
         .collect();
 
@@ -258,6 +274,7 @@ fn emit_parse_error(path: &Path, _src: &str, e: &ManifestError, format: OutputFo
                     code: "PARSE.ERROR",
                     path: "<root>".into(),
                     message: e.to_string(),
+                    doc: doc_link("PARSE.ERROR"),
                 }],
             };
             let _ = output::emit(format, &result);
@@ -278,11 +295,16 @@ struct CheckDiagnostic {
     message: String,
     src: NamedSource<String>,
     span: Option<SourceSpan>,
+    help: String,
 }
 
 impl Diagnostic for CheckDiagnostic {
     fn code<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
         Some(Box::new(self.code.clone()))
+    }
+
+    fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
+        Some(Box::new(self.help.clone()))
     }
 
     fn source_code(&self) -> Option<&dyn miette::SourceCode> {
@@ -303,5 +325,6 @@ fn issue_diagnostic(file_name: &str, src: &str, issue: &ValidationIssue) -> Chec
         message: format!("{} ({})", issue.message, issue.path),
         src: NamedSource::new(file_name, src.to_string()),
         span: None,
+        help: format!("see {}", doc_link(issue.code)),
     }
 }

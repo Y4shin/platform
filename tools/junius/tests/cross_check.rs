@@ -39,6 +39,15 @@ fn write_prov(repo: &Path) {
         "CREATE SCHEMA prov;\nCREATE TABLE prov.thing (id UUID PRIMARY KEY);\n",
     )
     .unwrap();
+    // The exposed `Widget` component must be a named export of index.ts
+    // (FE.EXPORTS.MATCH_MANIFEST).
+    let fe = dir.join("frontend/src");
+    fs::create_dir_all(&fe).unwrap();
+    fs::write(
+        fe.join("index.ts"),
+        "export { Widget } from './lib/Widget.js';\n",
+    )
+    .unwrap();
 }
 
 /// Overwrite `cons`'s `plugin.toml`.
@@ -62,6 +71,13 @@ fn cons_frontend(repo: &Path, ts: &str) {
     let dir = repo.join("plugins/cons/frontend/src");
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("page.tsx"), ts).unwrap();
+}
+
+/// Write `cons`'s `frontend/src/index.ts` (the exposed-component barrel).
+fn cons_frontend_index(repo: &Path, ts: &str) {
+    let dir = repo.join("plugins/cons/frontend/src");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("index.ts"), ts).unwrap();
 }
 
 fn check(repo: &Path) -> assert_cmd::assert::Assert {
@@ -169,6 +185,43 @@ fn clean_cross_plugin_setup_passes() {
     cons_migration(
         tmp.path(),
         "-- @requires prov:0001_thing\nCREATE SCHEMA cons;\nCREATE TABLE cons.x (\n  id UUID PRIMARY KEY,\n  t UUID NOT NULL REFERENCES prov.thing (id)\n);\n",
+    );
+
+    check(tmp.path()).success().stdout(
+        predicate::str::contains("\"ok\": true").or(predicate::str::contains("\"ok\":true")),
+    );
+}
+
+#[test]
+fn fe_exports_flags_declared_component_not_exported() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    // cons declares a component but its index.ts exports something else.
+    cons_manifest(
+        tmp.path(),
+        "[exposes.components.Card]\nmodule = \"./lib/Card\"\n",
+    );
+    cons_frontend_index(tmp.path(), "export { Other } from './lib/Other.js';\n");
+
+    check(tmp.path())
+        .failure()
+        .stdout(predicate::str::contains("FE.EXPORTS.MATCH_MANIFEST"));
+}
+
+#[test]
+fn fe_exports_passes_when_component_is_exported() {
+    let tmp = tempdir();
+    make_repo(tmp.path(), &["prov", "cons"]);
+    write_prov(tmp.path());
+    cons_manifest(
+        tmp.path(),
+        "[exposes.components.Card]\nmodule = \"./lib/Card\"\n",
+    );
+    // Multiline export list with an alias and a type export to exercise the scan.
+    cons_frontend_index(
+        tmp.path(),
+        "export type { CardProps } from './lib/Card.js';\nexport {\n  Inner as Card,\n  helper,\n} from './lib/Card.js';\n",
     );
 
     check(tmp.path()).success().stdout(
