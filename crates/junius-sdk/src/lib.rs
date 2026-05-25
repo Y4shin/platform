@@ -48,6 +48,6 @@ pub use resources::{PluginResourceCtx, PluginResources};
 pub use secrets::{SecretStore, SecretString};
 pub use storage::{
     BucketCapabilities, BucketHandle, BucketName, ObjectId, ObjectStore, PluginStorage,
-    StorageError,
+    StorageError, UploadTarget, UrlSigner,
 };
 pub use telemetry::Telemetry;

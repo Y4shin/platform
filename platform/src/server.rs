@@ -196,7 +196,7 @@ pub async fn run(
     let auth_state =
         AuthState::from_config(platform_pool.clone(), resolved, &redirect_uri, false).await;
 
-    let app = build_app_with_services(
+    let mut app = build_app_with_services(
         &plugins,
         &pools,
         &platform_pool,
@@ -204,6 +204,18 @@ pub async fn run(
         auth_state,
         &infra,
     );
+
+    // juniusd-mediated storage endpoints (token-authed, no session) — mounted
+    // when a storage token secret is configured.
+    if let Some(signer) = &infra.storage.token_signer {
+        app = app.merge(crate::storage::http::router(
+            crate::storage::http::StorageHttpState {
+                stores: infra.storage.stores.clone(),
+                signer: signer.clone(),
+                platform_pool: platform_pool.clone(),
+            },
+        ));
+    }
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
     let local_addr = listener.local_addr()?;

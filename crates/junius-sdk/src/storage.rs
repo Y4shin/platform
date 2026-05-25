@@ -47,10 +47,33 @@ pub trait ObjectStore: Send + Sync {
     async fn put(&self, key: &str, body: Vec<u8>, content_type: &str) -> Result<(), StorageError>;
     async fn get(&self, key: &str) -> Result<Vec<u8>, StorageError>;
     async fn delete(&self, key: &str) -> Result<(), StorageError>;
+    /// A provider-presigned PUT URL, or `None` when the provider lacks the
+    /// capability (the host then mediates the upload itself).
+    async fn presign_put(&self, key: &str, ttl_secs: u32) -> Result<Option<String>, StorageError>;
+    /// A provider-presigned GET URL, or `None` when unsupported.
+    async fn presign_get(&self, key: &str, ttl_secs: u32) -> Result<Option<String>, StorageError>;
+    /// A stable public URL, or `None` when the bucket isn't publicly readable.
+    fn public_url(&self, key: &str) -> Option<String>;
     /// The physical bucket's provider capabilities.
     fn capabilities(&self) -> BucketCapabilities;
     /// The configured physical bucket name (recorded in `platform.object`).
     fn physical_bucket(&self) -> &str;
+}
+
+/// Host-provided signer for **juniusd-mediated** URLs — used when the provider
+/// lacks a presign/public capability. Produces short-lived, op/object-scoped
+/// signed URLs the host's `/api/storage` endpoints accept.
+pub trait UrlSigner: Send + Sync {
+    fn upload_url(&self, physical_bucket: &str, key: &str, ttl_secs: u32) -> String;
+    fn download_url(&self, physical_bucket: &str, key: &str, ttl_secs: u32) -> String;
+}
+
+/// The result of [`BucketHandle::upload_url`]: where to PUT the bytes and the
+/// `platform.object` id to FK from a plugin row.
+#[derive(Debug, Clone)]
+pub struct UploadTarget {
+    pub url: String,
+    pub object_id: ObjectId,
 }
 
 /// Failure in an object-storage operation.
@@ -68,6 +91,10 @@ pub enum StorageError {
     /// Recording the object in `platform.object` failed.
     #[error("object bookkeeping error: {0}")]
     Db(String),
+}
+
+fn ttl_secs(ttl: std::time::Duration) -> u32 {
+    u32::try_from(ttl.as_secs()).unwrap_or(u32::MAX)
 }
 
 fn to_plugin_error(e: StorageError) -> PluginError {
@@ -99,6 +126,8 @@ struct StorageInner {
     plugin_name: &'static str,
     capabilities: &'static [&'static str],
     platform_pool: Option<PgPool>,
+    /// Host signer for juniusd-mediated URLs (provider-fallback).
+    signer: Option<Arc<dyn UrlSigner>>,
 }
 
 impl PluginStorage {
@@ -109,6 +138,7 @@ impl PluginStorage {
         plugin_name: &'static str,
         capabilities: &'static [&'static str],
         platform_pool: Option<PgPool>,
+        signer: Option<Arc<dyn UrlSigner>>,
     ) -> Self {
         Self {
             inner: Arc::new(StorageInner {
@@ -117,6 +147,7 @@ impl PluginStorage {
                 plugin_name,
                 capabilities,
                 platform_pool,
+                signer,
             }),
         }
     }
@@ -129,6 +160,7 @@ impl PluginStorage {
             HashMap::new(),
             plugin_name,
             capabilities,
+            None,
             None,
         )
     }
@@ -152,9 +184,11 @@ impl PluginStorage {
         Ok(BucketHandle {
             store,
             logical,
+            physical: physical.clone(),
             plugin_name: self.inner.plugin_name,
             capabilities: self.inner.capabilities,
             platform_pool: self.inner.platform_pool.clone(),
+            signer: self.inner.signer.clone(),
         })
     }
 }
@@ -165,9 +199,14 @@ impl PluginStorage {
 pub struct BucketHandle {
     store: Arc<dyn ObjectStore>,
     logical: &'static str,
+    /// The deployment's physical-bucket config key — the stable identifier used
+    /// in `platform.object`, signed tokens, and the host endpoint's store lookup
+    /// (distinct from the provider's real bucket name).
+    physical: String,
     plugin_name: &'static str,
     capabilities: &'static [&'static str],
     platform_pool: Option<PgPool>,
+    signer: Option<Arc<dyn UrlSigner>>,
 }
 
 impl BucketHandle {
@@ -181,6 +220,34 @@ impl BucketHandle {
     #[must_use]
     pub fn capabilities(&self) -> BucketCapabilities {
         self.store.capabilities()
+    }
+
+    /// Upsert the `platform.object` row for a scoped key, returning its id.
+    async fn record(
+        &self,
+        scoped: &str,
+        content_type: &str,
+        size: i64,
+    ) -> Result<ObjectId, PluginError> {
+        let pool = self.platform_pool.as_ref().ok_or_else(|| {
+            PluginError::External(anyhow::anyhow!(
+                "storage: object bookkeeping not configured"
+            ))
+        })?;
+        let id: Uuid =
+            sqlx::query_scalar("SELECT platform.record_object($1, $2, $3, $4, $5, $6, $7, $8)")
+                .bind(self.plugin_name)
+                .bind(self.logical)
+                .bind(&self.physical)
+                .bind(scoped)
+                .bind(content_type)
+                .bind(size)
+                .bind("private")
+                .bind(Option::<Uuid>::None)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| to_plugin_error(StorageError::Db(e.to_string())))?;
+        Ok(ObjectId(id))
     }
 
     /// Store `body` at `key` and record it in `platform.object`. Returns the
@@ -198,25 +265,71 @@ impl BucketHandle {
             .put(&scoped, body, content_type)
             .await
             .map_err(to_plugin_error)?;
-        let pool = self.platform_pool.as_ref().ok_or_else(|| {
+        self.record(&scoped, content_type, size).await
+    }
+
+    /// A URL the client can PUT bytes to (provider-presigned when the bucket
+    /// supports it, else a juniusd-mediated URL), plus the recorded object id to
+    /// FK from a plugin row. The object row is created now; the bytes follow.
+    pub async fn upload_url(
+        &self,
+        key: &str,
+        content_type: &str,
+        ttl: std::time::Duration,
+    ) -> Result<UploadTarget, PluginError> {
+        require_capability(self.capabilities, "storage.write")?;
+        let scoped = self.scoped_key(key);
+        let object_id = self.record(&scoped, content_type, 0).await?;
+        let ttl_secs = ttl_secs(ttl);
+        let url = match self
+            .store
+            .presign_put(&scoped, ttl_secs)
+            .await
+            .map_err(to_plugin_error)?
+        {
+            Some(url) => url,
+            None => self.mediated_url(|s, b, k| s.upload_url(b, k, ttl_secs), &scoped)?,
+        };
+        Ok(UploadTarget { url, object_id })
+    }
+
+    /// A URL to download the object (stable public URL, else provider-presigned
+    /// GET, else a juniusd-mediated URL).
+    pub async fn download_url(
+        &self,
+        key: &str,
+        ttl: std::time::Duration,
+    ) -> Result<String, PluginError> {
+        require_capability(self.capabilities, "storage.read")?;
+        let scoped = self.scoped_key(key);
+        if let Some(url) = self.store.public_url(&scoped) {
+            return Ok(url);
+        }
+        let ttl_secs = ttl_secs(ttl);
+        if let Some(url) = self
+            .store
+            .presign_get(&scoped, ttl_secs)
+            .await
+            .map_err(to_plugin_error)?
+        {
+            return Ok(url);
+        }
+        self.mediated_url(|s, b, k| s.download_url(b, k, ttl_secs), &scoped)
+    }
+
+    /// Build a juniusd-mediated URL via the host signer, erroring if no signer is
+    /// configured (the provider lacked the capability and no fallback exists).
+    fn mediated_url(
+        &self,
+        make: impl FnOnce(&dyn UrlSigner, &str, &str) -> String,
+        scoped: &str,
+    ) -> Result<String, PluginError> {
+        let signer = self.signer.as_ref().ok_or_else(|| {
             PluginError::External(anyhow::anyhow!(
-                "storage: object bookkeeping not configured"
+                "storage: provider lacks the capability and no host signer is configured"
             ))
         })?;
-        let id: Uuid =
-            sqlx::query_scalar("SELECT platform.record_object($1, $2, $3, $4, $5, $6, $7, $8)")
-                .bind(self.plugin_name)
-                .bind(self.logical)
-                .bind(self.store.physical_bucket())
-                .bind(&scoped)
-                .bind(content_type)
-                .bind(size)
-                .bind("private")
-                .bind(Option::<Uuid>::None)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| to_plugin_error(StorageError::Db(e.to_string())))?;
-        Ok(ObjectId(id))
+        Ok(make(signer.as_ref(), &self.physical, scoped))
     }
 
     /// Fetch the object at `key`.
@@ -235,7 +348,7 @@ impl BucketHandle {
         self.store.delete(&scoped).await.map_err(to_plugin_error)?;
         if let Some(pool) = &self.platform_pool {
             sqlx::query("SELECT platform.delete_object($1, $2)")
-                .bind(self.store.physical_bucket())
+                .bind(&self.physical)
                 .bind(&scoped)
                 .execute(pool)
                 .await

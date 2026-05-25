@@ -78,6 +78,7 @@ fn plugin_storage(
         plugin,
         &["storage.read", "storage.write"],
         Some(pool.clone()),
+        None,
     )
 }
 

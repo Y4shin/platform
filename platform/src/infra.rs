@@ -11,8 +11,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use junius_manifest::ResolvedConfig;
-use junius_sdk::{Email, JobBackend, Jobs, MetricSink, ObjectStore, PluginStorage, Transport};
+use junius_sdk::{
+    Email, JobBackend, Jobs, MetricSink, ObjectStore, PluginStorage, Transport, UrlSigner,
+};
 use sqlx::PgPool;
+
+use crate::storage::http::HostUrlSigner;
+use crate::storage::token::TokenSigner;
 
 /// Shared, request-independent infra handles. Cheap to clone (members are
 /// `Arc`/`Clone`).
@@ -30,12 +35,15 @@ pub struct HostInfra {
     pub storage: StorageInfra,
 }
 
-/// The deployment's object storage: one [`ObjectStore`] per physical bucket plus
-/// the `"<plugin>:<logical>" → physical` mapping.
+/// The deployment's object storage: one [`ObjectStore`] per physical bucket, the
+/// `"<plugin>:<logical>" → physical` mapping, and (when a token secret is set)
+/// the signer for juniusd-mediated URLs + the token signer the host endpoints use.
 #[derive(Clone, Default)]
 pub struct StorageInfra {
     pub stores: Arc<HashMap<String, Arc<dyn ObjectStore>>>,
     pub mapping: Arc<HashMap<String, String>>,
+    pub signer: Option<Arc<dyn UrlSigner>>,
+    pub token_signer: Option<TokenSigner>,
 }
 
 /// The deployment's job broker: the publish backend (for `enqueue`) + the
@@ -86,10 +94,18 @@ impl HostInfra {
             None => JobsInfra::default(),
         };
         let storage = match &resolved.storage {
-            Some(cfg) => StorageInfra {
-                stores: Arc::new(crate::storage::build_object_stores(cfg).await?),
-                mapping: Arc::new(cfg.mapping.clone().into_iter().collect()),
-            },
+            Some(cfg) => {
+                let token_signer = cfg.token_secret.as_deref().map(TokenSigner::new);
+                let signer: Option<Arc<dyn UrlSigner>> = token_signer
+                    .clone()
+                    .map(|ts| Arc::new(HostUrlSigner::new(ts)) as Arc<dyn UrlSigner>);
+                StorageInfra {
+                    stores: Arc::new(crate::storage::build_object_stores(cfg).await?),
+                    mapping: Arc::new(cfg.mapping.clone().into_iter().collect()),
+                    signer,
+                    token_signer,
+                }
+            }
             None => StorageInfra::default(),
         };
         Ok(Self {
@@ -161,6 +177,7 @@ impl HostInfra {
             plugin_name,
             capabilities,
             Some(platform_pool.clone()),
+            self.storage.signer.clone(),
         )
     }
 }

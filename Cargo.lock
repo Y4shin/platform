@@ -3540,6 +3540,7 @@ dependencies = [
  "futures-lite",
  "greetings-plugin",
  "hello-plugin",
+ "hmac",
  "http 1.4.0",
  "junius-manifest",
  "junius-sdk",

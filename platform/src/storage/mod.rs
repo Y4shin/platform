@@ -8,6 +8,9 @@
 //! plan's sanctioned fallback `rust-s3` (pure-Rust, rustls/ring) behind the
 //! `ObjectStore` trait. Swapping back to aws-sdk-s3 is localized to this module.
 
+pub mod http;
+pub mod token;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -61,6 +64,36 @@ impl ObjectStore for S3ObjectStore {
             .await
             .map_err(|e| StorageError::Backend(format!("delete {key}: {e}")))?;
         Ok(())
+    }
+
+    async fn presign_put(&self, key: &str, ttl_secs: u32) -> Result<Option<String>, StorageError> {
+        if !self.caps.presigned_put {
+            return Ok(None);
+        }
+        self.bucket
+            .presign_put(key, ttl_secs, None, None)
+            .await
+            .map(Some)
+            .map_err(|e| StorageError::Backend(format!("presign put {key}: {e}")))
+    }
+
+    async fn presign_get(&self, key: &str, ttl_secs: u32) -> Result<Option<String>, StorageError> {
+        if !self.caps.presigned_get {
+            return Ok(None);
+        }
+        self.bucket
+            .presign_get(key, ttl_secs, None)
+            .await
+            .map(Some)
+            .map_err(|e| StorageError::Backend(format!("presign get {key}: {e}")))
+    }
+
+    fn public_url(&self, key: &str) -> Option<String> {
+        // `Bucket::url()` already includes the bucket (path-style) or encodes it
+        // in the host (virtual-host style).
+        self.caps
+            .public_get
+            .then(|| format!("{}/{}", self.bucket.url(), key))
     }
 
     fn capabilities(&self) -> BucketCapabilities {

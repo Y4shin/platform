@@ -64,6 +64,7 @@ tower-cookies = { workspace = true }
 aes-gcm       = { workspace = true }
 rand          = { workspace = true }
 sha2          = { workspace = true }
+hmac          = { workspace = true }
 reqwest       = { workspace = true }
 openidconnect = { workspace = true }
 
