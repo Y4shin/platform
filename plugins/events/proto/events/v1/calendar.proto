@@ -1,0 +1,66 @@
+// Events plugin calendar-feed RPC surface (M13 Stage 9). These manage feed
+// *tokens* (mint / list / revoke) and the per-group public toggle; the `.ics`
+// endpoints they produce URLs for are unauthenticated HTTP (see src/http.rs).
+// Minting a personal key needs events:read; publishing a group calendar or
+// minting a group key needs events:write *within that group* (checked in the
+// handler from the caller's group memberships).
+syntax = "proto3";
+
+package events.v1;
+
+import "platform/v1/annotations.proto";
+
+service CalendarService {
+  rpc GetPersonalFeed(GetPersonalFeedRequest) returns (GetPersonalFeedResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+  rpc CreateGroupKey(CreateGroupKeyRequest) returns (CreateGroupKeyResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc SetGroupPublic(SetGroupPublicRequest) returns (SetGroupPublicResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc ListFeeds(ListFeedsRequest) returns (ListFeedsResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+  rpc RevokeFeed(RevokeFeedRequest) returns (RevokeFeedResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+}
+
+message GetPersonalFeedRequest {}
+message GetPersonalFeedResponse {
+  string url = 1; // /h/events/ics/u/<key>
+}
+
+message CreateGroupKeyRequest {
+  string group_id = 1;
+  string label = 2;
+}
+message CreateGroupKeyResponse {
+  string url = 1; // /h/events/ics/g/<name>/<key>
+}
+
+message SetGroupPublicRequest {
+  string group_id = 1;
+  bool public = 2;
+}
+message SetGroupPublicResponse {}
+
+message ListFeedsRequest {}
+message Feed {
+  string id = 1;
+  string kind = 2; // "personal" | "group"
+  string group_id = 3; // set for group feeds
+  string label = 4;
+  string created_at = 5; // RFC 3339
+  bool revoked = 6;
+}
+message ListFeedsResponse {
+  repeated Feed feeds = 1;
+}
+
+message RevokeFeedRequest {
+  string id = 1;
+}
+message RevokeFeedResponse {}

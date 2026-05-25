@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO events.group_calendar (group_id, public, updated_by)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (group_id)\n            DO UPDATE SET public = $2, updated_by = $3, updated_at = now()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b5857c8eafc6a8f60643ffc1ae7d1679e4834f3e63540dd307e8b54d2d8b5ce4"
+}

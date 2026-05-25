@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(\n                 (SELECT public FROM events.group_calendar WHERE group_id = $1), false\n               ) AS \"public!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "public!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8bb06adf8e41053a345979f25805aaffa5fb9b05fcb4ace9cf20f72bf8ac7fd9"
+}

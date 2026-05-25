@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO events.calendar_token\n              (token_hash, kind, subject_user_id, subject_group_id, created_by, label)\n            VALUES ($1, $2::events.feed_kind, $3, $4, $5, $6)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        {
+          "Custom": {
+            "name": "events.feed_kind",
+            "kind": {
+              "Enum": [
+                "personal",
+                "group"
+              ]
+            }
+          }
+        },
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "13e4938a71e0453b42f1472b25ce184a0314e51be50aefa42b7a5e5183448c72"
+}

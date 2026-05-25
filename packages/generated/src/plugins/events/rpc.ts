@@ -5,10 +5,18 @@
 // cross-plugin methods declared in [dependencies.<dep>].rpc_methods.
 // An undeclared method is not a key here → a type error on use.
 
+import { CalendarService } from '../../proto/events/v1/calendar_pb.js';
 import { EventService } from '../../proto/events/v1/events_pb.js';
 import { InviteService } from '../../proto/events/v1/invite_pb.js';
 
 export const rpc = {
+  CalendarService: {
+    createGroupKey: CalendarService.method.createGroupKey,
+    getPersonalFeed: CalendarService.method.getPersonalFeed,
+    listFeeds: CalendarService.method.listFeeds,
+    revokeFeed: CalendarService.method.revokeFeed,
+    setGroupPublic: CalendarService.method.setGroupPublic,
+  },
   EventService: {
     createEvent: EventService.method.createEvent,
     deleteEvent: EventService.method.deleteEvent,

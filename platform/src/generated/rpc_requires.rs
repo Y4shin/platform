@@ -5,6 +5,23 @@
 /// method's `option (platform.requires)`. The host RPC guard enforces these.
 pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
     (
+        "events.v1.CalendarService",
+        "CreateGroupKey",
+        &["events:read", "events:write"],
+    ),
+    (
+        "events.v1.CalendarService",
+        "GetPersonalFeed",
+        &["events:read"],
+    ),
+    ("events.v1.CalendarService", "ListFeeds", &["events:read"]),
+    ("events.v1.CalendarService", "RevokeFeed", &["events:read"]),
+    (
+        "events.v1.CalendarService",
+        "SetGroupPublic",
+        &["events:read", "events:write"],
+    ),
+    (
         "events.v1.EventService",
         "CreateEvent",
         &["events:read", "events:write"],
@@ -66,6 +83,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `service_fqn` -> owning plugin, so the host attaches the right
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("events.v1.CalendarService", "events"),
     ("events.v1.EventService", "events"),
     ("events.v1.InviteService", "events"),
     ("greetings.v1.GreetingService", "greetings"),

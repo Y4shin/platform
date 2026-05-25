@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT kind AS \"kind: FeedKind\", subject_user_id, subject_group_id\n            FROM events.calendar_token\n            WHERE token_hash = $1 AND revoked_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind: FeedKind",
+        "type_info": {
+          "Custom": {
+            "name": "events.feed_kind",
+            "kind": {
+              "Enum": [
+                "personal",
+                "group"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "subject_group_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "5f5d7b53b2074f18b14060c88d92d53f05557e33d47f02f78f7af5185a1e38c2"
+}

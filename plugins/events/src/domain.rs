@@ -6,6 +6,7 @@
 use base64::Engine;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// A row id in `events.event`.
@@ -77,10 +78,42 @@ impl SignupKind {
     }
 }
 
+/// `events.feed_kind` — a personal (per-user) vs. group calendar feed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "events.feed_kind", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum FeedKind {
+    Personal,
+    Group,
+}
+
 /// A URL-safe, unguessable invite slug — 128 bits of entropy, base64url (no pad).
 #[must_use]
 pub fn generate_slug() -> String {
-    let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+    random_token(16)
+}
+
+/// A URL-safe, unguessable calendar-feed key — 256 bits of entropy. The key lives
+/// only in the feed URL; the database stores its [`hash_token`].
+#[must_use]
+pub fn generate_feed_key() -> String {
+    random_token(32)
+}
+
+/// SHA-256 of a feed key, hex-encoded — what `calendar_token.token_hash` stores.
+#[must_use]
+pub fn hash_token(key: &str) -> String {
+    let digest = Sha256::digest(key.as_bytes());
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+fn random_token(bytes: usize) -> String {
+    let mut buf = vec![0u8; bytes];
+    rand::thread_rng().fill_bytes(&mut buf);
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)
 }

@@ -35,24 +35,29 @@ mod proto {
 }
 
 pub mod domain;
+mod http;
+pub mod ics;
 pub mod repo;
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::{EventId, OwnerKind, Visibility};
+use crate::domain::{EventId, FeedKind, OwnerKind, Visibility, generate_feed_key, hash_token};
 use crate::permissions::{EventsRead, EventsShare, EventsWrite};
 use crate::repo::{
-    EventRepo, EventUpdate, EventView, Invite, InviteConfig, InvitePage, InviteRepo, NewEvent,
-    SignupRepo, SignupRow,
+    CalendarRepo, EventRepo, EventUpdate, EventView, Invite, InviteConfig, InvitePage, InviteRepo,
+    NewEvent, SignupRepo, SignupRow, TokenInfo,
 };
+use junius_sdk::User;
 
 use proto::events::v1 as pb;
 use proto::events::v1::{
-    EventService, EventServiceExt, InviteService, InviteServiceExt, OwnedCreateEventRequestView,
+    CalendarService, CalendarServiceExt, EventService, EventServiceExt, InviteService,
+    InviteServiceExt, OwnedCreateEventRequestView, OwnedCreateGroupKeyRequestView,
     OwnedCreateInviteRequestView, OwnedDeleteEventRequestView, OwnedGetEventRequestView,
-    OwnedGetInviteRequestView, OwnedListEventsRequestView, OwnedListSignupsRequestView,
-    OwnedOptOutRequestView, OwnedShareEventRequestView, OwnedSignupRequestView,
-    OwnedUpdateEventRequestView, OwnedUpdateInviteRequestView,
+    OwnedGetInviteRequestView, OwnedGetPersonalFeedRequestView, OwnedListEventsRequestView,
+    OwnedListFeedsRequestView, OwnedListSignupsRequestView, OwnedOptOutRequestView,
+    OwnedRevokeFeedRequestView, OwnedSetGroupPublicRequestView, OwnedShareEventRequestView,
+    OwnedSignupRequestView, OwnedUpdateEventRequestView, OwnedUpdateInviteRequestView,
 };
 
 /// Per-request state for the events plugin: its repositories, typed on the
@@ -65,6 +70,8 @@ pub struct EventState<P = ()> {
     pub invites: InviteRepo<P>,
     #[repo]
     pub signups: SignupRepo<P>,
+    #[repo]
+    pub calendar: CalendarRepo<P>,
 }
 
 /// The events plugin's request context: state + caller + resources, proven to
@@ -583,6 +590,181 @@ fn is_unique_violation(e: &sqlx::Error) -> bool {
         .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
 }
 
+/// Connect-RPC implementation of `events.v1.CalendarService`. Mints / lists /
+/// revokes feed tokens and toggles a group's public calendar; the `.ics` feeds
+/// these point at are served unauthenticated by [`crate::http`]. Group actions
+/// additionally require the caller to hold `events:write` *within* the group.
+struct CalendarRpc;
+
+impl CalendarService for CalendarRpc {
+    async fn get_personal_feed(
+        &self,
+        ctx: RequestContext,
+        _request: OwnedGetPersonalFeedRequestView,
+    ) -> ServiceResult<impl Encodable<pb::GetPersonalFeedResponse>> {
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let caller = require_caller(ectx.user.as_ref())?;
+        // Keys are stored hashed (not recoverable), so each call mints a fresh
+        // personal key; old ones remain valid until revoked.
+        let key = generate_feed_key();
+        ectx.state
+            .calendar
+            .mint_token(
+                FeedKind::Personal,
+                Some(caller.0),
+                None,
+                caller.0,
+                None,
+                &hash_token(&key),
+            )
+            .await?;
+        Ok(Response::new(pb::GetPersonalFeedResponse {
+            url: format!("/h/events/ics/u/{key}"),
+            ..Default::default()
+        }))
+    }
+
+    async fn create_group_key(
+        &self,
+        ctx: RequestContext,
+        request: OwnedCreateGroupKeyRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateGroupKeyResponse>> {
+        let group_id = parse_uuid(request.group_id, "group_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let caller = require_user(ectx.user.as_ref())?;
+        require_group_write(caller, group_id)?;
+        let key = generate_feed_key();
+        ectx.state
+            .calendar
+            .mint_token(
+                FeedKind::Group,
+                None,
+                Some(group_id),
+                caller.id.0,
+                nonempty(request.label),
+                &hash_token(&key),
+            )
+            .await?;
+        let name = ectx
+            .resources
+            .groups
+            .by_id(GroupId(group_id))
+            .await?
+            .map_or_else(|| group_id.to_string(), |g| encode_segment(&g.name));
+        Ok(Response::new(pb::CreateGroupKeyResponse {
+            url: format!("/h/events/ics/g/{name}/{key}"),
+            ..Default::default()
+        }))
+    }
+
+    async fn set_group_public(
+        &self,
+        ctx: RequestContext,
+        request: OwnedSetGroupPublicRequestView,
+    ) -> ServiceResult<impl Encodable<pb::SetGroupPublicResponse>> {
+        let group_id = parse_uuid(request.group_id, "group_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let caller = require_user(ectx.user.as_ref())?;
+        require_group_write(caller, group_id)?;
+        ectx.state
+            .calendar
+            .set_group_public(group_id, request.public, caller.id.0)
+            .await?;
+        Ok(Response::new(pb::SetGroupPublicResponse::default()))
+    }
+
+    async fn list_feeds(
+        &self,
+        ctx: RequestContext,
+        _request: OwnedListFeedsRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListFeedsResponse>> {
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let caller = require_caller(ectx.user.as_ref())?;
+        let tokens = ectx.state.calendar.list_tokens(caller.0).await?;
+        Ok(Response::new(pb::ListFeedsResponse {
+            feeds: tokens.into_iter().map(feed_to_proto).collect(),
+            ..Default::default()
+        }))
+    }
+
+    async fn revoke_feed(
+        &self,
+        ctx: RequestContext,
+        request: OwnedRevokeFeedRequestView,
+    ) -> ServiceResult<impl Encodable<pb::RevokeFeedResponse>> {
+        let token_id = parse_uuid(request.id, "id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let caller = require_caller(ectx.user.as_ref())?;
+        ectx.state.calendar.revoke_token(token_id, caller.0).await?;
+        Ok(Response::new(pb::RevokeFeedResponse::default()))
+    }
+}
+
+/// The authenticated caller's id, or `unauthenticated` (gated methods should
+/// always have one, but be defensive).
+fn require_caller(user: Option<&User>) -> Result<UserId, ConnectError> {
+    Ok(require_user(user)?.id)
+}
+
+/// The authenticated caller, or `unauthenticated`.
+fn require_user(user: Option<&User>) -> Result<&User, ConnectError> {
+    user.ok_or_else(|| ConnectError::unauthenticated("authentication required"))
+}
+
+/// Require the caller to hold `events:write` within `group_id` (a role in that
+/// group granting it), beyond the static `events:write`-anywhere RPC gate.
+fn require_group_write(caller: &User, group_id: Uuid) -> Result<(), ConnectError> {
+    let ok = caller
+        .memberships
+        .iter()
+        .any(|m| m.group_id.0 == group_id && m.permissions.contains("events:write"));
+    if ok {
+        Ok(())
+    } else {
+        Err(ConnectError::permission_denied(
+            "you need events:write within this group",
+        ))
+    }
+}
+
+/// Convert a feed token into proto.
+fn feed_to_proto(t: TokenInfo) -> pb::Feed {
+    pb::Feed {
+        id: t.id.to_string(),
+        kind: match t.kind {
+            FeedKind::Personal => "personal",
+            FeedKind::Group => "group",
+        }
+        .to_string(),
+        group_id: t
+            .subject_group_id
+            .map(|g| g.to_string())
+            .unwrap_or_default(),
+        label: t.label.unwrap_or_default(),
+        created_at: t.created_at.to_rfc3339(),
+        revoked: t.revoked,
+        ..Default::default()
+    }
+}
+
+/// Percent-encode a single URL path segment (group name in a feed URL is
+/// cosmetic — the key is the credential — but the URL must still be valid).
+fn encode_segment(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char);
+            }
+            other => {
+                use std::fmt::Write;
+                let _ = write!(out, "%{other:02X}");
+            }
+        }
+    }
+    out
+}
+
 /// Background job (M10): email a sign-up confirmation. Enqueued by the `Signup`
 /// handler; run out-of-band by the host job worker, which sends it via the gated
 /// `email.send` capability.
@@ -630,12 +812,15 @@ impl Plugin for EventsPlugin {
     }
 
     fn routes(&self) -> Router {
-        Router::new().route("/ping", get(|| async { "pong" }))
+        Router::new()
+            .route("/ping", get(|| async { "pong" }))
+            .merge(http::routes())
     }
 
     fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
         let router = Arc::new(EventRpc).register(router);
-        Arc::new(InviteRpc).register(router)
+        let router = Arc::new(InviteRpc).register(router);
+        Arc::new(CalendarRpc).register(router)
     }
 
     fn jobs(&self) -> Vec<JobHandler> {
