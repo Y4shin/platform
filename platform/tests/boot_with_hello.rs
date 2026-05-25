@@ -5,11 +5,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use axum::body::{Body, to_bytes};
-use hello_plugin::{GreetRequest, GreetResponse, HelloPlugin};
+use hello_plugin::HelloPlugin;
 use http::{Request, header};
 use junius_sdk::Plugin;
 use platform::server;
-use prost::Message;
 use tower::ServiceExt;
 
 fn hello_registry() -> Vec<Box<dyn Plugin>> {
@@ -96,16 +95,12 @@ async fn full_server_run_against_hello() {
 async fn rpc_route_mounted_under_slash_rpc() {
     let plugins = hello_registry();
     let app = server::build_app(&plugins);
-    let body = GreetRequest {
-        name: "alice".to_string(),
-    }
-    .encode_to_vec();
 
     let response = app
         .oneshot(
             Request::post("/rpc/hello.v1.HelloService/Greet")
-                .header(header::CONTENT_TYPE, "application/proto")
-                .body(Body::from(body))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"name":"alice"}"#))
                 .unwrap(),
         )
         .await
@@ -113,8 +108,8 @@ async fn rpc_route_mounted_under_slash_rpc() {
 
     assert_eq!(response.status(), 200);
     let bytes = to_bytes(response.into_body(), 4096).await.unwrap();
-    let decoded = GreetResponse::decode(&bytes[..]).unwrap();
-    assert_eq!(decoded.message, "Hello, alice!");
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["message"], "Hello, alice!");
 }
 
 #[tokio::test]
@@ -161,11 +156,14 @@ async fn missing_plugin_rpc_route_404s() {
     let response = app
         .oneshot(
             Request::post("/rpc/other.v1.OtherService/DoesNotExist")
-                .body(Body::empty())
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
                 .unwrap(),
         )
         .await
         .unwrap();
 
+    // connectrpc's router answers every `/rpc/*` path (it's a fallback service),
+    // returning 404 for a service/method it doesn't know.
     assert_eq!(response.status(), 404);
 }

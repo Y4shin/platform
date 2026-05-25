@@ -53,8 +53,7 @@ hello-plugin = { path = "../plugins/hello" }
 # <<< junius managed end
 
 [dev-dependencies]
-http  = { workspace = true }
-prost = { workspace = true }
+http = { workspace = true }
 
 # Ephemeral Postgres for the auth integration tests (M06).
 testcontainers         = { workspace = true }

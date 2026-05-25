@@ -11,11 +11,15 @@ junius-sdk = { workspace = true }
 
 axum        = { workspace = true }
 async-trait = { workspace = true }
-prost       = { workspace = true }
+connectrpc  = { workspace = true }
+buffa       = { workspace = true }
+buffa-types = { workspace = true }
 serde       = { workspace = true }
+serde_json  = { workspace = true }
+http-body   = { workspace = true }
 
 [build-dependencies]
-prost-build = { workspace = true }
+connectrpc-build = { workspace = true }
 
 [dev-dependencies]
 tokio      = { workspace = true }

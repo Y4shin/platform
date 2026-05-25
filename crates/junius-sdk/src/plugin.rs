@@ -27,10 +27,12 @@ pub trait Plugin: Send + Sync + 'static {
 
     /// Build the plugin's Connect-RPC routes. Default returns an empty router
     /// for plugins that don't expose RPCs. The host merges every plugin's RPC
-    /// router under `/rpc` (a flat namespace — the proto package name is
-    /// what scopes services by plugin). Use
-    /// [`junius_sdk::rpc::ServiceBuilder`](crate::rpc::ServiceBuilder) to
-    /// construct the router.
+    /// router under `/rpc` (a flat namespace — the proto package name is what
+    /// scopes services by plugin). Implement the generated `connectrpc` service
+    /// trait and build the router with
+    /// `service.register(connectrpc::Router::new()).into_axum_router()`; the
+    /// per-plugin `PluginResourceCtx` and the caller flow in via request
+    /// extensions (read in handlers through `RequestContext::extensions`).
     fn rpc_routes(&self) -> Router {
         Router::new()
     }

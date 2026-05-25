@@ -47,10 +47,14 @@ syn         = { version = "2", features = ["full", "extra-traits"] }
 quote       = "1"
 proc-macro2 = "1"
 
-# Protocol buffers + Connect
-prost       = "0.14"
-prost-build = "0.14"
-bytes       = "1"
+# Protocol buffers + Connect-RPC. connectrpc (Anthropic's Tower-based Connect
+# server) generates service traits; buffa is its zero-copy protobuf. Replaces the
+# M05 hand-rolled unary server + prost message types (see M06.5).
+connectrpc       = { version = "0.6", features = ["axum", "server"] }
+connectrpc-build = "0.6"
+buffa            = { version = "0.6", features = ["json"] }
+buffa-types      = { version = "0.6", features = ["json"] }
+http-body        = "1"
 
 # Database (used heavily from M06)
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }

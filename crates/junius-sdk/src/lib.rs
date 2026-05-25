@@ -12,7 +12,6 @@ pub mod error;
 pub mod metadata;
 pub mod plugin;
 pub mod resources;
-pub mod rpc;
 pub mod secrets;
 pub mod telemetry;
 
