@@ -183,6 +183,13 @@ pub async fn run(
         &worker_cancel,
     );
 
+    // Host audit-retention prune (interval task; cancelled with the worker token).
+    let audit_prune = crate::jobs::audit_prune::spawn(
+        platform_pool.clone(),
+        resolved.audit.retention_days,
+        worker_cancel.clone(),
+    );
+
     // Browser-facing OIDC callback. When `oidc_redirect_url` is configured (e.g.
     // the Vite `:5173` origin under `junius dev`, so the callback flows through
     // the single dev origin), use it verbatim; otherwise derive it from the
@@ -241,6 +248,7 @@ pub async fn run(
             tracing::error!(error = %e, "job worker task panicked");
         }
     }
+    audit_prune.abort();
 
     boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins, &infra).await;
     Ok(())

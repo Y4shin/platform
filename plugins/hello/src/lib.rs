@@ -29,7 +29,10 @@ mod proto {
 pub mod repo;
 
 use connectrpc::ConnectError;
-use junius_sdk::{GroupId, Principal, UserId};
+use junius_sdk::{
+    EmailMessage, GroupId, Job, JobHandler, PluginError, PluginResources, Principal, UserId,
+};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use proto::hello::v1 as pb;
@@ -43,6 +46,37 @@ pub use proto::hello::v1::{GreetRequest, GreetResponse};
 
 use crate::permissions::{HelloRead, HelloWrite};
 use crate::repo::{Greeting, HelloRepo, NewGreeting, NewNote, NoteId, NoteRepo, NoteView};
+
+/// Background job (M10): email a greeting after it's created. Enqueued by
+/// `create_greeting`; handled out-of-band by the host job worker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendGreeting {
+    pub greeting_id: String,
+    pub name: String,
+    pub body: String,
+    pub recipient_email: String,
+}
+
+impl Job for SendGreeting {
+    const NAME: &'static str = "hello.send_greeting";
+}
+
+/// Handler for [`SendGreeting`] — runs in the worker with the plugin's own
+/// resources, sending the greeting via the gated `email.send` capability.
+async fn send_greeting_handler(
+    job: SendGreeting,
+    resources: PluginResources,
+) -> Result<(), PluginError> {
+    resources
+        .email
+        .send(EmailMessage {
+            to: vec![job.recipient_email],
+            subject: format!("A greeting for {}", job.name),
+            body_text: job.body,
+            ..Default::default()
+        })
+        .await
+}
 
 /// Convert a stored greeting into its proto wire form.
 fn greeting_to_proto(g: Greeting) -> pb::Greeting {
@@ -171,6 +205,17 @@ impl HelloService for HelloRpc {
                 body: request.body.to_string(),
             })
             .await?;
+        // Enqueue the follow-up email (best-effort: a missing/unconfigured job
+        // backend must not fail the create).
+        let job = SendGreeting {
+            greeting_id: created.id.0.to_string(),
+            name: created.name.clone(),
+            body: created.body.clone(),
+            recipient_email: "recipient@local".to_string(),
+        };
+        if let Err(e) = hctx.resources.jobs.enqueue(job).await {
+            tracing::warn!(error = %e, "failed to enqueue hello.send_greeting");
+        }
         Ok(Response::new(pb::CreateGreetingResponse {
             greeting: Some(greeting_to_proto(created)).into(),
             ..Default::default()
@@ -272,5 +317,9 @@ impl Plugin for HelloPlugin {
     fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
         let router = Arc::new(HelloRpc).register(router);
         Arc::new(NoteRpc).register(router)
+    }
+
+    fn jobs(&self) -> Vec<JobHandler> {
+        vec![JobHandler::new::<SendGreeting, _, _>(send_greeting_handler)]
     }
 }

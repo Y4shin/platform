@@ -4,6 +4,19 @@ display_name = "Hello"
 description = "Smoke-test plugin exercising the platform shape."
 manifest_schema = 1
 
+# Infra capabilities this plugin uses at runtime (M10). The host gates the
+# matching `PluginResources` handles on these: `email.send`, `job.enqueue`,
+# `storage.read`/`storage.write`. `db.*`/`audit.emit` are enforced by the
+# per-plugin Postgres role and aren't gated here.
+[requires]
+capabilities = ["email.send", "job.enqueue", "storage.read", "storage.write"]
+
+# A logical object-storage bucket (M10). `plugin_metadata!()` generates a
+# `buckets::Bucket::Attachments` variant from this; the deployment maps
+# `hello:attachments` to a physical bucket in `[config.storage.mapping]`.
+[storage.buckets.attachments]
+description = "File attachments for notes."
+
 # Typed config schema (M06). Codegen emits a `Config` struct; the deployment may
 # override `greeting` under [plugins.hello.config].
 [config.greeting]

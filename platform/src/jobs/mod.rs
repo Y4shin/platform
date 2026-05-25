@@ -4,6 +4,7 @@
 //! job name; the [`worker`] declares a durable queue + dead-letter queue per
 //! registered job and dispatches deliveries to plugin handlers.
 
+pub mod audit_prune;
 pub mod worker;
 
 use std::sync::Arc;
