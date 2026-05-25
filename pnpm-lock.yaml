@@ -25,6 +25,16 @@ importers:
         version: 5.6.3
 
   packages/design:
+    dependencies:
+      '@hookform/resolvers':
+        specifier: ^3.9.0
+        version: 3.10.0(react-hook-form@7.76.1(react@19.2.6))
+      react-hook-form:
+        specifier: ^7.53.0
+        version: 7.76.1(react@19.2.6)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@radix-ui/react-slot':
         specifier: ^1.1.0
@@ -853,6 +863,11 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@hookform/resolvers@3.10.0':
+    resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
+    peerDependencies:
+      react-hook-form: ^7.0.0
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1694,6 +1709,12 @@ packages:
     peerDependencies:
       react: ^19.2.6
 
+  react-hook-form@7.76.1:
+    resolution: {integrity: sha512-rYM7tPiWlu3nZchkR/ex7piyzui2vFPyaLnXnI/RnblB/L4qfMmyses8llJVtF1NpE9WBBsJlGtcSZzPCXW1qQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      react: ^16.8.0 || ^17 || ^18 || ^19
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -1977,6 +1998,9 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -2380,6 +2404,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.12':
     optional: true
+
+  '@hookform/resolvers@3.10.0(react-hook-form@7.76.1(react@19.2.6))':
+    dependencies:
+      react-hook-form: 7.76.1(react@19.2.6)
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -3138,6 +3166,10 @@ snapshots:
       react: 19.2.6
       scheduler: 0.27.0
 
+  react-hook-form@7.76.1(react@19.2.6):
+    dependencies:
+      react: 19.2.6
+
   react-is@17.0.2: {}
 
   react-refresh@0.17.0: {}
@@ -3365,3 +3397,5 @@ snapshots:
   xmlchars@2.2.0: {}
 
   yallist@3.1.1: {}
+
+  zod@3.25.76: {}
