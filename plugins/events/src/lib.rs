@@ -1,9 +1,11 @@
 //! `events` — the events plugin (M13). The first real domain plugin: events that
 //! belong to a **user or a group** and are **private or public**, with per-instance
 //! access control (public events bypass the ACL on read; private ones are gated by
-//! ownership/shares). Stage 6 ships the event domain core — `EventRepo` CRUD and a
-//! permission-gated `EventService`. Invites, sign-ups, the public invite page,
-//! iCalendar feeds, and the confirmation-email job land in later stages.
+//! ownership/shares). Stage 6 shipped the event domain core (`EventService`);
+//! Stage 7 adds invites + sign-ups (`InviteService`): owner-gated configuration
+//! plus the **ungated** viewer surface (GetInvite/Signup/OptOut) whose access is
+//! enforced at runtime by the event ACL rather than a compile-time witness.
+//! iCalendar feeds and the confirmation-email job land in later stages.
 
 use std::sync::Arc;
 
@@ -35,13 +37,18 @@ use chrono::{DateTime, Utc};
 
 use crate::domain::{EventId, OwnerKind, Visibility};
 use crate::permissions::{EventsRead, EventsShare, EventsWrite};
-use crate::repo::{EventRepo, EventUpdate, EventView, NewEvent};
+use crate::repo::{
+    EventRepo, EventUpdate, EventView, Invite, InviteConfig, InvitePage, InviteRepo, NewEvent,
+    SignupRepo, SignupRow,
+};
 
 use proto::events::v1 as pb;
 use proto::events::v1::{
-    EventService, EventServiceExt, OwnedCreateEventRequestView, OwnedDeleteEventRequestView,
-    OwnedGetEventRequestView, OwnedListEventsRequestView, OwnedShareEventRequestView,
-    OwnedUpdateEventRequestView,
+    EventService, EventServiceExt, InviteService, InviteServiceExt, OwnedCreateEventRequestView,
+    OwnedCreateInviteRequestView, OwnedDeleteEventRequestView, OwnedGetEventRequestView,
+    OwnedGetInviteRequestView, OwnedListEventsRequestView, OwnedListSignupsRequestView,
+    OwnedOptOutRequestView, OwnedShareEventRequestView, OwnedSignupRequestView,
+    OwnedUpdateEventRequestView, OwnedUpdateInviteRequestView,
 };
 
 /// Per-request state for the events plugin: its repositories, typed on the
@@ -50,6 +57,10 @@ use proto::events::v1::{
 pub struct EventState<P = ()> {
     #[repo]
     pub events: EventRepo<P>,
+    #[repo]
+    pub invites: InviteRepo<P>,
+    #[repo]
+    pub signups: SignupRepo<P>,
 }
 
 /// The events plugin's request context: state + caller + resources, proven to
@@ -306,6 +317,247 @@ fn parse_principal(kind: &str, id: &str) -> Result<Principal, ConnectError> {
     }
 }
 
+/// Connect-RPC implementation of `events.v1.InviteService`. Owner-side methods
+/// build a permission-gated `EventCtx<P>`; the viewer-side methods build the
+/// **no-witness** `EventCtx<()>` (so anonymous callers reach them) and rely on
+/// the repository's runtime ACL.
+struct InviteRpc;
+
+impl InviteService for InviteRpc {
+    async fn create_invite(
+        &self,
+        ctx: RequestContext,
+        request: OwnedCreateInviteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateInviteResponse>> {
+        let event_id = parse_uuid(request.event_id, "event_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let caller = ectx
+            .user
+            .as_ref()
+            .map(|u| u.id)
+            .ok_or_else(|| ConnectError::unauthenticated("authentication required"))?;
+        // Fetch the event (also confirms read access + gives the owner) before
+        // creating its invite.
+        let event = ectx.state.events.get(EventId(event_id)).await?;
+        let config = InviteConfig {
+            signup_enabled: request.signup_enabled,
+            signup_open: request.signup_open,
+            slot_limit: (request.slot_limit > 0).then_some(request.slot_limit),
+            show_title: request.show_title,
+            show_datetime: request.show_datetime,
+            show_location: request.show_location,
+            show_description: request.show_description,
+            show_remaining: request.show_remaining,
+        };
+        let slug = crate::domain::generate_slug();
+        let invite = match ectx.state.invites.create(event_id, &slug, &config).await {
+            Ok(invite) => invite,
+            Err(junius_sdk::RepoError::Db(e)) if is_unique_violation(&e) => {
+                return Err(ConnectError::already_exists(
+                    "an invite already exists for this event",
+                ));
+            }
+            Err(e) => return Err(e.into()),
+        };
+        // Group pre-sign-up: snapshot the owning group's current members as going.
+        if request.presignup_group && matches!(event.owner_kind, OwnerKind::Group) {
+            if let Some(gid) = event.owning_group_id {
+                let members = ectx.resources.groups.members(GroupId(gid), caller).await?;
+                let ids: Vec<UserId> = members.into_iter().map(|m| m.user.id).collect();
+                ectx.state.signups.presign_users(invite.id, &ids).await?;
+            }
+        }
+        Ok(Response::new(pb::CreateInviteResponse {
+            invite: Some(invite_to_proto(invite)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn update_invite(
+        &self,
+        ctx: RequestContext,
+        request: OwnedUpdateInviteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::UpdateInviteResponse>> {
+        let event_id = parse_uuid(request.event_id, "event_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let config = InviteConfig {
+            signup_enabled: request.signup_enabled,
+            signup_open: request.signup_open,
+            slot_limit: (request.slot_limit > 0).then_some(request.slot_limit),
+            show_title: request.show_title,
+            show_datetime: request.show_datetime,
+            show_location: request.show_location,
+            show_description: request.show_description,
+            show_remaining: request.show_remaining,
+        };
+        let invite = ectx.state.invites.update(event_id, &config).await?;
+        Ok(Response::new(pb::UpdateInviteResponse {
+            invite: Some(invite_to_proto(invite)).into(),
+            ..Default::default()
+        }))
+    }
+
+    async fn list_signups(
+        &self,
+        ctx: RequestContext,
+        request: OwnedListSignupsRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListSignupsResponse>> {
+        let event_id = parse_uuid(request.event_id, "event_id")?;
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
+        let rows = ectx.state.invites.list_signups(event_id).await?;
+        let mut signups = Vec::with_capacity(rows.len());
+        for row in rows {
+            // Resolve a display name/email for user sign-ups via the directory;
+            // guests carry their own.
+            let (display_name, email) = match row.user_id {
+                Some(uid) => ectx
+                    .resources
+                    .users
+                    .lookup(UserId(uid))
+                    .await?
+                    .map(|u| (u.display_name, u.email))
+                    .unwrap_or_default(),
+                None => (
+                    row.guest_name.clone().unwrap_or_default(),
+                    row.guest_email.clone().unwrap_or_default(),
+                ),
+            };
+            signups.push(signup_to_proto(&row, display_name, email));
+        }
+        Ok(Response::new(pb::ListSignupsResponse {
+            signups,
+            ..Default::default()
+        }))
+    }
+
+    async fn get_invite(
+        &self,
+        ctx: RequestContext,
+        request: OwnedGetInviteRequestView,
+    ) -> ServiceResult<impl Encodable<pb::GetInviteResponse>> {
+        // No witness: anonymous callers reach this; the repo enforces the ACL.
+        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
+        let page = ectx.state.invites.get_page_by_slug(request.slug).await?;
+        Ok(Response::new(invite_page_to_proto(page)))
+    }
+
+    async fn signup(
+        &self,
+        ctx: RequestContext,
+        request: OwnedSignupRequestView,
+    ) -> ServiceResult<impl Encodable<pb::SignupResponse>> {
+        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
+        let (id, status) = ectx
+            .state
+            .signups
+            .signup(
+                request.slug,
+                nonempty(request.guest_name),
+                nonempty(request.guest_email),
+            )
+            .await?;
+        Ok(Response::new(pb::SignupResponse {
+            signup_id: id.to_string(),
+            status: status.as_str().to_string(),
+            ..Default::default()
+        }))
+    }
+
+    async fn opt_out(
+        &self,
+        ctx: RequestContext,
+        request: OwnedOptOutRequestView,
+    ) -> ServiceResult<impl Encodable<pb::OptOutResponse>> {
+        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
+        ectx.state.signups.opt_out(request.slug).await?;
+        Ok(Response::new(pb::OptOutResponse::default()))
+    }
+}
+
+/// Convert an owner's invite view into proto (`slot_limit` 0 = unlimited).
+fn invite_to_proto(i: Invite) -> pb::Invite {
+    pb::Invite {
+        id: i.id.to_string(),
+        event_id: i.event_id.to_string(),
+        slug: i.slug,
+        signup_enabled: i.signup_enabled,
+        signup_open: i.signup_open,
+        slot_limit: i.slot_limit.unwrap_or(0),
+        show_title: i.show_title,
+        show_datetime: i.show_datetime,
+        show_location: i.show_location,
+        show_description: i.show_description,
+        show_remaining: i.show_remaining,
+        ..Default::default()
+    }
+}
+
+/// Convert a sign-up row into proto, with the resolved display name + email.
+fn signup_to_proto(row: &SignupRow, display_name: String, email: String) -> pb::Signup {
+    pb::Signup {
+        id: row.id.to_string(),
+        kind: row.kind.as_str().to_string(),
+        user_id: row.user_id.map(|u| u.to_string()).unwrap_or_default(),
+        display_name,
+        email,
+        status: row.status.as_str().to_string(),
+        created_at: row.created_at.to_rfc3339(),
+        ..Default::default()
+    }
+}
+
+/// Project the public invite page to proto, applying the `show_*` toggles so
+/// hidden fields never leave the server, and computing the slot affordances.
+fn invite_page_to_proto(p: InvitePage) -> pb::GetInviteResponse {
+    let unlimited = p.slot_limit.is_none();
+    let remaining = p.slot_limit.map_or(0, |limit| {
+        let used = i32::try_from(p.going_count).unwrap_or(i32::MAX);
+        limit.saturating_sub(used).max(0)
+    });
+    let can_signup = p.signup_enabled && p.signup_open && (unlimited || remaining > 0);
+    pb::GetInviteResponse {
+        slug: p.slug,
+        event_id: p.event_id.to_string(),
+        signup_enabled: p.signup_enabled,
+        signup_open: p.signup_open,
+        can_signup,
+        show_remaining: p.show_remaining,
+        unlimited_slots: unlimited,
+        slots_remaining: if p.show_remaining && !unlimited {
+            remaining
+        } else {
+            0
+        },
+        title: toggled(p.show_title, p.title),
+        description: toggled(p.show_description, p.description.unwrap_or_default()),
+        location: toggled(p.show_location, p.location.unwrap_or_default()),
+        starts_at: toggled(p.show_datetime, p.starts_at.to_rfc3339()),
+        ends_at: toggled(
+            p.show_datetime,
+            p.ends_at.map(|t| t.to_rfc3339()).unwrap_or_default(),
+        ),
+        all_day: p.show_datetime && p.all_day,
+        ..Default::default()
+    }
+}
+
+/// Return `value` only when `shown`, else the empty string (hidden field).
+fn toggled(shown: bool, value: String) -> String {
+    if shown { value } else { String::new() }
+}
+
+/// A non-empty trimmed view of a proto string field, else `None`.
+fn nonempty(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+/// Whether a sqlx error is a unique-constraint violation.
+fn is_unique_violation(e: &sqlx::Error) -> bool {
+    e.as_database_error()
+        .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
+}
+
 #[async_trait]
 impl Plugin for EventsPlugin {
     fn metadata(&self) -> &'static PluginMetadata {
@@ -317,6 +569,7 @@ impl Plugin for EventsPlugin {
     }
 
     fn register_rpc(&self, router: connectrpc::Router) -> connectrpc::Router {
-        Arc::new(EventRpc).register(router)
+        let router = Arc::new(EventRpc).register(router);
+        Arc::new(InviteRpc).register(router)
     }
 }

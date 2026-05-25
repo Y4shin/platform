@@ -7,10 +7,14 @@
 
 fn main() {
     println!("cargo:rerun-if-changed=proto/events/v1/events.proto");
+    println!("cargo:rerun-if-changed=proto/events/v1/invite.proto");
     println!("cargo:rerun-if-changed=../../proto/platform/v1/annotations.proto");
 
     if let Err(e) = connectrpc_build::Config::new()
-        .files(&["proto/events/v1/events.proto"])
+        .files(&[
+            "proto/events/v1/events.proto",
+            "proto/events/v1/invite.proto",
+        ])
         .includes(&["proto", "../../proto"])
         .include_file("_connectrpc.rs")
         .compile()

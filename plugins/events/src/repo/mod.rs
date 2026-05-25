@@ -6,5 +6,9 @@
 //! `platform.user_can_access`, with public events bypassing the ACL on read.
 
 mod event;
+mod invite;
+mod signup;
 
 pub use event::{EventRepo, EventUpdate, EventView, NewEvent};
+pub use invite::{Invite, InviteConfig, InvitePage, InviteRepo, SignupRow};
+pub use signup::{SignupError, SignupRepo};

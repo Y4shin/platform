@@ -1,0 +1,125 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT i.id AS invite_id, i.event_id, i.slug, i.signup_enabled, i.signup_open,\n                   i.slot_limit, i.show_title, i.show_datetime, i.show_location,\n                   i.show_description, i.show_remaining,\n                   e.title, e.description, e.location, e.starts_at, e.ends_at, e.all_day,\n                   (SELECT count(*) FROM events.signup s\n                    WHERE s.invite_id = i.id AND s.status = 'going') AS \"going_count!\"\n            FROM events.invite i\n            JOIN events.event e ON e.id = i.event_id\n            WHERE i.slug = $1\n              AND (e.visibility = 'public'\n                   OR platform.user_can_access('events:event', e.id, $2, 'events:read'))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "invite_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "signup_enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "signup_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "slot_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "show_title",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "show_datetime",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "show_location",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "show_description",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "show_remaining",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "location",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "starts_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "ends_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "all_day",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 17,
+        "name": "going_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "951e2335b2e4d7a987297a4882cab78520d28743b811d9d3f887eef07a134c75"
+}

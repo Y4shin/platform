@@ -1,0 +1,131 @@
+// Events plugin invite + sign-up RPC surface (M13 Stage 7). Owner-side invite
+// configuration + sign-up management is permission-gated; the viewer/attendee
+// side (GetInvite/Signup/OptOut) carries NO static `requires` — public invites
+// are reachable by anyone (incl. anonymous), and the handler enforces
+// events:read access for private events.
+syntax = "proto3";
+
+package events.v1;
+
+import "platform/v1/annotations.proto";
+
+service InviteService {
+  rpc CreateInvite(CreateInviteRequest) returns (CreateInviteResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc UpdateInvite(UpdateInviteRequest) returns (UpdateInviteResponse) {
+    option (platform.v1.requires) = "events:read,events:write";
+  }
+  rpc ListSignups(ListSignupsRequest) returns (ListSignupsResponse) {
+    option (platform.v1.requires) = "events:read";
+  }
+
+  // Viewer/attendee side — no static `requires` (see file header).
+  rpc GetInvite(GetInviteRequest) returns (GetInviteResponse);
+  rpc Signup(SignupRequest) returns (SignupResponse);
+  rpc OptOut(OptOutRequest) returns (OptOutResponse);
+}
+
+// The owner's full view of an invite's configuration.
+message Invite {
+  string id = 1;
+  string event_id = 2;
+  string slug = 3;
+  bool signup_enabled = 4;
+  bool signup_open = 5;
+  int32 slot_limit = 6; // 0 = unlimited
+  bool show_title = 7;
+  bool show_datetime = 8;
+  bool show_location = 9;
+  bool show_description = 10;
+  bool show_remaining = 11;
+}
+
+// Invite configuration is inlined on the create/update requests (flat scalar
+// fields, mirroring the rest of the surface).
+message CreateInviteRequest {
+  string event_id = 1;
+  bool signup_enabled = 2;
+  bool signup_open = 3;
+  int32 slot_limit = 4; // 0 = unlimited
+  bool show_title = 5;
+  bool show_datetime = 6;
+  bool show_location = 7;
+  bool show_description = 8;
+  bool show_remaining = 9;
+  // For a group-owned event: snapshot the group's current members as "going".
+  bool presignup_group = 10;
+}
+message CreateInviteResponse {
+  Invite invite = 1;
+}
+
+message UpdateInviteRequest {
+  string event_id = 1;
+  bool signup_enabled = 2;
+  bool signup_open = 3;
+  int32 slot_limit = 4; // 0 = unlimited
+  bool show_title = 5;
+  bool show_datetime = 6;
+  bool show_location = 7;
+  bool show_description = 8;
+  bool show_remaining = 9;
+}
+message UpdateInviteResponse {
+  Invite invite = 1;
+}
+
+message ListSignupsRequest {
+  string event_id = 1;
+}
+message Signup {
+  string id = 1;
+  string kind = 2; // "user" | "guest"
+  string user_id = 3; // set for user sign-ups
+  string display_name = 4; // resolved user display name, or the guest name
+  string email = 5; // guest email; resolved user email
+  string status = 6; // "going" | "opted_out"
+  string created_at = 7; // RFC 3339
+}
+message ListSignupsResponse {
+  repeated Signup signups = 1;
+}
+
+// --- viewer/attendee side (public for public events) -----------------------
+
+message GetInviteRequest {
+  string slug = 1;
+}
+
+// Only the toggled-visible fields are populated; hidden fields are empty/false.
+message GetInviteResponse {
+  string slug = 1;
+  string event_id = 2;
+  bool signup_enabled = 3;
+  bool signup_open = 4;
+  bool can_signup = 5; // enabled && open && (unlimited || slots remain)
+  bool show_remaining = 6;
+  bool unlimited_slots = 7;
+  int32 slots_remaining = 8; // meaningful when show_remaining && !unlimited_slots
+  string title = 10;
+  string description = 11;
+  string location = 12;
+  string starts_at = 13; // RFC 3339
+  string ends_at = 14; // RFC 3339
+  bool all_day = 15;
+}
+
+message SignupRequest {
+  string slug = 1;
+  string guest_name = 2; // anonymous sign-ups
+  string guest_email = 3; // anonymous sign-ups
+}
+message SignupResponse {
+  string signup_id = 1;
+  string status = 2; // "going"
+}
+
+message OptOutRequest {
+  string slug = 1;
+}
+message OptOutResponse {}

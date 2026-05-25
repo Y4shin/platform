@@ -27,6 +27,17 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
         &["events:read", "events:write"],
     ),
     (
+        "events.v1.InviteService",
+        "CreateInvite",
+        &["events:read", "events:write"],
+    ),
+    ("events.v1.InviteService", "ListSignups", &["events:read"]),
+    (
+        "events.v1.InviteService",
+        "UpdateInvite",
+        &["events:read", "events:write"],
+    ),
+    (
         "greetings.v1.GreetingService",
         "CreateGreeting",
         &["greetings:read", "greetings:write"],
@@ -56,6 +67,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
     ("events.v1.EventService", "events"),
+    ("events.v1.InviteService", "events"),
     ("greetings.v1.GreetingService", "greetings"),
     ("hello.v1.HelloService", "hello"),
     ("hello.v1.NoteService", "hello"),

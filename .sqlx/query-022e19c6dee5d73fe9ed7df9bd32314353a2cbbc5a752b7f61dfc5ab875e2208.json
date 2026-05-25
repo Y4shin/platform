@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT i.id, i.event_id, i.slug, i.signup_enabled, i.signup_open, i.slot_limit,\n                   i.show_title, i.show_datetime, i.show_location, i.show_description,\n                   i.show_remaining\n            FROM events.invite i\n            JOIN events.event e ON e.id = i.event_id\n            WHERE i.event_id = $1\n              AND (e.visibility = 'public'\n                   OR platform.user_can_access('events:event', e.id, $2, 'events:read'))\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "signup_enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "signup_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "slot_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "show_title",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "show_datetime",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "show_location",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "show_description",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "show_remaining",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "022e19c6dee5d73fe9ed7df9bd32314353a2cbbc5a752b7f61dfc5ab875e2208"
+}

@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO events.invite\n              (event_id, slug, signup_enabled, signup_open, slot_limit,\n               show_title, show_datetime, show_location, show_description, show_remaining)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n            RETURNING id, event_id, slug, signup_enabled, signup_open, slot_limit,\n                      show_title, show_datetime, show_location, show_description, show_remaining\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "signup_enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "signup_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "slot_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "show_title",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "show_datetime",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "show_location",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "show_description",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "show_remaining",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "453fdb0317e6b6f974d61f7c44ddbb632d78da37e0c898662d01b443743dd8c9"
+}

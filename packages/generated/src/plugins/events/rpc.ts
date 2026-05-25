@@ -6,6 +6,7 @@
 // An undeclared method is not a key here → a type error on use.
 
 import { EventService } from '../../proto/events/v1/events_pb.js';
+import { InviteService } from '../../proto/events/v1/invite_pb.js';
 
 export const rpc = {
   EventService: {
@@ -15,5 +16,13 @@ export const rpc = {
     listEvents: EventService.method.listEvents,
     shareEvent: EventService.method.shareEvent,
     updateEvent: EventService.method.updateEvent,
+  },
+  InviteService: {
+    createInvite: InviteService.method.createInvite,
+    getInvite: InviteService.method.getInvite,
+    listSignups: InviteService.method.listSignups,
+    optOut: InviteService.method.optOut,
+    signup: InviteService.method.signup,
+    updateInvite: InviteService.method.updateInvite,
   },
 };

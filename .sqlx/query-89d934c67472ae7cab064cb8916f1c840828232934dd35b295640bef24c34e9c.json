@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE events.invite i SET\n              signup_enabled = $2, signup_open = $3, slot_limit = $4,\n              show_title = $5, show_datetime = $6, show_location = $7,\n              show_description = $8, show_remaining = $9, updated_at = now()\n            FROM events.event e\n            WHERE i.event_id = $1 AND e.id = i.event_id\n              AND platform.user_can_access('events:event', e.id, $10, 'events:write')\n            RETURNING i.id, i.event_id, i.slug, i.signup_enabled, i.signup_open, i.slot_limit,\n                      i.show_title, i.show_datetime, i.show_location, i.show_description,\n                      i.show_remaining\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "signup_enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "signup_open",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "slot_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "show_title",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "show_datetime",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "show_location",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "show_description",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "show_remaining",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "89d934c67472ae7cab064cb8916f1c840828232934dd35b295640bef24c34e9c"
+}

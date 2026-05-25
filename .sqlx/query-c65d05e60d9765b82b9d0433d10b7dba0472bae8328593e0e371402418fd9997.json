@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO events.signup (invite_id, kind, user_id, status)\n            SELECT $1, 'user'::events.signup_kind, uid, 'going'::events.signup_status\n            FROM unnest($2::uuid[]) AS t(uid)\n            ON CONFLICT (invite_id, user_id) WHERE kind = 'user' DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c65d05e60d9765b82b9d0433d10b7dba0472bae8328593e0e371402418fd9997"
+}
