@@ -47,6 +47,12 @@
               pkgs.openssl
               pkgs.pkg-config
 
+              # LLVM lld linker — selected on Linux via .cargo/config.toml. Far
+              # lower peak memory + faster than the default GNU bfd linker when
+              # linking the many large debug test binaries (~95% debug info), so
+              # `cargo test --workspace` no longer risks OOM at high parallelism.
+              pkgs.lld
+
               # `cargo sqlx prepare` regenerates the committed `.sqlx/` offline
               # query cache that the repository `query!` macros check against in
               # CI (SQLX_OFFLINE=true).

@@ -1,0 +1,12 @@
+# Use the LLVM linker (lld) on Linux. The default GNU bfd linker is single-
+# threaded and memory-hungry: each debug test binary is ~340 MB (~95% DWARF
+# debug info), and linking ~15 of them in parallel under `cargo test --workspace`
+# can exhaust memory on a 16 GB box. lld links them with far lower peak memory
+# (and faster). Linux-gnu targets only — macOS/Windows/other targets keep their
+# platform default. lld is provided by the nix dev shell (flake.nix).
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
