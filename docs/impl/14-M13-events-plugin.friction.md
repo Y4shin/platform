@@ -63,3 +63,43 @@ directory, public routes) are done.
 | 2026-05-25 | 11 | forms / build | **Schema-authoring consumers need a direct `zod` dep.** The events frontend imports `z` from `zod` to define form schemas, so it had to add `zod` to its own `package.json` (it isn't transitively provided by `@junius/design`). Mild, but easy to hit (the error is a bare `Cannot find module 'zod'`). | papercut | Document that plugins authoring zod schemas depend on `zod` directly; or have `@junius/design` re-export `z`. |
 | 2026-05-25 | 11 | authz (FE) | **`requirePermissions` is an M04 no-op**, so the spec's `beforeLoad` route guard wouldn't actually enforce anything. Relied on the server-computed `viewerCanEdit` flag to gate edit/delete/manage affordances instead — which is the correct posture (never trust a client gate), but the guard example in the spec is misleading. | friction | Either implement `requirePermissions` as a real guard (M14/hardening) or drop it from the guide in favour of server-flag gating; document the chosen posture. |
 | 2026-05-25 | 10 | forms | **Positive note:** the forms library landed cleanly — `react-hook-form` + `zod` + `@hookform/resolvers` (`zodResolver`) gave a typed `Form`/`FormField` (`useForm` + `FormProvider` + `useController`) in ~5 small files, and a single zod schema drives both validation and the inferred value type. Inputs (Input/Select/Textarea/DateTime/DateRange) are thin styled natives over the existing `cx` + theme tokens. The only deps friction was needing 3 packages (a fetch) + the import-sort papercut above. | — | (Reusable for every later plugin; use the event form as the guide's forms example.) |
+
+---
+
+## Final triage outcome (2026-05-25, joint with the user)
+
+Walked the log together at the end of M13. Dispositions:
+
+**Resolved during M13** (fixed in the build, see the rows above): the `junius new`/
+`sync` Cluster A (Stage 4), the `Groups` directory accessor (Stage 2), the SPA
+public-route seam (Stage 3), B/C/D — struct-literal `PluginResourceCtx` +
+authorized `Groups::members` + centralized login-redirect (Stage 5), the owner
+`InviteService.GetEventInvite` RPC and the `createFormField` per-field typing
+(Stage 11).
+
+**Promoted to a planned milestone (user-owned):** the proto-vs-handler permission
+*restatement* → **M15 "Typed RPC handlers"** ([`17-M15-rpc-service-macro.md`](17-M15-rpc-service-macro.md)) —
+make `option (platform.v1.requires)` the single source of truth so handlers don't
+restate the witness.
+
+**Documented in [`docs/plugin-authoring-guide.md`](../plugin-authoring-guide.md)**
+(kept in this log; the user opted *not* to split a separate durable friction doc):
+custom-enum `query!` boilerplate, per-RPC response naming (no shared `Empty`), the
+`use junius_sdk::permissions` module collision, `struct_excessive_bools` on toggle
+DTOs, the public-handler recipe, the group-ownership-needs-a-role-permission rule,
+`biome check` vs `format` for import sorting, and consumers needing a direct `zod`
+dep.
+
+**Scheduled as concrete follow-ups** (post-M13, the user selected all four):
+
+| ID | Follow-up | Scope |
+|----|-----------|-------|
+| **A** | `junius sync` auto-wiring | `sync` manages `buf.yaml` + runs `buf generate`, and manages the host frontend's `@junius/plugin-<name>` `workspace:*` dep — the two deferred Cluster-A items. Subprocess / format-preserving-edit work; likely its own focused pass. |
+| **B** | `Authz::forget_resource(kind, id)` | Delete-time counterpart to `record_owner` — removes `resource_principal` + `resource_share` in the caller's tx; call it from `EventRepo::delete`. Closes the orphaned-ACL-rows gap. |
+| **C** | `User::has_permission_in_group(group, perm)` | SDK helper for group-scoped authorization (events hand-rolls it in `require_group_write`). Pairs with the group-ownership access rule. |
+| **D** | Blessed public-handler + nav affordances | SDK `Ctx::public()` (no-permission-witness context) and a `usePluginNavigate`/`PluginLink` for type-erased plugin sub-routes, so every plugin doesn't re-roll the escape hatches. |
+
+**Decided, no further action:** `Groups::by_name` stays id-canonical (group names
+intentionally non-unique); `GetPersonalFeed` minting a fresh key per call is
+acceptable (keys are hashed-at-rest) and documented; the FE `requirePermissions`
+no-op is M14/hardening territory (M13 correctly gates on server `viewerCanEdit`).
