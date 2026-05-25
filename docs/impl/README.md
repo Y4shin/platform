@@ -17,7 +17,7 @@ Status legend: ✅ implemented · 🚧 planned · ⏳ in progress.
 | **M04** | ✅ | [Frontend shell](05-M04-frontend-shell.md) | React/TanStack shell, `buildRoutes`, Vite, `rust-embed`, `junius dev` | `junius dev` renders `/p/hello` in a browser |
 | **M05** | ✅ | [Connect-RPC](06-M05-connect-rpc.md) | proto + buf + hand-rolled Connect unary server + connect-query end-to-end | `/p/hello` shows server response via `useQuery` |
 | **M06** | ✅ | [DB + auth](07-M06-db-auth.md) | Postgres, host migrations, per-plugin roles, OIDC, sessions, typed plugin config/secrets | Log in via Authentik; `GET /api/me` returns user |
-| **M07** | 🚧 | [Repos + permissions](08-M07-repos-permissions.md) | `#[derive(Repository)]`, `Has<X>`, `#[derive(PluginCtx)]`, RPC `requires` enforcement | Compile-fail test rejects writes without the permission |
+| **M07** | ✅ | [Repos + permissions](08-M07-repos-permissions.md) | `#[repository]`, `Has<X>`, `#[derive(PluginCtx)]`, RPC `requires` enforcement | Compile-fail test rejects writes without the permission |
 | **M08** | 🚧 | [Resource access](09-M08-resource-access.md) | `resource_principal`/`resource_share` recording, `viewerCanX` flags | User A's private note invisible to B until shared |
 | **M09** | 🚧 | [Cross-plugin](10-M09-cross-plugin.md) | Required + optional inter-plugin deps; component registry; narrow RPC namespaces | Disabling `widgets` degrades the page gracefully |
 | **M10** | 🚧 | [Infra capabilities](11-M10-infra-capabilities.md) | Jobs (apalis), Storage (S3), Email (lettre), Telemetry (OTel) | Job dispatched from RPC runs and sends an email |

@@ -353,7 +353,7 @@ fn render_rpc_requires_rs(plugins: &[ResolvedPlugin]) -> String {
 }
 
 /// Recursively collect `*.proto` files under `dir`.
-fn collect_proto_files(dir: &Path, out: &mut Vec<PathBuf>) {
+pub(crate) fn collect_proto_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(read) = std::fs::read_dir(dir) else {
         return;
     };
@@ -375,7 +375,7 @@ fn collect_proto_files(dir: &Path, out: &mut Vec<PathBuf>) {
     clippy::unwrap_used,
     reason = "compile-constant regexes are known-valid"
 )]
-fn scan_proto_requires(content: &str) -> Vec<(String, String, Vec<String>)> {
+pub(crate) fn scan_proto_requires(content: &str) -> Vec<(String, String, Vec<String>)> {
     let package = regex::Regex::new(r"(?m)^\s*package\s+([\w.]+)\s*;")
         .unwrap()
         .captures(content)

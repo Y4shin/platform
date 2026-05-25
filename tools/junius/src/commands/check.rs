@@ -104,8 +104,53 @@ fn resolve_manifest_path(args: &CheckArgs) -> Result<Option<PathBuf>, i32> {
 
 fn check_plugin(path: &Path, src: &str, format: OutputFormat) -> i32 {
     match PluginManifest::parse(src) {
-        Ok(manifest) => report(path, src, &manifest.validate(), format),
+        Ok(manifest) => {
+            let mut validation = manifest.validate();
+            check_proto_requires(path, &manifest, &mut validation);
+            report(path, src, &validation, format)
+        }
         Err(e) => emit_parse_error(path, src, &e, format),
+    }
+}
+
+/// Validate that every `option (platform.v1.requires)` in the plugin's `.proto`
+/// files names a permission the plugin declares in `[permissions]`. (Rust gets
+/// this for free via the typed permission markers; proto strings need an
+/// explicit check.) Best-effort: skips if the `proto/` dir isn't a sibling.
+fn check_proto_requires(
+    plugin_toml: &Path,
+    manifest: &PluginManifest,
+    validation: &mut ValidationReport,
+) {
+    let proto_dir = plugin_toml
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("proto");
+    let mut files = Vec::new();
+    crate::commands::sync::collect_proto_files(&proto_dir, &mut files);
+    files.sort();
+
+    let declared: std::collections::BTreeSet<&str> =
+        manifest.permissions.keys().map(String::as_str).collect();
+
+    for file in files {
+        let Ok(content) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        for (service, method, perms) in crate::commands::sync::scan_proto_requires(&content) {
+            for perm in perms {
+                if !declared.contains(perm.as_str()) {
+                    validation.issues.push(ValidationIssue {
+                        severity: Severity::Error,
+                        code: "PROTO.REQUIRES.UNDECLARED",
+                        path: format!("{service}/{method}"),
+                        message: format!(
+                            "permission \"{perm}\" required by RPC but not declared in [permissions]"
+                        ),
+                    });
+                }
+            }
+        }
     }
 }
 

@@ -1,6 +1,35 @@
 # M07 — Repository Pattern + Typed Permissions + `PluginCtx` Derive
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Done.
+>
+> **Implementation notes / deviations from the sketch below** (the design predates
+> the M06.5 connectrpc re-platform; the shipped shape is):
+> - **`Has<X>` carries an inferred index param** (`Has<X, Idx>`, the HList
+>   membership encoding) so the recursive impls stay coherent on stable Rust;
+>   `#[impl_repository]` injects the index per method so authors still write
+>   `impl<P: Has<HelloRead>>`. Witnesses are right-nested `And` chains terminated
+>   by `()` (`permissions!(A & B)` → `And<A, And<B, ()>>`).
+> - **`Repository` is the `#[repository]` *attribute* macro**, not a derive — a
+>   derive can't inject the `db`/`user`/`audit` fields. `new` takes a third
+>   `AuditEmitter` arg so writes can record events.
+> - **The repo guardrail is layered, not a hard seal**: `PluginDb` is opaque and
+>   the `ScopedDb`/`RepoPool` bridge is `#[doc(hidden)]`; `junius check`'s
+>   `PROTO.REQUIRES.UNDECLARED` + the type-hiding (trybuild-proven) are the
+>   enforcement. Runtime `query_as`/`QueryBuilder` are allowed for dynamic SQL
+>   alongside the default compile-time `query!`; `.sqlx/` is committed and CI runs
+>   `SQLX_OFFLINE=true`.
+> - **`#[derive(PluginCtx)]` emits a local `BuildState` impl**; the
+>   `FromRequestParts` extractor is one blanket impl in `junius-sdk` (the orphan
+>   rule forbids implementing the foreign trait for the foreign `PluginContext` in
+>   the plugin crate).
+> - **RPC**: connectrpc fixes the generated handler signature, so handlers build
+>   `Ctx<P>` in-body via `PluginContext::from_rpc(&RequestContext)`. Enforcement
+>   is a host axum `from_fn` guard over `/rpc` reading a `junius sync`-generated
+>   `(service, method) → perms` table (`platform/src/generated/rpc_requires.rs`) —
+>   not a connectrpc interceptor (buffa exposes no runtime method-option
+>   reflection). The conservative source-scan `junius check` rules (single
+>   `plugin_metadata!()`, `sqlx` outside `#[impl_repository]`) are deferred as
+>   redundant with the compile-time guarantees.
 
 ## Goal
 
