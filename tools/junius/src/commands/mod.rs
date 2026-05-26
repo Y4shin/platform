@@ -10,6 +10,8 @@ pub mod migrate;
 #[cfg(feature = "develop")]
 pub mod new;
 pub mod plugin_cmd;
+#[cfg(feature = "develop")]
+pub mod rpc_scaffold;
 // `sync` stays compiled even without `develop`: `build` (and, in M11, `plugin
 // enable/disable`) reuse its composition-glue generation. Only the `sync`
 // subcommand entry point is gated.

@@ -46,6 +46,9 @@ petgraph = { workspace = true }
 sqlparser = { workspace = true, features = ["visitor"] }
 # M12: parse plugin Rust source to pull SQL out of sqlx `query*!` macros.
 syn = { workspace = true, features = ["visit"] }
+# M15 `junius rpc scaffold`: stringify ctx-parameter type fragments without
+# adding a custom Display walker.
+quote = { workspace = true }
 
 # Source resolution (M11): blake3 content hashes for platform.lock.
 blake3 = { workspace = true }

@@ -75,6 +75,35 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: I18nCmd,
     },
+    /// `#[rpc_service]` codemods (M15). Source-tree-only.
+    #[cfg(feature = "develop")]
+    Rpc {
+        #[command(subcommand)]
+        subcommand: RpcCmd,
+    },
+}
+
+#[cfg(feature = "develop")]
+#[derive(Subcommand, Debug)]
+pub enum RpcCmd {
+    /// Insert a `todo!()` stub for every proto method missing from its
+    /// `#[rpc_service]` impl block. Idempotent — a second run is a no-op.
+    Scaffold(RpcScaffoldArgs),
+}
+
+#[cfg(feature = "develop")]
+#[derive(clap::Args, Debug)]
+pub struct RpcScaffoldArgs {
+    /// Plugin name (matches `plugins/<name>/`). Scaffolds every service in
+    /// the plugin's proto.
+    #[arg(long)]
+    pub plugin: String,
+
+    /// Report missing stubs without writing. Exits 1 if any are missing,
+    /// 0 if every proto method already has a handler. `junius check`'s
+    /// `RPC.SERVICE.UNIMPLEMENTED` invokes this in `--check` mode.
+    #[arg(long)]
+    pub check: bool,
 }
 
 #[derive(clap::Args, Debug)]
