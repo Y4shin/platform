@@ -318,7 +318,149 @@ on the next poll. Minting/publishing a *group* feed additionally requires
 
 ---
 
-## 12. Regenerate, check, and the CI gate
+## 12. Internationalization (i18n)
+
+Every user-facing string goes through a catalog so the platform can render in
+the viewer's locale. There are two catalog flavours: **backend** strings (emails,
+iCalendar, errors) use a key-based gettext `.po` with typed-codegen messages;
+**frontend** strings use Lingui's source-string-as-msgid convention. Both
+formats are `.po`; tooling is `junius i18n`.
+
+### Backend catalog (one per plugin)
+
+Add `i18n/en.po` (and any other shipped locales: `de.po`, `pseudo.po`) under
+your plugin root. msgid is a stable key (`events.signup.email.subject`); msgstr
+is the source-language template with `{placeholder}` substitutions:
+
+```
+msgid "events.signup.email.subject"
+msgstr "You're signed up for {title}"
+```
+
+Wire the codegen into your `build.rs`:
+
+```rust
+junius_i18n_build::generate(junius_i18n_build::Options::new("<plugin-name>"))?;
+```
+
+Then in `src/lib.rs`:
+
+```rust
+junius_sdk::i18n_catalog!();   // includes the codegen'd `messages` + `catalog`
+
+#[async_trait]
+impl Plugin for MyPlugin {
+    // …
+    fn register_i18n(&self, b: &mut junius_sdk::LocalizerBuilder) {
+        catalog::register(b);
+    }
+}
+```
+
+`junius_sdk::i18n_catalog!()` emits one typed struct per msgid with one
+`&str` field per `{placeholder}`. Calling code renders against the recipient's
+locale through `Localizer::for_stored(...)` or `for_request(...)`:
+
+```rust
+let l = ctx.localizer.for_stored(job.recipient_locale.as_deref());
+let subject = l.t(messages::EventsSignupEmailSubject { title: &event.title });
+```
+
+Missing placeholder → compile error. Misspelled key → compile error. Translator
+typo in a `de.po` msgstr (introduced a placeholder en doesn't have) → build
+error with file:line spans.
+
+### Recipient locale on jobs
+
+For work that runs outside a request (jobs, `.ics` feeds), capture the locale at
+**enqueue time** and carry it through the job payload:
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct SendSignupConfirmation {
+    // … other fields …
+    #[serde(default)]
+    pub recipient_locale: Option<String>,
+}
+
+// At enqueue:
+let job = SendSignupConfirmation {
+    recipient_locale: user.locale.clone(),  // from the request-scoped User
+    // …
+};
+```
+
+`None` falls back to the deployment default. The worker resolves through
+`ctx.localizer.for_stored(...)`.
+
+### RPC errors → codes, not English
+
+Don't send English error strings — they bypass the catalog. Use a stable
+`<plugin>.error.<code>` ID as the `ConnectError` message; the FE has a small
+mapping hook that translates them. See `plugins/events/src/lib.rs` (`mod err`)
+and `plugins/events/frontend/src/errors.ts` (`useEventsError`) for the pattern.
+Codes with arguments encode them after a `:` (e.g.
+`events.error.field_required:title`).
+
+### Frontend catalog (one per plugin frontend)
+
+Wrap user-facing strings with Lingui macros imported from
+`@lingui/react/macro` directly (the SDK can't re-export them — the babel plugin
+only transforms calls whose import source it recognises):
+
+```tsx
+import { Trans, useLingui } from '@lingui/react/macro';
+
+export function EventsListPage() {
+  const { t } = useLingui();
+  return (
+    <h1><Trans>Events</Trans></h1>
+    // For props that need plain strings (placeholders, aria-labels):
+    <Input placeholder={t`Filter events…`} />
+  );
+}
+```
+
+Expose a `loadI18n` from your plugin's `src/index.ts`:
+
+```ts
+/// <reference types="vite/client" />
+import type { CatalogLoader } from '@junius/sdk';
+const catalogs = import.meta.glob<{ messages: Record<string, string> }>('./i18n/*.po');
+export const loadI18n: CatalogLoader = async (locale) => {
+  const importer = catalogs[`./i18n/${locale}.po`];
+  return importer ? importer() : { messages: {} };
+};
+```
+
+`junius sync` automatically picks this up — your plugin appears in
+`platform/frontend/src/generated/i18n-catalogs.ts` and the host wires it into
+`<I18nProvider catalogs={...}>`.
+
+For Zod schema messages: build the schema inside the component (via
+`useMemo` on `t`) so error strings flow through the active locale.
+
+### Extract, translate, check
+
+```bash
+junius i18n extract           # scan source → update each <plugin>/frontend/i18n/<locale>.po
+junius i18n check             # validate every catalog (BE + FE) parses + has translations
+junius i18n check --check-drift   # CI mode: also fail if extract would change anything
+```
+
+Translators edit `*.po` files; vitest + Playwright catch unwrapped strings via
+the pseudo-locale gate (a diacritic-substituted form of every msgid renders in
+place of the source — any plain English under pseudo is a regression).
+
+### iCalendar caveat
+
+iCalendar (`PRODID`) is non-translatable RFC 5545 metadata — leave it as the
+English string. User-entered event data (title, description, location) is
+pass-through and doesn't need wrapping.
+
+---
+
+## 13. Regenerate, check, and the CI gate
 
 After changing schema/queries/proto/manifest:
 
