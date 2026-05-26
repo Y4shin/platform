@@ -194,7 +194,7 @@ msgstr "Bitte melde dich an."
 msgid "Sign up"
 msgstr "Anmelden"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:127
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:125
 msgid "Sign-up is closed."
 msgstr "Die Anmeldung ist geschlossen."
 

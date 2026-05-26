@@ -157,10 +157,11 @@ tasks:
       - cd examples/example-deployment && ../../target/release/junius build --check-config
 
   ci:i18n:
-    desc: M14 fifth job — validate every plugin + host i18n catalog (`junius i18n check`) + pseudo gate.
+    desc: M14 fifth job — full i18n gate (BE + FE catalogs, drift, pseudo).
     cmds:
-      # 1. BE catalog validation (parse + schema + placeholder agreement).
-      - cargo run -q -p junius -- i18n check --config {{.CONFIG}}
+      # 1. BE + FE catalog validation + extract-drift gate (`--check-drift`
+      #    runs `lingui extract` and fails if catalogs need re-extracting).
+      - cargo run -q -p junius -- i18n check --config {{.CONFIG}} --check-drift
       # 2. Compile FE catalogs so the pseudo `.js` is fresh before the gate.
       - pnpm exec lingui compile
       # 3. FE pseudo-catalog completeness gate (every msgid → diacritic'd literal).

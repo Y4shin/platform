@@ -31,7 +31,7 @@
 //! placeholder set — a translator-introduced extra placeholder is a build error.
 
 mod codegen;
-mod po;
+pub mod po;
 
 use std::path::{Path, PathBuf};
 

@@ -197,13 +197,16 @@ pub enum PluginCmd {
 
 #[derive(Subcommand, Debug)]
 pub enum I18nCmd {
-    /// Validate every enabled plugin's `i18n/*.po` catalogs: parse, schema
-    /// agreement against `en.po`, and translator-introduced placeholders.
-    /// Returns non-zero on the first failure with <file:line> spans.
+    /// Validate every enabled plugin's `i18n/*.po` catalogs (BE key-based
+    /// + FE Lingui-format) and optionally fail on extract-drift.
     Check {
         /// Path to platform.toml. Defaults to ./platform.toml.
         #[arg(long)]
         config: Option<PathBuf>,
+        /// Also run `lingui extract` and fail if it changes any FE `.po`
+        /// file (catalog has drifted from source). Used in CI; off locally.
+        #[arg(long)]
+        check_drift: bool,
     },
     /// Run `lingui extract` to scan frontend source for `t` / `<Trans>` calls
     /// and update each package's `i18n/<locale>.po`. Wraps the Lingui CLI so

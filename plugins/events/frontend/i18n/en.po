@@ -194,7 +194,7 @@ msgstr "Sign in to continue."
 msgid "Sign up"
 msgstr "Sign up"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:127
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:125
 msgid "Sign-up is closed."
 msgstr "Sign-up is closed."
 
