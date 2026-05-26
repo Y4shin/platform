@@ -102,6 +102,11 @@ pub struct ResolvedConfig {
     /// `junius dev` it points at the Vite origin (`:5173`) so the whole login
     /// round-trip — including the callback — flows through the single dev origin.
     pub oidc_redirect_url: Option<String>,
+    /// Deployment-wide default locale code (e.g. `"en"`, `"de"`). Consumed by
+    /// the host's `LocaleResolver` as the fallback when neither the user's
+    /// stored preference nor `Accept-Language` yields a known locale. Defaults
+    /// to `"en"` when absent.
+    pub default_locale: Option<String>,
 
     // --- M10 infra sections (all optional; absent = capability unconfigured) ---
     /// `[config.jobs]` — message-broker connection for the job queue.
@@ -168,6 +173,7 @@ pub fn resolve_config(
         role_password_secret: required(raw, "role_password_secret", lookup)?,
         bind_addr: optional(raw, "bind_addr", lookup)?,
         oidc_redirect_url: optional(raw, "oidc_redirect_url", lookup)?,
+        default_locale: optional(raw, "default_locale", lookup)?,
         jobs: parse_jobs(&cfg, dyn_lookup)?,
         job_workers: parse_job_workers(&cfg),
         email: parse_email(&cfg, dyn_lookup)?,
@@ -272,5 +278,25 @@ mod tests {
         assert_eq!(cfg.database_url, "postgres://x");
         assert_eq!(cfg.bind_addr, None);
         assert_eq!(cfg.oidc_redirect_url, None);
+        assert_eq!(cfg.default_locale, None);
+    }
+
+    #[test]
+    fn resolve_config_reads_default_locale() {
+        let env = |_: &str| None;
+        let mut raw = BTreeMap::new();
+        for (k, v) in [
+            ("database_url", "postgres://x"),
+            ("oidc_issuer", "http://localhost:9000/"),
+            ("oidc_client_id", "platform"),
+            ("oidc_client_secret", "shh"),
+            ("session_encryption_key", "literalkey"),
+            ("role_password_secret", "rolesecret"),
+            ("default_locale", "de"),
+        ] {
+            raw.insert(k.into(), toml::Value::from(v));
+        }
+        let cfg = resolve_config(&raw, &env).unwrap();
+        assert_eq!(cfg.default_locale.as_deref(), Some("de"));
     }
 }

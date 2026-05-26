@@ -56,6 +56,7 @@ async fn seed_user(pool: &PgPool, sub: &str) -> User {
         id: UserId(id),
         email: format!("{sub}@local"),
         display_name: sub.to_string(),
+        locale: None,
         memberships: vec![],
     }
 }

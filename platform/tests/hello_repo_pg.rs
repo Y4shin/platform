@@ -60,6 +60,7 @@ async fn repo_create_list_get_and_audit() {
         id: UserId(user_id),
         email: "bob@local".into(),
         display_name: "Bob".into(),
+        locale: None,
         memberships: vec![],
     };
 

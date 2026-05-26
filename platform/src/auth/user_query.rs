@@ -14,7 +14,7 @@ pub async fn load_user_by_session(
     session_id: Uuid,
 ) -> Result<Option<User>, sqlx::Error> {
     let Some(row) = sqlx::query(
-        "SELECT u.id, u.email, u.display_name \
+        "SELECT u.id, u.email, u.display_name, u.locale \
          FROM platform.session s \
          JOIN platform.user u ON u.id = s.user_id \
          WHERE s.id = $1 AND s.expires_at > now()",
@@ -31,6 +31,7 @@ pub async fn load_user_by_session(
         id: UserId(user_id),
         email: row.get("email"),
         display_name: row.get("display_name"),
+        locale: row.get("locale"),
         memberships: load_memberships(pool, user_id).await?,
     }))
 }

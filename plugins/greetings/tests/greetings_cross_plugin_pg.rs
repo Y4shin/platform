@@ -79,6 +79,7 @@ async fn greeting_repo_reads_hello_template_cross_plugin() {
         id: UserId(user_id),
         email: "amy@local".into(),
         display_name: "Amy".into(),
+        locale: None,
         memberships: vec![],
     };
 

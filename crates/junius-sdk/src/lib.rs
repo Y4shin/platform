@@ -12,6 +12,7 @@ pub mod context;
 pub mod db;
 pub mod email;
 pub mod error;
+pub mod i18n;
 pub mod jobs;
 pub mod metadata;
 pub mod permissions;
@@ -38,6 +39,7 @@ pub use config::PluginConfig;
 pub use db::PluginDb;
 pub use email::{Attachment, Email, EmailMessage, Transport, TransportError};
 pub use error::{PluginError, RepoError};
+pub use i18n::{Locale, LocaleResolver};
 pub use jobs::{Job, JobBackend, JobEnvelope, JobError, JobHandler, Jobs};
 pub use metadata::{
     DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,

@@ -27,6 +27,7 @@ const HOST_MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0008_authz_functions.up.sql"),
     include_str!("../migrations/0009_job_run.up.sql"),
     include_str!("../migrations/0010_object.up.sql"),
+    include_str!("../migrations/0011_user_locale.up.sql"),
 ];
 
 /// A standalone logical-bucket marker (the macro generates these per plugin).

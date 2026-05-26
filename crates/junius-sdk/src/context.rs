@@ -276,6 +276,7 @@ mod tests {
             id: UserId(uuid::Uuid::nil()),
             email: "u@example.com".into(),
             display_name: "U".into(),
+            locale: None,
             memberships: vec![Membership {
                 group_id: GroupId(uuid::Uuid::nil()),
                 group_name: "G".into(),

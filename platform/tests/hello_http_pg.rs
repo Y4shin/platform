@@ -39,6 +39,7 @@ fn user_with(perms: &[&str]) -> User {
         id: UserId(Uuid::nil()),
         email: "u@example.com".into(),
         display_name: "U".into(),
+        locale: None,
         memberships: vec![Membership {
             group_id: GroupId(Uuid::nil()),
             group_name: "G".into(),

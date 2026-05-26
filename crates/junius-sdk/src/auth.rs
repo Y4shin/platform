@@ -78,6 +78,10 @@ pub struct User {
     pub id: UserId,
     pub email: String,
     pub display_name: String,
+    /// Persisted locale preference (e.g. `"en"`, `"de"`). `None` falls back to
+    /// `Accept-Language` and then the deployment default. See
+    /// [`crate::i18n::LocaleResolver`].
+    pub locale: Option<String>,
     pub memberships: Vec<Membership>,
 }
 
