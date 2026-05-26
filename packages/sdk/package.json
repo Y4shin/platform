@@ -13,19 +13,24 @@
     "test": "vitest run"
   },
   "peerDependencies": {
+    "@lingui/core": "^5.0.0",
+    "@lingui/react": "^5.0.0",
+    "@tanstack/react-router": "^1.95.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@tanstack/react-router": "^1.95.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@lingui/core": "^5.9.5",
+    "@lingui/macro": "^5.9.5",
+    "@lingui/react": "^5.9.5",
+    "@tanstack/react-router": "^1.95.0",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "jsdom": "^25.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@tanstack/react-router": "^1.95.0",
-    "vitest": "^2.1.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.5.0",
-    "jsdom": "^25.0.0"
+    "vitest": "^2.1.0"
   }
 }

@@ -1,5 +1,6 @@
 import { Stack } from '@junius/design';
 import { useUser } from '@junius/sdk';
+import { Trans } from '@lingui/react/macro';
 import type { ReactNode } from 'react';
 
 import { LocaleSwitcher } from './LocaleSwitcher.js';
@@ -15,11 +16,14 @@ export function Shell({ children }: ShellProps) {
     <div className="flex min-h-full flex-col">
       <header className="border-border bg-surface-1 border-b px-4 py-3">
         <Stack direction="row" gap="md" className="items-center justify-between">
+          {/* The brand name is intentionally not translated. */}
           <strong className="text-base">Junius</strong>
           <NavLinks />
           <Stack direction="row" gap="sm" className="items-center">
             <LocaleSwitcher />
-            <span className="text-fg-2 text-sm">{user?.displayName ?? 'Anonymous'}</span>
+            <span className="text-fg-2 text-sm">
+              {user?.displayName ?? <Trans>Anonymous</Trans>}
+            </span>
           </Stack>
         </Stack>
       </header>

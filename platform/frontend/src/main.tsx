@@ -1,8 +1,10 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
+import { loadI18n as loadHelloI18n } from '@junius/plugin-hello';
 import {
   AuthProvider,
+  type CatalogLoader,
   ComponentRegistryProvider,
   goToLoginUnlessPublic,
   I18nProvider,
@@ -13,6 +15,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { componentRegistry } from './generated/component-registry.js';
 import { PUBLIC_ROUTE_PREFIXES, routeTree } from './generated/routes.js';
+import { loadShellI18n } from './i18n.js';
+
+// Lingui catalog loaders, one per participating package. Hand-listed for now;
+// `junius sync` will codegen this array against the deployment's plugin list
+// in a follow-up (the same way it owns routes + the component registry).
+const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n, loadHelloI18n];
 
 import './styles.css';
 
@@ -52,7 +60,7 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <AuthProvider publicPaths={PUBLIC_ROUTE_PREFIXES}>
-      <I18nProvider>
+      <I18nProvider catalogs={I18N_CATALOGS}>
         <QueryClientProvider client={queryClient}>
           <TransportProvider transport={transport}>
             <ComponentRegistryProvider registry={componentRegistry}>

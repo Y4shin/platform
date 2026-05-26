@@ -18,6 +18,34 @@ use crate::exit;
 pub fn run(cmd: &I18nCmd, _format: OutputFormat) -> i32 {
     match cmd {
         I18nCmd::Check { config } => check(config.as_deref()),
+        I18nCmd::Extract { clean } => extract(*clean),
+    }
+}
+
+/// Run `pnpm exec lingui extract` against the workspace. Lingui reads
+/// `lingui.config.cjs` for the catalog set, walks each catalog's source
+/// roots, and rewrites the corresponding `i18n/*.po`. Plugin authors invoke
+/// this via `junius i18n extract` so they don't need Lingui CLI knowledge —
+/// the wrapper means a future library swap stays in this file.
+fn extract(clean: bool) -> i32 {
+    let mut cmd = std::process::Command::new("pnpm");
+    cmd.args(["exec", "lingui", "extract"]);
+    if clean {
+        cmd.arg("--clean");
+    }
+    match cmd.status() {
+        Ok(status) if status.success() => exit::OK,
+        Ok(status) => {
+            eprintln!(
+                "junius: i18n: extract failed (lingui exit {})",
+                status.code().unwrap_or(-1)
+            );
+            exit::VALIDATION
+        }
+        Err(e) => {
+            eprintln!("junius: i18n: cannot spawn pnpm: {e}");
+            exit::PARSE_ERROR
+        }
     }
 }
 

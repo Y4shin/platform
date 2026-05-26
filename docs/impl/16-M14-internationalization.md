@@ -1,22 +1,29 @@
 # M14 — Internationalization
 
-> **Status:** ⏳ Seam landed; full retrofit + Lingui FE integration in progress.
+> **Status:** ⏳ Seam + Lingui FE integration landed; retrofit of the other
+> three plugins is the remaining work.
 >
-> Stages A–E + the CI gate (Stage F.1) shipped: the host-side locale storage,
-> the typed-codegen backend localizer, the library-agnostic FE seam, the
-> `junius i18n check` command, and an end-to-end retrofit of the `hello`
-> plugin. Deferred for follow-up commits:
+> Stages A–F shipped (locale storage, typed-codegen backend localizer, FE
+> locale seam + persistence, `junius i18n check` + CI gate, end-to-end
+> retrofit of `hello`). Stage G then layered Lingui v5 on top of the seam:
+> the host shell + the hello plugin frontend use `t` / `<Trans>` / `useLingui`
+> from `@lingui/react/macro` (the macros must be imported from a Lingui-
+> recognised path; the SDK re-exports the runtime `i18n` singleton +
+> `useLingui` + the `I18nProvider`). `junius i18n extract` wraps Lingui's
+> CLI; `@lingui/vite-plugin` compiles `.po` → JS on demand. The locale
+> switcher round-trips: English ↔ German.
 >
-> - **Lingui** integration on the FE (the `t`/`<Trans>` re-exports). Stage C
->   shipped the locale Context + persistence; plugins still ship plain English
->   in their TSX until Lingui lands. The seam in `@junius/sdk` stays stable.
-> - **Other plugins' retrofit** (`greetings`, `widgets`, `events`). The
->   pattern hello uses (build.rs + `i18n_catalog!()` + `register_i18n`) is
->   the template; each plugin's strings move at its own pace.
-> - **`junius i18n extract`** for TS/TSX. Currently only `check` is
->   implemented; extraction is a Lingui-driven follow-up.
-> - **Playwright locale-switch E2E**. The dev stack already has the wiring
->   to support it; we'll add a spec once the FE retrofit lands.
+> Remaining follow-ups:
+>
+> - **`greetings` / `widgets` / `events` retrofit** — both BE (build.rs +
+>   `i18n_catalog!()` + `register_i18n`) and FE (Lingui macros + per-plugin
+>   `loadI18n` loader + `.po` files). The hello plugin is the worked example.
+> - **`junius sync` codegen for FE catalogs**: the host's `main.tsx` hand-lists
+>   the catalog-loader array today; it should generate the same way
+>   `generated/routes.ts` does.
+> - **Playwright locale-switch spec** runs under `JUNIUS_E2E=1` against the
+>   live dev stack ([e2e/locale.spec.ts](../../e2e/locale.spec.ts)); a
+>   CI-default unattended version is a future enhancement.
 
 ## Goal
 

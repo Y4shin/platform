@@ -1,3 +1,4 @@
+import { lingui } from '@lingui/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -8,7 +9,20 @@ import { defineConfig } from 'vite';
 const BACKEND = 'http://127.0.0.1:18080';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    // `@lingui/vite-plugin` does two things:
+    // 1. Transforms `t`/`Trans` macro calls at build time (via babel-plugin-lingui).
+    //    `@vitejs/plugin-react` must be told to apply the babel macros plugin.
+    // 2. Lets us `import { messages } from '@junius/plugin-hello/i18n/de.po'`
+    //    in the host shell — the plugin compiles `.po` to a JS module on demand.
+    lingui(),
+    react({
+      babel: {
+        plugins: ['@lingui/babel-plugin-lingui-macro'],
+      },
+    }),
+    tailwindcss(),
+  ],
   server: {
     port: 5173,
     proxy: {

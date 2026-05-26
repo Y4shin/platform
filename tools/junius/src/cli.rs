@@ -205,6 +205,15 @@ pub enum I18nCmd {
         #[arg(long)]
         config: Option<PathBuf>,
     },
+    /// Run `lingui extract` to scan frontend source for `t` / `<Trans>` calls
+    /// and update each package's `i18n/<locale>.po`. Wraps the Lingui CLI so
+    /// plugin authors don't need to know it directly.
+    Extract {
+        /// Pass `--clean` to drop catalog entries no longer referenced in
+        /// source. Off by default to match `pnpm exec lingui extract`.
+        #[arg(long)]
+        clean: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]

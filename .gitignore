@@ -32,3 +32,9 @@ Thumbs.db
 
 # direnv local cache (nix flake materialisations)
 .direnv/
+
+# Lingui compile output. `pnpm exec lingui compile` (and the
+# `@lingui/vite-plugin` during dev) writes one `<locale>.js` next to each
+# `<locale>.po`; only the `.po` source is committed. Dev/CI regenerate the
+# `.js` files on demand.
+**/i18n/*.js

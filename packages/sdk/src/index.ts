@@ -9,8 +9,14 @@ export {
 } from './auth/AuthProvider.js';
 export { useIsAuthenticated } from './auth/useIsAuthenticated.js';
 export { useCurrentUser, useUser } from './auth/useUser.js';
-export type { I18nProviderProps, LocaleCode } from './i18n/index.js';
-export { I18nProvider, SUPPORTED_LOCALES, useLocale } from './i18n/index.js';
+export type { CatalogLoader, I18nProviderProps, LocaleCode } from './i18n/index.js';
+export {
+  I18nProvider,
+  i18n,
+  SUPPORTED_LOCALES,
+  useLingui,
+  useLocale,
+} from './i18n/index.js';
 export { requirePermissions } from './permissions/requirePermissions.js';
 
 export {
