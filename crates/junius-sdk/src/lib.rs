@@ -26,7 +26,7 @@ pub mod storage;
 pub mod telemetry;
 
 pub use junius_sdk_macros::{
-    PluginCtx, i18n_catalog, impl_repository, permissions, plugin_metadata, repository,
+    PluginCtx, i18n_catalog, impl_repository, permissions, plugin_metadata, repository, rpc_service,
 };
 
 pub use authz::{Authz, Principal, ShareRecord};

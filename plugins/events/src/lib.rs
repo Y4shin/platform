@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::{Router, routing::get};
-use connectrpc::{ConnectError, Encodable, RequestContext, Response, ServiceResult};
+use connectrpc::{ConnectError, Encodable, Response, ServiceResult};
 use junius_sdk::{
     EmailMessage, GroupId, Job, JobHandler, Plugin, PluginContext, PluginCtx, PluginError,
     PluginMetadata, PluginResources, Principal, UserId,
@@ -49,7 +49,6 @@ pub mod repo;
 use chrono::{DateTime, Utc};
 
 use crate::domain::{EventId, FeedKind, OwnerKind, Visibility, generate_feed_key, hash_token};
-use crate::permissions::{EventsRead, EventsShare, EventsWrite};
 use crate::repo::{
     CalendarRepo, EventRepo, EventUpdate, EventView, Invite, InviteConfig, InvitePage, InviteRepo,
     NewEvent, SignupRepo, SignupRow, TokenInfo,
@@ -101,19 +100,20 @@ impl Default for EventsPlugin {
     }
 }
 
-/// Connect-RPC implementation of `events.v1.EventService`. Each handler builds a
-/// typed `EventCtx<P>` from the request context (`from_rpc`), which re-checks the
-/// witness and yields the permission-gated repository; the host's RPC guard also
-/// enforces each method's `(platform.v1.requires)` before the handler runs.
+/// Connect-RPC implementation of `events.v1.EventService`. The `#[rpc_service]`
+/// macro rewrites each handler into the shape the `connectrpc` trait expects:
+/// the ctx parameter's witness alias resolves to the proto method's
+/// `(platform.v1.requires)` set, the macro prepends the `from_rpc` resolution,
+/// and the host's RPC guard enforces the same set pre-dispatch.
 struct EventRpc;
 
-impl EventService for EventRpc {
+#[junius_sdk::rpc_service(EventService)]
+impl EventRpc {
     async fn list_events(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::ListEvents>,
         _request: OwnedListEventsRequestView,
     ) -> ServiceResult<impl Encodable<pb::ListEventsResponse>> {
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let events = ectx.state.events.list().await?;
         Ok(Response::new(pb::ListEventsResponse {
             events: events.into_iter().map(event_to_proto).collect(),
@@ -123,11 +123,10 @@ impl EventService for EventRpc {
 
     async fn get_event(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::GetEvent>,
         request: OwnedGetEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::GetEventResponse>> {
         let id = EventId(parse_uuid(request.id, "id")?);
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let event = ectx.state.events.get(id).await?;
         Ok(Response::new(pb::GetEventResponse {
             event: Some(event_to_proto(event)).into(),
@@ -137,10 +136,9 @@ impl EventService for EventRpc {
 
     async fn create_event(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::CreateEvent>,
         request: OwnedCreateEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let caller = ectx
             .user
             .as_ref()
@@ -183,11 +181,10 @@ impl EventService for EventRpc {
 
     async fn update_event(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::UpdateEvent>,
         request: OwnedUpdateEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::UpdateEventResponse>> {
         let id = EventId(parse_uuid(request.id, "id")?);
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let update = EventUpdate {
             title: require_nonempty(request.title, "title")?,
             description: optional(request.description),
@@ -206,23 +203,21 @@ impl EventService for EventRpc {
 
     async fn delete_event(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::DeleteEvent>,
         request: OwnedDeleteEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::DeleteEventResponse>> {
         let id = EventId(parse_uuid(request.id, "id")?);
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         ectx.state.events.delete(id).await?;
         Ok(Response::new(pb::DeleteEventResponse::default()))
     }
 
     async fn share_event(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::event_service::ShareEvent>,
         request: OwnedShareEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::ShareEventResponse>> {
         let event_id = parse_uuid(request.id, "id")?;
         let principal = parse_principal(request.principal_kind, request.principal_id)?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsShare)>::from_rpc(&ctx)?;
         let share = ectx
             .resources
             .authz
@@ -327,19 +322,20 @@ fn parse_principal(kind: &str, id: &str) -> Result<Principal, ConnectError> {
 }
 
 /// Connect-RPC implementation of `events.v1.InviteService`. Owner-side methods
-/// build a permission-gated `EventCtx<P>`; the viewer-side methods build the
-/// **no-witness** `EventCtx<()>` (so anonymous callers reach them) and rely on
-/// the repository's runtime ACL.
+/// resolve to a permission-gated `EventCtx<P>` from their proto-derived alias;
+/// the viewer-side methods (`GetInvite`/`Signup`/`OptOut`) carry no annotation,
+/// so their alias is `()` and anonymous callers reach them — the repository's
+/// runtime ACL gates the data.
 struct InviteRpc;
 
-impl InviteService for InviteRpc {
+#[junius_sdk::rpc_service(InviteService)]
+impl InviteRpc {
     async fn create_invite(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::CreateInvite>,
         request: OwnedCreateInviteRequestView,
     ) -> ServiceResult<impl Encodable<pb::CreateInviteResponse>> {
         let event_id = parse_uuid(request.event_id, "event_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let caller = ectx
             .user
             .as_ref()
@@ -382,11 +378,10 @@ impl InviteService for InviteRpc {
 
     async fn update_invite(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::UpdateInvite>,
         request: OwnedUpdateInviteRequestView,
     ) -> ServiceResult<impl Encodable<pb::UpdateInviteResponse>> {
         let event_id = parse_uuid(request.event_id, "event_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let config = InviteConfig {
             signup_enabled: request.signup_enabled,
             signup_open: request.signup_open,
@@ -406,11 +401,10 @@ impl InviteService for InviteRpc {
 
     async fn list_signups(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::ListSignups>,
         request: OwnedListSignupsRequestView,
     ) -> ServiceResult<impl Encodable<pb::ListSignupsResponse>> {
         let event_id = parse_uuid(request.event_id, "event_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let rows = ectx.state.invites.list_signups(event_id).await?;
         let mut signups = Vec::with_capacity(rows.len());
         for row in rows {
@@ -439,11 +433,10 @@ impl InviteService for InviteRpc {
 
     async fn get_event_invite(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::GetEventInvite>,
         request: OwnedGetEventInviteRequestView,
     ) -> ServiceResult<impl Encodable<pb::GetEventInviteResponse>> {
         let event_id = parse_uuid(request.event_id, "event_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let invite = ectx.state.invites.get_for_event(event_id).await?;
         Ok(Response::new(pb::GetEventInviteResponse {
             has_invite: invite.is_some(),
@@ -454,21 +447,20 @@ impl InviteService for InviteRpc {
 
     async fn get_invite(
         &self,
-        ctx: RequestContext,
+        // No witness — `GetInvite` carries no `(platform.v1.requires)`, so the
+        // alias resolves to `()`. Anonymous callers reach this; the repo gates.
+        ectx: EventCtx<crate::__rpc_requires::invite_service::GetInvite>,
         request: OwnedGetInviteRequestView,
     ) -> ServiceResult<impl Encodable<pb::GetInviteResponse>> {
-        // No witness: anonymous callers reach this; the repo enforces the ACL.
-        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
         let page = ectx.state.invites.get_page_by_slug(request.slug).await?;
         Ok(Response::new(invite_page_to_proto(page)))
     }
 
     async fn signup(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::Signup>,
         request: OwnedSignupRequestView,
     ) -> ServiceResult<impl Encodable<pb::SignupResponse>> {
-        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
         let outcome = ectx
             .state
             .signups
@@ -510,10 +502,9 @@ impl InviteService for InviteRpc {
 
     async fn opt_out(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::invite_service::OptOut>,
         request: OwnedOptOutRequestView,
     ) -> ServiceResult<impl Encodable<pb::OptOutResponse>> {
-        let ectx = EventCtx::<()>::from_rpc(&ctx)?;
         ectx.state.signups.opt_out(request.slug).await?;
         Ok(Response::new(pb::OptOutResponse::default()))
     }
@@ -609,13 +600,13 @@ fn is_unique_violation(e: &sqlx::Error) -> bool {
 /// additionally require the caller to hold `events:write` *within* the group.
 struct CalendarRpc;
 
-impl CalendarService for CalendarRpc {
+#[junius_sdk::rpc_service(CalendarService)]
+impl CalendarRpc {
     async fn get_personal_feed(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::calendar_service::GetPersonalFeed>,
         _request: OwnedGetPersonalFeedRequestView,
     ) -> ServiceResult<impl Encodable<pb::GetPersonalFeedResponse>> {
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let caller = require_caller(ectx.user.as_ref())?;
         // Keys are stored hashed (not recoverable), so each call mints a fresh
         // personal key; old ones remain valid until revoked.
@@ -639,11 +630,10 @@ impl CalendarService for CalendarRpc {
 
     async fn create_group_key(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::calendar_service::CreateGroupKey>,
         request: OwnedCreateGroupKeyRequestView,
     ) -> ServiceResult<impl Encodable<pb::CreateGroupKeyResponse>> {
         let group_id = parse_uuid(request.group_id, "group_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let caller = require_user(ectx.user.as_ref())?;
         require_group_write(caller, group_id)?;
         let key = generate_feed_key();
@@ -672,11 +662,10 @@ impl CalendarService for CalendarRpc {
 
     async fn set_group_public(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::calendar_service::SetGroupPublic>,
         request: OwnedSetGroupPublicRequestView,
     ) -> ServiceResult<impl Encodable<pb::SetGroupPublicResponse>> {
         let group_id = parse_uuid(request.group_id, "group_id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
         let caller = require_user(ectx.user.as_ref())?;
         require_group_write(caller, group_id)?;
         ectx.state
@@ -688,10 +677,9 @@ impl CalendarService for CalendarRpc {
 
     async fn list_feeds(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::calendar_service::ListFeeds>,
         _request: OwnedListFeedsRequestView,
     ) -> ServiceResult<impl Encodable<pb::ListFeedsResponse>> {
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let caller = require_caller(ectx.user.as_ref())?;
         let tokens = ectx.state.calendar.list_tokens(caller.0).await?;
         Ok(Response::new(pb::ListFeedsResponse {
@@ -702,11 +690,10 @@ impl CalendarService for CalendarRpc {
 
     async fn revoke_feed(
         &self,
-        ctx: RequestContext,
+        ectx: EventCtx<crate::__rpc_requires::calendar_service::RevokeFeed>,
         request: OwnedRevokeFeedRequestView,
     ) -> ServiceResult<impl Encodable<pb::RevokeFeedResponse>> {
         let token_id = parse_uuid(request.id, "id")?;
-        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead)>::from_rpc(&ctx)?;
         let caller = require_caller(ectx.user.as_ref())?;
         ectx.state.calendar.revoke_token(token_id, caller.0).await?;
         Ok(Response::new(pb::RevokeFeedResponse::default()))
