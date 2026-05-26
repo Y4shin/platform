@@ -114,3 +114,19 @@ jobs:
       - name: Full deployment build (gated)
         if: ${{ env.JUNIUS_E2E == '1' }}
         run: nix develop --command cargo test -p junius --test build_e2e -- --ignored --nocapture
+
+  # M14: validate every plugin + host i18n catalog (`junius i18n check`). Runs
+  # independently of the other jobs — no DB or container needed. Fails on
+  # missing en.po, schema mismatch, translator-introduced placeholders, or
+  # embedded ICU plural syntax in any catalog.
+  i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: Validate catalogs (task ci:i18n)
+        run: nix develop --command task ci:i18n

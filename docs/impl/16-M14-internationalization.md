@@ -1,9 +1,22 @@
 # M14 — Internationalization
 
-> **Status:** 🚧 Planned — **top priority** (the first milestone after M13).
+> **Status:** ⏳ Seam landed; full retrofit + Lingui FE integration in progress.
 >
-> *(This milestone is scoped at a high level; its **Library choices** are not yet
-> decided. Detail it — like M12/M13 were — before implementing.)*
+> Stages A–E + the CI gate (Stage F.1) shipped: the host-side locale storage,
+> the typed-codegen backend localizer, the library-agnostic FE seam, the
+> `junius i18n check` command, and an end-to-end retrofit of the `hello`
+> plugin. Deferred for follow-up commits:
+>
+> - **Lingui** integration on the FE (the `t`/`<Trans>` re-exports). Stage C
+>   shipped the locale Context + persistence; plugins still ship plain English
+>   in their TSX until Lingui lands. The seam in `@junius/sdk` stays stable.
+> - **Other plugins' retrofit** (`greetings`, `widgets`, `events`). The
+>   pattern hello uses (build.rs + `i18n_catalog!()` + `register_i18n`) is
+>   the template; each plugin's strings move at its own pace.
+> - **`junius i18n extract`** for TS/TSX. Currently only `check` is
+>   implemented; extraction is a Lingui-driven follow-up.
+> - **Playwright locale-switch E2E**. The dev stack already has the wiring
+>   to support it; we'll add a spec once the FE retrofit lands.
 
 ## Goal
 
@@ -66,22 +79,25 @@ surfaces (emails, calendar exports) that a frontend-only shim can't reach.
 - **Locale-specific content authoring** (e.g. per-locale event descriptions entered
   by users) — M14 translates *platform/plugin* strings, not user data.
 
-## Library choices — confirm before starting
+## Library choices — locked in
 
-| Choice | Options | Notes |
+| Choice | Decision | Rationale |
 |---|---|---|
-| **Frontend i18n library** | `lingui` · `i18next`/`react-i18next` · `react-intl` (FormatJS) | Drives the catalog format + extraction tooling; all hide behind the SDK `t()` |
-| **Message format** | ICU MessageFormat · Fluent | Affects plurals/gender + the catalog syntax |
-| **Backend i18n approach** | `fluent-rs` · `gettext` · simple per-locale JSON/TOML catalogs keyed by message id | Must cover emails + iCalendar + errors; ideally shares the catalog format with the frontend |
-| **Catalog format + layout** | e.g. `.po`, `.ftl`, or JSON; per-plugin `i18n/<locale>.<ext>` | Extraction/check tooling is built around this |
-| **Locale source priority** | user preference → `Accept-Language` → deployment default | Where the per-user preference is stored (platform schema vs a settings table) |
-| **Locales shipped in M14** | `en` + ≥1 real locale + a pseudo-locale | The pseudo-locale powers the "no hardcoded strings" CI check |
+| **Frontend i18n library** | Lingui (deferred — Stage C ships the library-agnostic seam; Lingui plugs into it during the FE retrofit follow-up) | ICU under the hood, `.po` catalogs, compile-time macros for tiny runtime, Vite plugin |
+| **Message format** | ICU MessageFormat (FE) · `{var}` substitution + distinct keys for plurals (BE) | FE keeps full ICU via Lingui; BE codegen rejects ICU plural/select syntax so the typed-struct fields stay 1:1 with placeholders |
+| **Backend i18n approach** | Custom build-time codegen + a parsed `Template`/`Message` runtime in `junius-sdk` (no `polib` / `fluent-rs` dep) | Pure-Rust; catalogs baked into the binary as `&'static` arrays; lookups are O(1) `[Domain × Locale][ID]` indexing |
+| **Catalog format + layout** | gettext `.po`, key-based (msgid = stable catalog key like `event.signup.subject`, msgstr = source-language template); `plugins/<name>/i18n/<locale>.po` + host `platform/i18n/<locale>.po` | Single format for both sides; Lingui supports `.po` natively |
+| **Locale source priority** | `User.locale` (stored on `platform.user`) → `Accept-Language` → deployment-config `default_locale` (defaults to `"en"`) | Persisted on a column rather than a key/value table — simpler, indexable |
+| **Locales shipped in M14** | `en`, `de`, `pseudo` | German is the first real translation; pseudo powers the CI hardcoded-string gate |
 
-## Open questions
+## Open questions — resolved
 
-- Does `junius check` gain an `I18N.*` rule (missing/untranslated keys), or does
-  `junius i18n check` stay a separate gate? (Lean: separate command, wired into CI.)
-- One catalog format across FE + backend, or two? (Prefer one to share tooling.)
+- **`junius check` vs `junius i18n check`** — kept as a separate subcommand (see
+  [tools/junius/src/commands/i18n.rs](../../tools/junius/src/commands/i18n.rs)).
+  Wired into CI as a fifth job (`task ci:i18n`, see [Taskfile.yml](../../Taskfile.yml)
+  and [.github/workflows/ci.yml](../../.github/workflows/ci.yml)).
+- **One catalog format across FE + BE** — yes, gettext `.po`. The build-time
+  codegen and the Lingui runtime both consume the same files.
 
 ## Verification
 
