@@ -7,12 +7,16 @@
 //!   marker types (`permissions!(A & B)` → `And<A, And<B, ()>>`).
 //! - [`i18n_catalog!`] — invoked once per plugin crate, expands to an `include!`
 //!   of the per-plugin codegen file written by `junius-i18n-build` from `build.rs`.
+//! - [`rpc_service`] — rewrite an inherent `impl <RpcStruct>` into the
+//!   `connectrpc`-shaped `impl <ServiceTrait> for <RpcStruct>`, hiding the
+//!   `RequestContext`/`from_rpc` boilerplate (M15).
 //!
 //! `Repository` / `PluginCtx` derives land in M07.
 
 mod ctx;
 mod expand;
 mod repo;
+mod rpc_service;
 
 use proc_macro::TokenStream;
 
@@ -90,6 +94,34 @@ pub fn impl_repository(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(PluginCtx, attributes(repo))]
 pub fn plugin_ctx(input: TokenStream) -> TokenStream {
     ctx::derive(input.into()).into()
+}
+
+/// Rewrite an inherent `impl <RpcStruct> { … }` into the
+/// `connectrpc`-shaped `impl <ServiceTrait> for <RpcStruct> { … }`. For each
+/// method, the ctx parameter (first non-`&self` argument) is the type the
+/// witness alias `crate::__rpc_requires::<service>::<Method>` resolves through;
+/// the macro replaces it with `::connectrpc::RequestContext` and prepends a
+/// `let <ctx> = <WrittenType>::from_rpc(&__ctx)?;` to the body, so the proto's
+/// permission set stays the single source of truth and the author's body keeps
+/// the same ctx ident.
+///
+/// Example (inside a plugin's `lib.rs`):
+/// ```ignore
+/// #[rpc_service(EventService)]
+/// impl EventRpc {
+///     async fn list_events(
+///         &self,
+///         ectx: EventCtx<crate::__rpc_requires::event_service::ListEvents>,
+///         _request: OwnedListEventsRequestView,
+///     ) -> ServiceResult<impl Encodable<pb::ListEventsResponse>> {
+///         let events = ectx.state.events.list().await?;
+///         /* … */
+///     }
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn rpc_service(attr: TokenStream, item: TokenStream) -> TokenStream {
+    rpc_service::rpc_service(attr.into(), item.into()).into()
 }
 
 /// Expands to `include!(concat!(env!("OUT_DIR"), "/i18n_messages.rs"))`. The
