@@ -1,10 +1,12 @@
 # 18. M16 — Plugin-authoring ergonomics (M13 dogfooding follow-ups)
 
-> **Status:** 🚧 planned. Sequenced **after [M15 typed RPC handlers](17-M15-rpc-service-macro.md)**
-> (which already owns the largest M13 authoring papercut — the proto-vs-handler permission
-> restatement). This milestone collects the **four follow-ups recorded but not implemented** in the
-> [M13 joint friction triage](14-M13-events-plugin.friction.md) ("Final triage outcome"): they are
-> independent and can land in any order.
+> **Status:** ✅ Implemented. Sequenced after
+> [M15 typed RPC handlers](17-M15-rpc-service-macro.md) (which already owned the
+> largest M13 authoring papercut — the proto-vs-handler permission restatement).
+> This milestone delivered the **four follow-ups recorded in the
+> [M13 joint friction triage](14-M13-events-plugin.friction.md)** ("Final triage
+> outcome"). See the [friction-log table](14-M13-events-plugin.friction.md) for
+> per-item dispositions.
 
 One-line goal: turn the four ergonomics gaps the `events` build hand-worked around into first-class
 platform affordances, so the *next* domain plugin doesn't re-hit them.

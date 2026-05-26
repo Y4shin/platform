@@ -138,6 +138,23 @@ passing `Principal::Group`.
 > `platform.role_permission`). Membership alone is not enough — `user_can_access`
 > step 2 checks the role's permission set. So "Alice is in the Committee" does *not*
 > let her see a Committee event unless her role lists `events:read`.
+>
+> For per-group authorization checks beyond the static RPC gate (e.g. "the caller
+> holds `events:write` *within this group*"), use the SDK's
+> `user.has_permission_in_group(group, "events:write")` rather than walking
+> `user.memberships` by hand. Same semantics as the access rule above.
+
+**Delete-time counterpart:** record on create, **forget on delete**. `Authz::forget_resource`
+clears the `resource_principal` + any `resource_share` rows in the same transaction
+as the row-delete (atomic; no orphans):
+
+```rust
+let mut tx = self.pool().begin().await?;
+let deleted = sqlx::query!("DELETE FROM events.event WHERE id = $1 RETURNING id", id)
+    .fetch_optional(&mut *tx).await?;
+authz.forget_resource(&mut tx, "events:event", id).await?;
+tx.commit().await?;
+```
 
 ---
 
@@ -295,8 +312,18 @@ const { data } = useQuery(rpc.EventService.listEvents, {});
 
 > **Navigating to your own sub-routes:** the composed route tree erases plugin
 > route types (`buildRoutes` returns `AnyRoute`), so a typed `<Link to="/p/events/$eventId">`
-> won't compile. Events uses a one-line `usePluginNavigate` escape hatch
-> (`plugins/events/frontend/src/nav.ts`).
+> won't compile. Use `usePluginNavigate` / `PluginLink` from `@junius/sdk` —
+> both take a raw path string + a params record and coerce past the typed
+> router's narrowing:
+> ```ts
+> import { PluginLink, usePluginNavigate } from '@junius/sdk';
+> const nav = usePluginNavigate();
+> nav('/p/events/$eventId', { eventId: id });
+> // or:
+> <PluginLink to="/p/events/$eventId" params={{ eventId: id }}>view</PluginLink>
+> ```
+> Internal to the calling plugin only — never use these for cross-plugin
+> navigation (the dependency surface there is `[exposes.components]` + `useComponent`).
 
 > **Don't gate UI on client permissions.** `requirePermissions` is a no-op stub
 > today; gate edit/delete affordances on the server-computed `viewerCanEdit` flag
@@ -542,12 +569,14 @@ pass-through and doesn't need wrapping.
 After changing schema/queries/proto/manifest:
 
 ```bash
-# 1. proto TS (if you changed a .proto):  pnpm exec buf generate
-# 2. composition glue:                    task sync   (junius sync)
-# 3. the .sqlx offline cache (if queries changed):
+# 1. composition glue + auto-wiring:        task sync   (junius sync)
+#    Now also: registers `plugins/<name>/proto` in buf.yaml + runs `buf generate`
+#    if anything changed; adds the `@junius/plugin-<name>` workspace dep to the
+#    host frontend's package.json + runs `pnpm install` if anything changed.
+# 2. the .sqlx offline cache (if queries changed):
 #    spin a Postgres, apply host + plugin migrations, then:
 #    DATABASE_URL=… SQLX_OFFLINE=false cargo sqlx prepare --workspace   # commit .sqlx/
-# 4. formatting:  cargo fmt · pnpm exec biome check --write <paths> · pnpm exec buf format -w
+# 3. formatting:  cargo fmt · pnpm exec biome check --write <paths> · pnpm exec buf format -w
 task ci   # fmt-check · clippy · no-default build · biome ci · buf lint/format · junius check · tests
 ```
 

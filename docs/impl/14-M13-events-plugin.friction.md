@@ -94,14 +94,15 @@ DTOs, the public-handler recipe, the group-ownership-needs-a-role-permission rul
 `biome check` vs `format` for import sorting, and consumers needing a direct `zod`
 dep.
 
-**Scheduled as concrete follow-ups** (post-M13, the user selected all four):
+**Scheduled as concrete follow-ups** (post-M13, the user selected all four — **all
+✅ shipped in [M16](18-M16-authoring-ergonomics.md)**):
 
-| ID | Follow-up | Scope |
-|----|-----------|-------|
-| **A** | `junius sync` auto-wiring | `sync` manages `buf.yaml` + runs `buf generate`, and manages the host frontend's `@junius/plugin-<name>` `workspace:*` dep — the two deferred Cluster-A items. Subprocess / format-preserving-edit work; likely its own focused pass. |
-| **B** | `Authz::forget_resource(kind, id)` | Delete-time counterpart to `record_owner` — removes `resource_principal` + `resource_share` in the caller's tx; call it from `EventRepo::delete`. Closes the orphaned-ACL-rows gap. |
-| **C** | `User::has_permission_in_group(group, perm)` | SDK helper for group-scoped authorization (events hand-rolls it in `require_group_write`). Pairs with the group-ownership access rule. |
-| **D** | Blessed public-handler + nav affordances | SDK `Ctx::public()` (no-permission-witness context) and a `usePluginNavigate`/`PluginLink` for type-erased plugin sub-routes, so every plugin doesn't re-roll the escape hatches. |
+| ID | Follow-up | Scope | M16 disposition |
+|----|-----------|-------|-----------------|
+| **A** | `junius sync` auto-wiring | `sync` manages `buf.yaml` + runs `buf generate`, and manages the host frontend's `@junius/plugin-<name>` `workspace:*` dep — the two deferred Cluster-A items. | ✅ Stage 4: `buf.yaml` gains a `junius managed` block; `package.json`'s `dependencies` span gets a targeted text-edit (top-level layout preserved). After non-dry-run sync, `pnpm exec buf generate` / `pnpm install` run iff the corresponding file changed. |
+| **B** | `Authz::forget_resource(kind, id)` | Delete-time counterpart to `record_owner` — removes `resource_principal` + `resource_share` in the caller's tx; call it from `EventRepo::delete`. | ✅ Stage 2: new host migration `0012_forget_resource.up.sql` adds the `SECURITY DEFINER`; `Authz::forget_resource(&mut tx, kind, id)` calls it; `EventRepo::delete` runs the row-DELETE + the cleanup in one tx. `event_access_pg` asserts zero orphaned ACL rows. |
+| **C** | `User::has_permission_in_group(group, perm)` | SDK helper for group-scoped authorization (events hand-rolls it in `require_group_write`). | ✅ Stage 1: `User::has_permission_in_group(group: GroupId, permission: &str) -> bool`; events adopted; `require_group_write` removed. Two unit tests pin the role-grants-permission semantics. |
+| **D** | Blessed public-handler + nav affordances | SDK `Ctx::public()` (no-permission-witness context) and a `usePluginNavigate`/`PluginLink` for type-erased plugin sub-routes. | ✅ Stage 3: backend `PluginContext::public(&ctx)` (sugar over `::<()>::from_rpc` — most authors get it implicitly via M15's unannotated proto aliases). Frontend `@junius/sdk` exports `usePluginNavigate` + `PluginLink`; events deleted its local `nav.ts`. |
 
 **Decided, no further action:** `Groups::by_name` stays id-canonical (group names
 intentionally non-unique); `GetPersonalFeed` minting a fresh key per call is
