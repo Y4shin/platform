@@ -1,7 +1,6 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { loadI18n as loadHelloI18n } from '@junius/plugin-hello';
 import {
   AuthProvider,
   type CatalogLoader,
@@ -17,10 +16,11 @@ import { componentRegistry } from './generated/component-registry.js';
 import { PUBLIC_ROUTE_PREFIXES, routeTree } from './generated/routes.js';
 import { loadShellI18n } from './i18n.js';
 
-// Lingui catalog loaders, one per participating package. Hand-listed for now;
-// `junius sync` will codegen this array against the deployment's plugin list
-// in a follow-up (the same way it owns routes + the component registry).
-const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n, loadHelloI18n];
+// Lingui catalog loaders, one per participating package. The host shell is the
+// only one wired up right now; `junius sync` will codegen this array against
+// the deployment's plugin list (same way it owns routes + component registry)
+// in a follow-up.
+const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n];
 
 import './styles.css';
 

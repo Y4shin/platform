@@ -59,30 +59,6 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
         "UpdateInvite",
         &["events:read", "events:write"],
     ),
-    (
-        "greetings.v1.GreetingService",
-        "CreateGreeting",
-        &["greetings:read", "greetings:write"],
-    ),
-    (
-        "greetings.v1.GreetingService",
-        "ListGreetings",
-        &["greetings:read"],
-    ),
-    (
-        "hello.v1.HelloService",
-        "CreateGreeting",
-        &["hello:read", "hello:write"],
-    ),
-    ("hello.v1.HelloService", "ListGreetings", &["hello:read"]),
-    (
-        "hello.v1.NoteService",
-        "CreateNote",
-        &["hello:read", "hello:write"],
-    ),
-    ("hello.v1.NoteService", "GetNote", &["hello:read"]),
-    ("hello.v1.NoteService", "ListNotes", &["hello:read"]),
-    ("hello.v1.NoteService", "ShareNote", &["hello:read"]),
 ];
 
 /// `service_fqn` -> owning plugin, so the host attaches the right
@@ -91,7 +67,4 @@ pub static RPC_SERVICES: &[(&str, &str)] = &[
     ("events.v1.CalendarService", "events"),
     ("events.v1.EventService", "events"),
     ("events.v1.InviteService", "events"),
-    ("greetings.v1.GreetingService", "greetings"),
-    ("hello.v1.HelloService", "hello"),
-    ("hello.v1.NoteService", "hello"),
 ];

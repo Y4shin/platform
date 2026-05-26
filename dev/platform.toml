@@ -5,7 +5,7 @@
 path = "."
 
 [plugins]
-enabled = ["hello", "greetings", "widgets", "events"]
+enabled = ["events"]
 
 # Host configuration. Secrets use `env:VAR` indirection so they aren't committed;
 # export OIDC_CLIENT_SECRET / SESSION_KEY / ROLE_PW_SECRET before running the
@@ -70,9 +70,3 @@ public_get     = false
 # Logical → physical bucket mapping. `junius check` requires every plugin's
 # declared logical bucket to appear here (STORAGE.BUCKET.UNMAPPED).
 [config.storage.mapping]
-"hello:attachments" = "main"
-
-# Per-plugin config/secrets. hello's `greeting` uses its declared default; the
-# api_key secret uses a literal dev value (prod would use env: indirection).
-[plugins.hello.secrets]
-api_key = "dev-hello-key"

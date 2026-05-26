@@ -52,7 +52,7 @@ async fn mailpit_smtp_round_trip() {
         Some(transport),
         Arc::from("no-reply@local"),
         Arc::from(vec!["local".to_string()]),
-        "hello",
+        "events",
         &["email.send"],
     );
 

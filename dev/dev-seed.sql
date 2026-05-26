@@ -2,7 +2,7 @@
 -- role that grants every plugin permission, so the dev app is fully usable in the
 -- browser. The platform has no built-in permission seed — a fresh OIDC user has
 -- no group memberships and therefore no permissions, so the permission-gated
--- pages (events, hello CRUD, …) would 403.
+-- pages (events CRUD, …) would 403.
 --
 -- Idempotent; safe to re-run. Memberships only attach once the user rows exist,
 -- so run this AFTER logging in once as each user (login creates platform.user).
@@ -29,10 +29,7 @@ BEGIN
 
   INSERT INTO platform.role_permission (role_id, permission)
   SELECT rid, p FROM unnest(ARRAY[
-    'events:read', 'events:write', 'events:share',
-    'greetings:read', 'greetings:write',
-    'hello:read', 'hello:write', 'hello:share',
-    'widgets:read'
+    'events:read', 'events:write', 'events:share'
   ]) AS p
   ON CONFLICT (role_id, permission) DO NOTHING;
 

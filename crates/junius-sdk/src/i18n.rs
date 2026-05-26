@@ -142,21 +142,12 @@ impl LocaleResolver {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Domain {
     Platform = 0,
-    Hello = 1,
-    Greetings = 2,
-    Widgets = 3,
-    Events = 4,
+    Events = 1,
 }
 
 impl Domain {
-    pub const COUNT: usize = 5;
-    pub const ALL: [Domain; Self::COUNT] = [
-        Self::Platform,
-        Self::Hello,
-        Self::Greetings,
-        Self::Widgets,
-        Self::Events,
-    ];
+    pub const COUNT: usize = 2;
+    pub const ALL: [Domain; Self::COUNT] = [Self::Platform, Self::Events];
 
     /// Catalog domain name as it appears in `.po` headers and in the build
     /// helper's `Options.domain` field.
@@ -164,9 +155,6 @@ impl Domain {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Platform => "platform",
-            Self::Hello => "hello",
-            Self::Greetings => "greetings",
-            Self::Widgets => "widgets",
             Self::Events => "events",
         }
     }
@@ -182,12 +170,6 @@ impl Domain {
         let b = s.as_bytes();
         if matches_bytes(b, b"platform") {
             Some(Self::Platform)
-        } else if matches_bytes(b, b"hello") {
-            Some(Self::Hello)
-        } else if matches_bytes(b, b"greetings") {
-            Some(Self::Greetings)
-        } else if matches_bytes(b, b"widgets") {
-            Some(Self::Widgets)
         } else if matches_bytes(b, b"events") {
             Some(Self::Events)
         } else {

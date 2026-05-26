@@ -10,8 +10,8 @@ export function NavLinks() {
       <Link to="/" className="hover:text-primary">
         Home
       </Link>
-      <Link to="/p/hello" className="hover:text-primary">
-        Hello
+      <Link to="/p/events" className="hover:text-primary">
+        Events
       </Link>
     </nav>
   );

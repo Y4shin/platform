@@ -179,7 +179,7 @@ mod tests {
     // `junius-i18n-build` and is validated by an integration test there.
     struct Hello;
     impl Message for Hello {
-        const DOMAIN: Domain = Domain::Hello;
+        const DOMAIN: Domain = Domain::Events;
         const ID: usize = 0;
         const KEY: &'static str = "hello.world";
         fn render(&self, template: &Template) -> String {
@@ -200,7 +200,7 @@ mod tests {
         name: &'a str,
     }
     impl Message for Greeted<'_> {
-        const DOMAIN: Domain = Domain::Hello;
+        const DOMAIN: Domain = Domain::Events;
         const ID: usize = 1;
         const KEY: &'static str = "hello.greeted";
         fn render(&self, template: &Template) -> String {
@@ -259,7 +259,7 @@ mod tests {
 
     fn build() -> Localizer {
         let mut b = LocalizerBuilder::new(Locale::En);
-        b.add_domain(Domain::Hello, hello_catalogs());
+        b.add_domain(Domain::Events, hello_catalogs());
         b.build()
     }
 

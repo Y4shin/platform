@@ -19,7 +19,7 @@
 path = "../.."
 
 [plugins]
-enabled = ["hello", "greetings", "widgets"]
+enabled = ["events"]
 
 # Secrets use `env:`/`file:` indirection so they aren't committed. Export the
 # `env:` vars (or mount the `file:` paths) before `junius build`/`./platform`.
@@ -63,9 +63,3 @@ secret_key     = "env:MINIO_PASS"
 use_path_style = true
 
 [config.storage.mapping]
-"hello:attachments" = "main"
-
-# A file: secret — the value is read from ./secrets/hello_api_key at boot
-# (mount it via your secret manager; the dir is gitignored).
-[plugins.hello.secrets]
-api_key = "file:secrets/hello_api_key"

@@ -26,11 +26,5 @@ module.exports = {
   sourceLocale: 'en',
   pseudoLocale: 'pseudo',
   format: 'po',
-  catalogs: [
-    pkg('platform/frontend'),
-    pkg('plugins/hello/frontend'),
-    pkg('plugins/greetings/frontend'),
-    pkg('plugins/widgets/frontend'),
-    pkg('plugins/events/frontend'),
-  ],
+  catalogs: [pkg('platform/frontend'), pkg('plugins/events/frontend')],
 };

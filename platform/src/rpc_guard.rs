@@ -79,14 +79,14 @@ mod tests {
 
     #[test]
     fn path_resolves_to_owning_plugin() {
-        // RPC_SERVICES is generated; hello's services map to "hello".
+        // RPC_SERVICES is generated; events' services map to "events".
         assert_eq!(
-            plugin_for_path("/hello.v1.HelloService/Greet"),
-            Some("hello")
+            plugin_for_path("/events.v1.EventService/ListEvents"),
+            Some("events")
         );
         assert_eq!(
-            plugin_for_path("/hello.v1.NoteService/ListNotes"),
-            Some("hello")
+            plugin_for_path("/events.v1.InviteService/ListSignups"),
+            Some("events")
         );
         assert_eq!(plugin_for_path("/unknown.v1.Svc/M"), None);
         assert_eq!(plugin_for_path("/malformed"), None);
