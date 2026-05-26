@@ -96,6 +96,80 @@ impl User {
             .iter()
             .any(|m| m.permissions.contains(permission))
     }
+
+    /// Whether the user holds `permission` **within** `group` — i.e. is a
+    /// member of that group through a role that grants it. Membership alone is
+    /// not enough: `platform.user_can_access` step 2 requires the member's role
+    /// to hold the plugin's permission via `platform.role_permission`. Use this
+    /// for per-group authorization beyond the static RPC gate (publishing a
+    /// group's calendar, minting a group key, etc.).
+    #[must_use]
+    pub fn has_permission_in_group(&self, group: GroupId, permission: &str) -> bool {
+        self.memberships
+            .iter()
+            .any(|m| m.group_id == group && m.permissions.contains(permission))
+    }
+}
+
+#[cfg(test)]
+mod user_tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+    use std::collections::HashSet;
+
+    fn membership(group_id: GroupId, perms: &[&str]) -> Membership {
+        Membership {
+            group_id,
+            group_name: "Test".into(),
+            role: Role {
+                id: RoleId(uuid::Uuid::nil()),
+                name: "test".into(),
+            },
+            permissions: perms
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect::<HashSet<_>>(),
+        }
+    }
+
+    fn user_with(memberships: Vec<Membership>) -> User {
+        User {
+            id: UserId(uuid::Uuid::nil()),
+            email: "u@x".into(),
+            display_name: "U".into(),
+            locale: None,
+            memberships,
+        }
+    }
+
+    #[test]
+    fn has_permission_in_group_requires_both_membership_and_role_perm() {
+        let g1 = GroupId(uuid::Uuid::from_u128(1));
+        let g2 = GroupId(uuid::Uuid::from_u128(2));
+        let user = user_with(vec![
+            membership(g1, &["events:write", "events:read"]),
+            membership(g2, &["events:read"]),
+        ]);
+
+        // Holds events:write in g1 (role grants it).
+        assert!(user.has_permission_in_group(g1, "events:write"));
+        // Holds events:read in g1 too.
+        assert!(user.has_permission_in_group(g1, "events:read"));
+        // Member of g2, but the role there only grants `events:read`.
+        assert!(!user.has_permission_in_group(g2, "events:write"));
+        // Not a member of g3 at all.
+        let g3 = GroupId(uuid::Uuid::from_u128(3));
+        assert!(!user.has_permission_in_group(g3, "events:read"));
+    }
+
+    #[test]
+    fn has_permission_is_group_agnostic() {
+        let g1 = GroupId(uuid::Uuid::from_u128(1));
+        let user = user_with(vec![membership(g1, &["events:write"])]);
+        assert!(user.has_permission("events:write"));
+        assert!(!user.has_permission("events:read"));
+    }
 }
 
 /// Minimal public projection of a user, for directory lookups.

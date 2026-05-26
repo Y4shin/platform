@@ -635,7 +635,9 @@ impl CalendarRpc {
     ) -> ServiceResult<impl Encodable<pb::CreateGroupKeyResponse>> {
         let group_id = parse_uuid(request.group_id, "group_id")?;
         let caller = require_user(ectx.user.as_ref())?;
-        require_group_write(caller, group_id)?;
+        if !caller.has_permission_in_group(GroupId(group_id), "events:write") {
+            return Err(err::group_write_required());
+        }
         let key = generate_feed_key();
         ectx.state
             .calendar
@@ -667,7 +669,9 @@ impl CalendarRpc {
     ) -> ServiceResult<impl Encodable<pb::SetGroupPublicResponse>> {
         let group_id = parse_uuid(request.group_id, "group_id")?;
         let caller = require_user(ectx.user.as_ref())?;
-        require_group_write(caller, group_id)?;
+        if !caller.has_permission_in_group(GroupId(group_id), "events:write") {
+            return Err(err::group_write_required());
+        }
         ectx.state
             .calendar
             .set_group_public(group_id, request.public, caller.id.0)
@@ -743,20 +747,6 @@ mod err {
     }
     pub fn invite_already_exists() -> ConnectError {
         ConnectError::already_exists("events.error.invite_already_exists")
-    }
-}
-
-/// Require the caller to hold `events:write` within `group_id` (a role in that
-/// group granting it), beyond the static `events:write`-anywhere RPC gate.
-fn require_group_write(caller: &User, group_id: Uuid) -> Result<(), ConnectError> {
-    let ok = caller
-        .memberships
-        .iter()
-        .any(|m| m.group_id.0 == group_id && m.permissions.contains("events:write"));
-    if ok {
-        Ok(())
-    } else {
-        Err(err::group_write_required())
     }
 }
 
