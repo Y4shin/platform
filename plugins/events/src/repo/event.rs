@@ -301,9 +301,12 @@ impl<P: Has<EventsRead> + Has<EventsWrite>> EventRepo<P> {
         })
     }
 
-    /// Delete an event the caller can write. `NotFound` if absent or not editable.
-    pub async fn delete(&self, id: EventId) -> Result<(), RepoError> {
+    /// Delete an event the caller can write, and clear its ACL rows
+    /// (`resource_principal` + `resource_share`) in the same transaction so no
+    /// orphans are left behind. `NotFound` if absent or not editable.
+    pub async fn delete(&self, id: EventId, authz: &Authz) -> Result<(), RepoError> {
         let viewer = self.user().map(|u| u.id.0);
+        let mut tx = self.pool().begin().await?;
         let deleted = sqlx::query_scalar!(
             r#"
             DELETE FROM events.event e
@@ -314,11 +317,13 @@ impl<P: Has<EventsRead> + Has<EventsWrite>> EventRepo<P> {
             id.0,
             viewer,
         )
-        .fetch_optional(self.pool())
+        .fetch_optional(&mut *tx)
         .await?;
         if deleted.is_none() {
             return Err(RepoError::NotFound);
         }
+        authz.forget_resource(&mut tx, "events:event", id.0).await?;
+        tx.commit().await?;
         self.audit()
             .emit(
                 "events:event.delete",

@@ -34,6 +34,7 @@ const HOST_MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0005_user_can_access.up.sql"),
     include_str!("../migrations/0007_audit_event.up.sql"),
     include_str!("../migrations/0008_authz_functions.up.sql"),
+    include_str!("../migrations/0012_forget_resource.up.sql"),
 ];
 const EVENTS_MIGRATION: &str = include_str!("../../plugins/events/migrations/0001_event.up.sql");
 
@@ -208,7 +209,7 @@ async fn event_access_matrix_via_role_events() {
         Err(RepoError::NotFound)
     ));
     assert!(matches!(
-        bob_rw.delete(priv_user.id).await,
+        bob_rw.delete(priv_user.id, &authz(&bob)).await,
         Err(RepoError::NotFound)
     ));
 
@@ -242,11 +243,54 @@ async fn event_access_matrix_via_role_events() {
     ));
 
     // --- delete gated on write access ----------------------------------------
-    alice_rw.delete(priv_group.id).await.unwrap();
+    // M16 item B: delete also clears the ACL rows atomically (no orphans).
+    // Capture the row counts before + after for an orphan-free assertion.
+    let acl_rows_before: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM platform.resource_principal \
+         WHERE resource_kind = 'events:event' AND resource_id = $1",
+    )
+    .bind(priv_group.id.0)
+    .fetch_one(&admin)
+    .await
+    .unwrap();
+    assert_eq!(
+        acl_rows_before, 1,
+        "expected one resource_principal row before delete"
+    );
+
+    alice_rw
+        .delete(priv_group.id, &authz(&alice))
+        .await
+        .unwrap();
     assert!(matches!(
         alice_ro.get(priv_group.id).await,
         Err(RepoError::NotFound)
     ));
+
+    let acl_rows_after: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM platform.resource_principal \
+         WHERE resource_kind = 'events:event' AND resource_id = $1",
+    )
+    .bind(priv_group.id.0)
+    .fetch_one(&admin)
+    .await
+    .unwrap();
+    assert_eq!(
+        acl_rows_after, 0,
+        "delete must clear resource_principal — no orphans"
+    );
+    let share_rows_after: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM platform.resource_share \
+         WHERE resource_kind = 'events:event' AND resource_id = $1",
+    )
+    .bind(priv_group.id.0)
+    .fetch_one(&admin)
+    .await
+    .unwrap();
+    assert_eq!(
+        share_rows_after, 0,
+        "delete must clear resource_share — no orphans"
+    );
 
     // The create/update/delete were audited.
     let kinds: Vec<String> =

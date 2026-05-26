@@ -207,7 +207,7 @@ impl EventRpc {
         request: OwnedDeleteEventRequestView,
     ) -> ServiceResult<impl Encodable<pb::DeleteEventResponse>> {
         let id = EventId(parse_uuid(request.id, "id")?);
-        ectx.state.events.delete(id).await?;
+        ectx.state.events.delete(id, &ectx.resources.authz).await?;
         Ok(Response::new(pb::DeleteEventResponse::default()))
     }
 

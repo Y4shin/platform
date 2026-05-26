@@ -100,6 +100,28 @@ impl Authz {
         Ok(())
     }
 
+    /// Delete-time counterpart to [`record_owner`]: clear a resource's
+    /// `resource_principal` + `resource_share` rows inside the plugin's own
+    /// transaction (atomic with the row delete), so deleting an owned resource
+    /// leaves no orphaned ACL rows. Plugin roles can't DELETE the host tables
+    /// directly; the privileged work happens in `platform.forget_resource`.
+    ///
+    /// No-op if the resource was never recorded — the SQL DELETEs match zero
+    /// rows. Callers don't need to check existence first.
+    pub async fn forget_resource(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        resource_kind: &str,
+        resource_id: Uuid,
+    ) -> Result<(), PluginError> {
+        sqlx::query("SELECT platform.forget_resource($1, $2)")
+            .bind(resource_kind)
+            .bind(resource_id)
+            .execute(&mut **tx)
+            .await?;
+        Ok(())
+    }
+
     /// Grant `permission` on a resource to `principal`. Only the resource's owner
     /// (or a member of the owning group) may share; emits an audit event.
     pub async fn share(
