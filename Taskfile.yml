@@ -157,9 +157,14 @@ tasks:
       - cd examples/example-deployment && ../../target/release/junius build --check-config
 
   ci:i18n:
-    desc: M14 fifth job — validate every plugin + host i18n catalog (`junius i18n check`).
+    desc: M14 fifth job — validate every plugin + host i18n catalog (`junius i18n check`) + pseudo gate.
     cmds:
+      # 1. BE catalog validation (parse + schema + placeholder agreement).
       - cargo run -q -p junius -- i18n check --config {{.CONFIG}}
+      # 2. Compile FE catalogs so the pseudo `.js` is fresh before the gate.
+      - pnpm exec lingui compile
+      # 3. FE pseudo-catalog completeness gate (every msgid → diacritic'd literal).
+      - pnpm --filter @junius/plugin-events test
 
   sqlx:check:
     desc: Verify the committed .sqlx cache is fresh (needs the dev DB + DATABASE_URL).
