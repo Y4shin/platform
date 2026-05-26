@@ -5,6 +5,7 @@ import { Trans } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 
 import { formatWhen } from '../../domain.js';
+import { useEventsError } from '../../errors.js';
 import { usePluginNavigate } from '../../nav.js';
 
 /** A single event's detail, with owner actions (edit / delete / manage invite)
@@ -20,11 +21,13 @@ export function EventDetailPage() {
   const del = useMutation(rpc.EventService.deleteEvent, {
     onSuccess: () => nav('/p/events'),
   });
+  // Hooks before any conditional return (rules-of-hooks).
+  const renderError = useEventsError();
 
   if (error) {
     return (
       <Card>
-        <p className="text-danger text-sm">{String(error)}</p>
+        <p className="text-danger text-sm">{renderError(error)}</p>
       </Card>
     );
   }

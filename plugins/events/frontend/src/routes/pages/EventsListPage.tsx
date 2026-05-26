@@ -3,6 +3,7 @@ import { Button, Card, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
 import { Trans } from '@lingui/react/macro';
 
+import { useEventsError } from '../../errors.js';
 import { EventCard } from '../../lib/EventCard.js';
 import { usePluginNavigate } from '../../nav.js';
 
@@ -12,6 +13,7 @@ import { usePluginNavigate } from '../../nav.js';
 export function EventsListPage() {
   const nav = usePluginNavigate();
   const { data, error, isPending } = useQuery(rpc.EventService.listEvents, {});
+  const renderError = useEventsError();
 
   return (
     <Stack gap="md">
@@ -26,7 +28,7 @@ export function EventsListPage() {
 
       {error ? (
         <Card>
-          <p className="text-danger text-sm">{String(error)}</p>
+          <p className="text-danger text-sm">{renderError(error)}</p>
         </Card>
       ) : isPending ? (
         <Card>

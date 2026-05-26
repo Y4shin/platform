@@ -18,9 +18,21 @@ msgid "(anonymous)"
 msgstr "(anonym)"
 
 #. placeholder {0}: page.slotsRemaining
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:63
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:65
 msgid "{0, plural, one {# slot remaining.} other {# slots remaining.}}"
 msgstr "{0, plural, one {# Platz übrig.} other {# Plätze übrig.}}"
+
+#: plugins/events/frontend/src/errors.ts:32
+msgid "{field} is required."
+msgstr "{field} ist erforderlich."
+
+#: plugins/events/frontend/src/errors.ts:34
+msgid "{field} must be a valid date/time."
+msgstr "{field} muss ein gültiges Datum/Uhrzeit sein."
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:63
+msgid "A start date/time is required."
+msgstr "Eine Startzeit ist erforderlich."
 
 #: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:92
 msgid "Collect sign-ups"
@@ -30,7 +42,7 @@ msgstr "Anmeldungen sammeln"
 msgid "Configuration"
 msgstr "Konfiguration"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:156
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:173
 msgid "Create event"
 msgstr "Veranstaltung erstellen"
 
@@ -38,19 +50,19 @@ msgstr "Veranstaltung erstellen"
 msgid "Create invite"
 msgstr "Einladung erstellen"
 
-#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:80
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:83
 msgid "Delete"
 msgstr "Löschen"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:129
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:146
 msgid "Description"
 msgstr "Beschreibung"
 
-#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:67
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:70
 msgid "Edit"
 msgstr "Bearbeiten"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:121
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:138
 msgid "Edit event"
 msgstr "Veranstaltung bearbeiten"
 
@@ -58,7 +70,7 @@ msgstr "Veranstaltung bearbeiten"
 msgid "Event"
 msgstr "Veranstaltung"
 
-#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:20
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:22
 msgid "Events"
 msgstr "Veranstaltungen"
 
@@ -66,39 +78,43 @@ msgstr "Veranstaltungen"
 msgid "Filter events…"
 msgstr "Veranstaltungen filtern…"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:105
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:107
 msgid "I’m going"
 msgstr "Ich komme"
+
+#: plugins/events/frontend/src/errors.ts:30
+msgid "Invalid value for {field}."
+msgstr "Ungültiger Wert für {field}."
 
 #: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:106
 msgid "Invite"
 msgstr "Einladung"
 
-#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:35
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:59
-#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:34
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:35
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:38
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:77
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:36
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:37
 msgid "Loading…"
 msgstr "Lade…"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:132
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:149
 msgid "Location"
 msgstr "Ort"
 
-#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:73
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:76
 msgid "Manage invite"
 msgstr "Einladung verwalten"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:90
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:107
 msgid "Myself"
 msgstr "Mich selbst"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:121
-#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:23
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:138
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:25
 msgid "New event"
 msgstr "Neue Veranstaltung"
 
-#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:40
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:42
 msgid "No events yet. Create your first one."
 msgstr "Noch keine Veranstaltungen. Erstelle deine erste."
 
@@ -106,27 +122,31 @@ msgstr "Noch keine Veranstaltungen. Erstelle deine erste."
 msgid "No sign-ups yet."
 msgstr "Noch keine Anmeldungen."
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:113
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:115
 msgid "Opt out"
 msgstr "Absagen"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:150
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:167
 msgid "Owner"
 msgstr "Eigentümer"
+
+#: plugins/events/frontend/src/errors.ts:38
+msgid "Owner must be yourself or a group."
+msgstr "Eigentümer muss du selbst oder eine Gruppe sein."
 
 #: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:152
 msgid "Pre-sign-up current group members (group events)"
 msgstr "Aktuelle Gruppenmitglieder vorab anmelden (Gruppen­veranstaltungen)"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:143
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:160
 msgid "Private"
 msgstr "Privat"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:144
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:161
 msgid "Public (world-readable)"
 msgstr "Öffentlich (für alle sichtbar)"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:156
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:173
 msgid "Save changes"
 msgstr "Änderungen speichern"
 
@@ -137,6 +157,10 @@ msgstr "Einladung speichern"
 #: plugins/events/frontend/src/lib/EventPicker.tsx:44
 msgid "Select an event…"
 msgstr "Veranstaltung auswählen…"
+
+#: plugins/events/frontend/src/errors.ts:40
+msgid "Share target must be a user, group, or \"public\"."
+msgstr "Freigabeziel muss ein Benutzer, eine Gruppe oder „öffentlich“ sein."
 
 #: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:113
 msgid "Shareable link"
@@ -162,11 +186,15 @@ msgstr "Verbleibende Plätze anzeigen"
 msgid "Show title"
 msgstr "Titel anzeigen"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:77
+#: plugins/events/frontend/src/errors.ts:28
+msgid "Sign in to continue."
+msgstr "Bitte melde dich an."
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:79
 msgid "Sign up"
 msgstr "Anmelden"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:123
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:127
 msgid "Sign-up is closed."
 msgstr "Die Anmeldung ist geschlossen."
 
@@ -179,7 +207,7 @@ msgid "Sign-ups"
 msgstr "Anmeldungen"
 
 #. placeholder {0}: user.displayName
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:81
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:83
 msgid "Signing up as {0}."
 msgstr "Anmeldung als {0}."
 
@@ -187,38 +215,58 @@ msgstr "Anmeldung als {0}."
 msgid "Slot limit (0 = unlimited)"
 msgstr "Platz-Limit (0 = unbegrenzt)"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:127
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:144
 msgid "Team offsite"
 msgstr "Team-Offsite"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:44
+#: plugins/events/frontend/src/errors.ts:46
+msgid "This event already has an invite."
+msgstr "Diese Veranstaltung hat bereits eine Einladung."
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:46
 msgid "This invite is not available."
 msgstr "Diese Einladung ist nicht verfügbar."
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:126
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:143
 msgid "Title"
 msgstr "Titel"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:138
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:59
+msgid "Title is required."
+msgstr "Titel ist erforderlich."
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:155
 msgid "Visibility"
 msgstr "Sichtbarkeit"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:135
+#: plugins/events/frontend/src/errors.ts:36
+msgid "Visibility must be private or public."
+msgstr "Sichtbarkeit muss privat oder öffentlich sein."
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:152
 msgid "When"
 msgstr "Wann"
 
-#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:133
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:150
 msgid "Where"
 msgstr "Wo"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:57
+#: plugins/events/frontend/src/errors.ts:42
+msgid "You must be a member of the owning group."
+msgstr "Du musst Mitglied der besitzenden Gruppe sein."
+
+#: plugins/events/frontend/src/errors.ts:44
+msgid "You need write access in this group."
+msgstr "Du brauchst Schreibrechte in dieser Gruppe."
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:59
 msgid "You’re invited"
 msgstr "Du bist eingeladen"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:91
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:93
 msgid "Your email"
 msgstr "Deine E-Mail"
 
-#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:86
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:88
 msgid "Your name"
 msgstr "Dein Name"

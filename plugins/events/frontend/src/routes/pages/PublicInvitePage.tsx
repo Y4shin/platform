@@ -7,6 +7,7 @@ import { useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { formatWhen } from '../../domain.js';
+import { useEventsError } from '../../errors.js';
 
 /**
  * The public (login-optional) invite page at `/i/events/<slug>`. Renders for
@@ -28,6 +29,7 @@ export function PublicInvitePage() {
   const optOut = useMutation(rpc.InviteService.optOut, { onSuccess: onChanged });
 
   const { t } = useLingui();
+  const renderError = useEventsError();
   if (invite.isPending) {
     return (
       <Card>
@@ -114,7 +116,7 @@ export function PublicInvitePage() {
                 </Button>
               )}
             </div>
-            {signup.error && <p className="text-danger text-sm">{String(signup.error)}</p>}
+            {signup.error && <p className="text-danger text-sm">{renderError(signup.error)}</p>}
           </Stack>
         </Card>
       ) : (

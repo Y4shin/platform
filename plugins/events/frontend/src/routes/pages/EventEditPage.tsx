@@ -14,24 +14,22 @@ import { rpc } from '@junius/generated/events/rpc';
 import { useUser } from '@junius/sdk';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
+import { useMemo } from 'react';
 import { z } from 'zod';
 
 import { toInputValue, toRfc3339 } from '../../domain.js';
 import { usePluginNavigate } from '../../nav.js';
 
-const schema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string(),
-  location: z.string(),
-  schedule: z.object({
-    start: z.string().min(1, 'A start date/time is required'),
-    end: z.string(),
-    allDay: z.boolean(),
-  }),
-  visibility: z.enum(['private', 'public']),
-  owner: z.string(),
-});
-type FormValues = z.infer<typeof schema>;
+/** Schema shape (validators are filled in inside the component so error
+ * messages pick up the active locale). */
+type FormValues = {
+  title: string;
+  description: string;
+  location: string;
+  schedule: { start: string; end: string; allDay: boolean };
+  visibility: 'private' | 'public';
+  owner: string;
+};
 
 const Field = createFormField<FormValues>();
 
@@ -53,6 +51,24 @@ export function EventEditPage() {
   });
   // Hooks must precede any conditional return (React rules-of-hooks).
   const { t } = useLingui();
+  // Schema is locale-dependent (error messages flow through `t`); memo on
+  // the translator so it doesn't rebuild every render.
+  const schema = useMemo(
+    () =>
+      z.object({
+        title: z.string().min(1, t`Title is required.`),
+        description: z.string(),
+        location: z.string(),
+        schedule: z.object({
+          start: z.string().min(1, t`A start date/time is required.`),
+          end: z.string(),
+          allDay: z.boolean(),
+        }),
+        visibility: z.enum(['private', 'public']),
+        owner: z.string(),
+      }),
+    [t],
+  );
 
   if (isEdit && existing.isPending) {
     return (

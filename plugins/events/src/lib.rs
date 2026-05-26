@@ -139,7 +139,7 @@ impl EventService for EventRpc {
             .user
             .as_ref()
             .map(|u| u.id)
-            .ok_or_else(|| ConnectError::unauthenticated("authentication required"))?;
+            .ok_or_else(|| ConnectError::unauthenticated("events.error.auth_required"))?;
         // Resolve + authorize the owner: a user event is owned by the caller; a
         // group event requires the caller to belong to that group.
         let owner = match request.owner_kind {
@@ -147,16 +147,12 @@ impl EventService for EventRpc {
             "group" => {
                 let gid = GroupId(parse_uuid(request.owner_id, "owner_id")?);
                 if !ectx.resources.groups.is_member(gid, caller).await? {
-                    return Err(ConnectError::permission_denied(
-                        "you must be a member of the owning group",
-                    ));
+                    return Err(err::group_membership_required());
                 }
                 Principal::Group(gid)
             }
             _ => {
-                return Err(ConnectError::invalid_argument(
-                    "owner_kind must be \"user\" or \"group\"",
-                ));
+                return Err(err::invalid_owner_kind());
             }
         };
         let new = NewEvent {
@@ -268,7 +264,7 @@ fn event_to_proto(e: EventView) -> pb::Event {
 
 /// Parse a UUID request field, mapping a parse failure to `invalid_argument`.
 fn parse_uuid(value: &str, field: &str) -> Result<Uuid, ConnectError> {
-    Uuid::parse_str(value).map_err(|_| ConnectError::invalid_argument(format!("invalid {field}")))
+    Uuid::parse_str(value).map_err(|_| err::invalid_field(field))
 }
 
 /// An empty proto string field becomes `None`; anything else `Some`.
@@ -283,9 +279,7 @@ fn optional(value: &str) -> Option<String> {
 /// Require a non-empty (after trim) string field.
 fn require_nonempty(value: &str, field: &str) -> Result<String, ConnectError> {
     if value.trim().is_empty() {
-        Err(ConnectError::invalid_argument(format!(
-            "{field} is required"
-        )))
+        Err(err::required_field(field))
     } else {
         Ok(value.to_string())
     }
@@ -295,7 +289,7 @@ fn require_nonempty(value: &str, field: &str) -> Result<String, ConnectError> {
 fn parse_rfc3339(value: &str, field: &str) -> Result<DateTime<Utc>, ConnectError> {
     DateTime::parse_from_rfc3339(value)
         .map(|d| d.with_timezone(&Utc))
-        .map_err(|_| ConnectError::invalid_argument(format!("invalid {field} (expected RFC 3339)")))
+        .map_err(|_| err::invalid_rfc3339(field))
 }
 
 /// Parse an optional RFC 3339 timestamp: empty → `None`.
@@ -312,9 +306,7 @@ fn parse_visibility(value: &str) -> Result<Visibility, ConnectError> {
     match value {
         "public" => Ok(Visibility::Public),
         "private" | "" => Ok(Visibility::Private),
-        _ => Err(ConnectError::invalid_argument(
-            "visibility must be \"private\" or \"public\"",
-        )),
+        _ => Err(err::invalid_visibility()),
     }
 }
 
@@ -324,9 +316,7 @@ fn parse_principal(kind: &str, id: &str) -> Result<Principal, ConnectError> {
         "user" => Ok(Principal::User(UserId(parse_uuid(id, "principal_id")?))),
         "group" => Ok(Principal::Group(GroupId(parse_uuid(id, "principal_id")?))),
         "public" => Ok(Principal::Public),
-        _ => Err(ConnectError::invalid_argument(
-            "principal_kind must be user, group, or public",
-        )),
+        _ => Err(err::invalid_principal_kind()),
     }
 }
 
@@ -348,7 +338,7 @@ impl InviteService for InviteRpc {
             .user
             .as_ref()
             .map(|u| u.id)
-            .ok_or_else(|| ConnectError::unauthenticated("authentication required"))?;
+            .ok_or_else(|| ConnectError::unauthenticated("events.error.auth_required"))?;
         // Fetch the event (also confirms read access + gives the owner) before
         // creating its invite.
         let event = ectx.state.events.get(EventId(event_id)).await?;
@@ -366,9 +356,7 @@ impl InviteService for InviteRpc {
         let invite = match ectx.state.invites.create(event_id, &slug, &config).await {
             Ok(invite) => invite,
             Err(junius_sdk::RepoError::Db(e)) if is_unique_violation(&e) => {
-                return Err(ConnectError::already_exists(
-                    "an invite already exists for this event",
-                ));
+                return Err(err::invite_already_exists());
             }
             Err(e) => return Err(e.into()),
         };
@@ -727,7 +715,42 @@ fn require_caller(user: Option<&User>) -> Result<UserId, ConnectError> {
 
 /// The authenticated caller, or `unauthenticated`.
 fn require_user(user: Option<&User>) -> Result<&User, ConnectError> {
-    user.ok_or_else(|| ConnectError::unauthenticated("authentication required"))
+    user.ok_or_else(|| ConnectError::unauthenticated("events.error.auth_required"))
+}
+
+/// Error-code helpers. Backend handlers emit stable `events.error.<code>` IDs
+/// (with optional positional args separated by `:`) as `ConnectError` messages;
+/// the frontend's `eventsError(err, t)` mapper renders the matching translated
+/// string via Lingui. Keeps RPC errors out of the UI's English-only path.
+mod err {
+    use connectrpc::ConnectError;
+    pub fn invalid_field(field: &str) -> ConnectError {
+        ConnectError::invalid_argument(format!("events.error.field_invalid:{field}"))
+    }
+    pub fn required_field(field: &str) -> ConnectError {
+        ConnectError::invalid_argument(format!("events.error.field_required:{field}"))
+    }
+    pub fn invalid_rfc3339(field: &str) -> ConnectError {
+        ConnectError::invalid_argument(format!("events.error.field_invalid_rfc3339:{field}"))
+    }
+    pub fn invalid_visibility() -> ConnectError {
+        ConnectError::invalid_argument("events.error.field_invalid_visibility")
+    }
+    pub fn invalid_owner_kind() -> ConnectError {
+        ConnectError::invalid_argument("events.error.field_invalid_owner_kind")
+    }
+    pub fn invalid_principal_kind() -> ConnectError {
+        ConnectError::invalid_argument("events.error.field_invalid_principal_kind")
+    }
+    pub fn group_membership_required() -> ConnectError {
+        ConnectError::permission_denied("events.error.group_membership_required")
+    }
+    pub fn group_write_required() -> ConnectError {
+        ConnectError::permission_denied("events.error.group_write_required")
+    }
+    pub fn invite_already_exists() -> ConnectError {
+        ConnectError::already_exists("events.error.invite_already_exists")
+    }
 }
 
 /// Require the caller to hold `events:write` within `group_id` (a role in that
@@ -740,9 +763,7 @@ fn require_group_write(caller: &User, group_id: Uuid) -> Result<(), ConnectError
     if ok {
         Ok(())
     } else {
-        Err(ConnectError::permission_denied(
-            "you need events:write within this group",
-        ))
+        Err(err::group_write_required())
     }
 }
 
