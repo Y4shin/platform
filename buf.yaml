@@ -1,8 +1,6 @@
 version: v2
 modules:
   - path: proto
-  - path: plugins/hello/proto
-  - path: plugins/greetings/proto
   - path: plugins/events/proto
 lint:
   use:
