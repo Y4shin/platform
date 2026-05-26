@@ -77,10 +77,14 @@ authorized `Groups::members` + centralized login-redirect (Stage 5), the owner
 `InviteService.GetEventInvite` RPC and the `createFormField` per-field typing
 (Stage 11).
 
-**Promoted to a planned milestone (user-owned):** the proto-vs-handler permission
-*restatement* → **M15 "Typed RPC handlers"** ([`17-M15-rpc-service-macro.md`](17-M15-rpc-service-macro.md)) —
-make `option (platform.v1.requires)` the single source of truth so handlers don't
-restate the witness.
+**Promoted to a planned milestone (user-owned), now ✅ shipped:** the
+proto-vs-handler permission *restatement* → **M15 "Typed RPC handlers"**
+([`17-M15-rpc-service-macro.md`](17-M15-rpc-service-macro.md)). `#[rpc_service]`
++ build-time `__rpc_requires` aliases make `option (platform.v1.requires)` the
+single source of truth, and `junius check` (`RPC.HANDLER.UNGUARDED`,
+`RPC.SERVICE.UNIMPLEMENTED`, `RPC.WITNESS.MISMATCH`) is the drift gate. Events
+adopted in M15 Stage 4 — every handler lost its `permissions!(…) … from_rpc`
+line and gained a typed ctx parameter.
 
 **Documented in [`docs/plugin-authoring-guide.md`](../plugin-authoring-guide.md)**
 (kept in this log; the user opted *not* to split a separate durable friction doc):

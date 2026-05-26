@@ -103,7 +103,7 @@ impl<P: Has<EventsRead> + Has<EventsWrite>> EventRepo<P> {
 
 Repos use **compile-time `sqlx::query!`/`query_as!`** checked against the committed
 `.sqlx/` offline cache. After adding or changing a query you must regenerate it
-(see §12). Use **runtime `sqlx::query(...)`** for host-schema reads (it skips the
+(see §13). Use **runtime `sqlx::query(...)`** for host-schema reads (it skips the
 cache) — that's what the SDK's `Groups`/`Users` directory accessors do.
 
 > **Postgres enums** (e.g. `events.visibility`) map to Rust via
@@ -162,19 +162,96 @@ returned as `NotFound`, never distinguished from a missing one (no existence lea
 
 ---
 
-## 6. A public, unauthenticated handler
+## 6. RPC service handlers (`#[rpc_service]`)
+
+`option (platform.v1.requires)` on a proto method is the **single source of
+truth** for that method's permission set (M15). `junius sync` codegens the
+host's `RPC_REQUIRES` table from it (pre-dispatch enforcement), and each plugin's
+`build.rs` codegens a per-method **type alias** the handler's ctx parameter
+references — so the witness can't drift from the proto.
+
+The pieces:
+
+- **proto annotation** (the source):
+  ```proto
+  service EventService {
+    rpc CreateEvent(CreateEventRequest) returns (CreateEventResponse) {
+      option (platform.v1.requires) = "events:read,events:write";
+    }
+  }
+  ```
+- **build.rs codegen** (one call): plugin's `build.rs` invokes
+  `junius_rpc_meta::emit_rpc_requires(&PROTO_FILES)` after `connectrpc_build`,
+  writing `__rpc_requires` into `OUT_DIR`. `lib.rs` `include!`s it:
+  ```rust
+  include!(concat!(env!("OUT_DIR"), "/_rpc_requires.rs"));
+  ```
+  → `crate::__rpc_requires::event_service::CreateEvent` resolves to the
+  `And<EventsRead, And<EventsWrite, ()>>` chain matching the annotation.
+- **`#[rpc_service]` impl** (what the author writes):
+  ```rust
+  struct EventRpc;
+
+  #[junius_sdk::rpc_service(EventService)]
+  impl EventRpc {
+      async fn create_event(
+          &self,
+          ectx: EventCtx<crate::__rpc_requires::event_service::CreateEvent>,
+          request: OwnedCreateEventRequestView,
+      ) -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
+          let created = ectx.state.events.create(/* … */).await?;
+          /* … */
+      }
+  }
+  ```
+  The macro replaces the ctx parameter with `__ctx: ::connectrpc::RequestContext`
+  and prepends `let ectx = <WrittenType>::from_rpc(&__ctx)?;` to the body, then
+  emits the `impl EventService for EventRpc { … }` trait impl. Author code keeps
+  the alias visible at the call site — no hidden invocation.
+
+The alias is used **directly** as the `P` type parameter. **Never wrap it in
+`permissions!(…)`**: the alias is already a built witness, and wrapping turns
+the chain head into `And<…>` instead of a `Permission`, which silently breaks
+`Has<X>` resolution on repository methods (the repo would still compile but
+the wrong methods would be reachable).
+
+`junius check` enforces the discipline:
+
+- **`RPC.HANDLER.UNGUARDED`** — a bare `impl XService for Y` in source.
+- **`RPC.SERVICE.UNIMPLEMENTED`** — a proto service with no `#[rpc_service]`
+  block; `junius rpc scaffold --plugin <name>` inserts `todo!()` stubs for
+  every missing method (the same shape shown above).
+- **`RPC.WITNESS.MISMATCH`** — a handler whose ctx-parameter alias path
+  doesn't name its own method/service (e.g. `create_event` carrying
+  `…::event_service::ListEvents`).
+
+A method with no annotation gets the unit alias (`pub type Signup = ();`),
+which is the no-permission witness — see §7 for when that's intentional.
+
+---
+
+## 7. A public, unauthenticated handler
 
 The host session middleware is **pass-through** — it attaches `Extension<User>`
 when a session cookie is present and otherwise just continues (it never 401s). So a
 public surface is simply a handler that doesn't *require* a caller. There are two
 shapes; both let the runtime ACL (not a compile-time witness) decide access:
 
-- **Ungated RPC** (`InviteService.GetInvite/Signup/OptOut`): build the **no-permission
-  witness** context, `EventCtx::<()>::from_rpc(&ctx)?`. It resolves the *real*
-  (maybe-anonymous) caller without a permission check. Put the public read/write
-  methods in a **plain `impl<P>` block** (no `#[impl_repository]`, no `Has` bound) so
-  they're callable on `Repo<()>` while still using the macro's `pool()/user()/audit()`.
-  See `plugins/events/src/repo/invite.rs::get_page_by_slug`.
+- **Ungated RPC** (`InviteService.GetInvite/Signup/OptOut`): leave the
+  `(platform.v1.requires)` annotation **off** the proto method — its
+  generated alias is then `()`, the no-permission witness. The handler still
+  writes the alias path so `junius check` can verify the binding:
+  ```rust
+  async fn get_invite(
+      &self,
+      ectx: EventCtx<crate::__rpc_requires::invite_service::GetInvite>, // = ()
+      request: OwnedGetInviteRequestView,
+  ) -> ServiceResult<impl Encodable<pb::GetInviteResponse>> { /* … */ }
+  ```
+  Put the public read/write methods in a **plain `impl<P>` block** (no
+  `#[impl_repository]`, no `Has` bound) so they're callable on `Repo<()>` while
+  still using the macro's `pool()/user()/audit()`. See
+  `plugins/events/src/repo/invite.rs::get_page_by_slug`.
 
 - **Unauthenticated HTTP** (the `.ics` endpoints): extract `PluginResources` directly
   and build a caller-less repo — `CalendarRepo::<()>::new(resources.db(), None, resources.audit.clone())`
@@ -187,7 +264,7 @@ unless a logged-in viewer has `events:read` access.
 
 ---
 
-## 7. Frontend routes (+ a login-optional public page)
+## 8. Frontend routes (+ a login-optional public page)
 
 A plugin's frontend exports `buildRoutes(parent)` (and, for a public surface,
 `buildPublicRoutes(parent)`) from `src/index.ts`:
@@ -227,7 +304,7 @@ const { data } = useQuery(rpc.EventService.listEvents, {});
 
 ---
 
-## 8. The forms library (`@junius/design`)
+## 9. The forms library (`@junius/design`)
 
 Non-trivial forms use the zod-validated `Form`/`FormField` wrappers over
 react-hook-form. One zod schema drives validation *and* the inferred value type:
@@ -252,7 +329,7 @@ See `plugins/events/frontend/src/routes/pages/EventEditPage.tsx`.
 
 ---
 
-## 9. Exposed components (`[exposes.components]`)
+## 10. Exposed components (`[exposes.components]`)
 
 Declare reusable components in the manifest; `junius sync` registers them in the
 host component registry so other plugins can consume them via
@@ -270,7 +347,7 @@ Each declared component **must** be a named export of `frontend/src/index.ts`
 
 ---
 
-## 10. Background jobs + email
+## 11. Background jobs + email
 
 A sign-up enqueues a confirmation email through a background job — the cleanest
 worked example of jobs + email. Declare the capabilities, define a `Job`, register
@@ -304,7 +381,7 @@ Test handlers with no container via `Jobs::disabled(...)` + a capturing `Transpo
 
 ---
 
-## 11. Token-authed public endpoints (calendar feeds)
+## 12. Token-authed public endpoints (calendar feeds)
 
 The `.ics` subscription feeds are the worked example of a **bearer credential
 outside the session**. A feed key is unguessable (256-bit base64url), stored only
@@ -318,7 +395,7 @@ on the next poll. Minting/publishing a *group* feed additionally requires
 
 ---
 
-## 12. Internationalization (i18n)
+## 13. Internationalization (i18n)
 
 Every user-facing string goes through a catalog so the platform can render in
 the viewer's locale. There are two catalog flavours: **backend** strings (emails,
@@ -460,7 +537,7 @@ pass-through and doesn't need wrapping.
 
 ---
 
-## 13. Regenerate, check, and the CI gate
+## 14. Regenerate, check, and the CI gate
 
 After changing schema/queries/proto/manifest:
 

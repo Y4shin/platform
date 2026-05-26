@@ -379,10 +379,15 @@ service SpeakerService {
 ```
 
 What this delivers:
-- **Server-side enforcement**: a `connect_rs` interceptor wired by the host reads each method's annotations and rejects requests whose user lacks the listed permissions, before the handler runs. Plugin authors write no Rust permission code for RPC.
-- **Type-safe handler bodies**: codegen produces method signatures taking the plugin's own `<PluginName>Ctx<P>` (per §11.6) where `P` is the type-level expansion of the annotated permission list. Repository gates from §11.5 apply transparently inside RPC handlers — the plugin name is known from the proto's enclosing manifest, so codegen synthesizes the right context type.
+- **Server-side enforcement**: the host's `rpc_guard` middleware reads each method's annotation from the generated `RPC_REQUIRES` table (codegened by `junius sync`) and rejects requests whose user lacks the listed permissions, **before** the handler runs. Plugin authors write no Rust permission code for the RPC surface.
+- **Type-safe handler bodies (M15)**: the `#[junius_sdk::rpc_service(<ServiceTrait>)]` attribute macro rewrites an inherent `impl <RpcStruct> { … }` into the `connectrpc` trait impl. The ctx parameter's witness alias path (`crate::__rpc_requires::<service>::<Method>`) is emitted by each plugin's `build.rs` via `junius_rpc_meta::emit_rpc_requires` from the same proto annotation that drives `RPC_REQUIRES`, so the type-level expansion of the permission list and the pre-dispatch table can't drift. Repository gates from §11.5 apply transparently inside RPC handlers — the witness is built once from the proto.
 - **Frontend awareness**: the same annotations are surfaced in the TS client, letting the FE gate UI elements (hide a "Create" button if the user lacks `speakers:write`).
-- **Manifest cross-check**: `junius check` parses proto annotations and verifies every referenced permission appears in the relevant plugin's manifest `[permissions]` block. (Rust gets this for free via the type system; proto needs an explicit check because strings aren't types yet.)
+- **Authoring & drift gates (M15)**:
+  - **Manifest cross-check** — `junius check`'s `PROTO.REQUIRES.UNDECLARED` verifies every permission referenced from a proto appears in the plugin's `[permissions]`.
+  - **`RPC.HANDLER.UNGUARDED`** — a bare `impl <X>Service for <Y>` in source skips the macro and is rejected.
+  - **`RPC.SERVICE.UNIMPLEMENTED`** — every proto service must have a matching `#[rpc_service]` block.
+  - **`RPC.WITNESS.MISMATCH`** — the ctx parameter's alias path must name its own method/service (purely syntactic).
+  - `junius rpc scaffold --plugin <name>` inserts `todo!()` stubs for every proto method missing from its impl, idempotent.
 
 ## 11.9 Background jobs
 
@@ -441,6 +446,6 @@ These are sequenced after this section lands; they don't block the design.
 - Full transitivity of `Has<X>` impls through nested `And` (sealed helper traits).
 - `Bucket` derive for object storage — parallel to `Repository`.
 - Job system identity model (`system_context::<S>(resources)` helper).
-- The buf custom-options plugin needed for `option (platform.requires)` to round-trip through Rust + TS codegen, including synthesizing the plugin's `<PluginName>Ctx<P>` type in handler signatures.
-- `connect_rs` interceptor wiring for proto-declared permission enforcement.
+- ~~The buf custom-options plugin needed for `option (platform.requires)` to round-trip through Rust + TS codegen, including synthesizing the plugin's `<PluginName>Ctx<P>` type in handler signatures.~~ ✅ **Delivered by M15** ([`17-M15-rpc-service-macro.md`](../impl/17-M15-rpc-service-macro.md)): the `junius_rpc_meta` crate scans protos and codegens a per-method `__rpc_requires` alias from each `(platform.v1.requires)`; the `#[rpc_service]` macro uses the author's written ctx type verbatim — no buf plugin / `connectrpc-build` fork needed.
+- ~~`connect_rs` interceptor wiring for proto-declared permission enforcement.~~ ✅ **Delivered by M06/M07**: host `rpc_guard` middleware reads from the `junius sync`-generated `RPC_REQUIRES` table.
 - OR-style permission combinators (`Or<A, B>` + `HasAny<X>`).

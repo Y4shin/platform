@@ -499,7 +499,8 @@ mod tests {
     // runner doesn't race them.
     fn cwd_lock() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        LOCK.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn run_in(root: &Path, plugin: &str, check: bool) -> i32 {

@@ -1,9 +1,10 @@
 # 17. M15 — Typed RPC handlers (`#[rpc_service]` + proto-derived witnesses)
 
-> **Status:** 🚧 planned. Sequenced **after [M14 i18n](16-M14-internationalization.md)**, and its
-> adoption step must wait for [M13](14-M13-events-plugin.md) to settle (the events plugin's RPC
-> surface is still in flux). Realizes the RPC half of [design §11.8](../design/11-backend-plugin-interface.md)
-> that §11.12 deferred — **without forking `connectrpc-build`**.
+> **Status:** ✅ Implemented. Realizes the RPC half of
+> [design §11.8](../design/11-backend-plugin-interface.md) that §11.12 deferred —
+> **without forking `connectrpc-build`**. Sequenced after
+> [M14 i18n](16-M14-internationalization.md); adoption was gated on
+> [M13](14-M13-events-plugin.md), now ✅.
 
 One-line goal: make the proto `option (platform.v1.requires)` the **single source of truth** for an
 RPC method's permissions, and let plugin authors write handlers that *receive* an explicitly-typed,
@@ -13,8 +14,8 @@ already-permission-checked context — instead of restating the permission set i
 
 Today an RPC method's permission set is written **twice**, in two encodings that nothing reconciles:
 
-1. In the proto — `option (platform.v1.requires) = "greetings:read,greetings:write"`.
-2. In the handler body — `GreetingCtx::<permissions!(GreetingsRead & GreetingsWrite)>::from_rpc(&ctx)?`.
+1. In the proto — `option (platform.v1.requires) = "events:read,events:write"`.
+2. In the handler body — `EventCtx::<permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?`.
 
 The host guard ([`platform/src/rpc_guard.rs`](../../platform/src/rpc_guard.rs)) enforces #1 at runtime
 from the generated [`RPC_REQUIRES`](../../platform/src/generated/rpc_requires.rs) table; the handler
@@ -45,7 +46,7 @@ build-time codegen step — no third-party fork.
 
 ## Decisions (confirmed with the user, 2026-05-25)
 
-1. **Explicit alias in the signature — not a bare ctx.** A bare `ctx: GreetingCtx` that the macro
+1. **Explicit alias in the signature — not a bare ctx.** A bare `ctx: EventCtx` that the macro
    silently fills was rejected as "too much magic" when reading a handler. Authors write the full
    witness alias in the parameter type, so the requirement is visible at the call site. Consequence:
    **the macro is plumbing-only** — it uses the author's written ctx type verbatim and never invents a
@@ -62,7 +63,8 @@ build-time codegen step — no third-party fork.
 ## Scope
 
 **In:** the shared scanner crate; build-time witness generation; the `#[rpc_service]` macro; adoption
-in `greetings` + `hello` (events after M13); the `junius check` enforcement rules; the
+in `events` (the only plugin with an RPC surface; the `greetings`/`hello`
+illustrations in earlier drafts referenced dummy plugins now deleted); the `junius check` enforcement rules; the
 `junius rpc scaffold` codemod; docs + friction-log closure.
 
 **Out (deferred, noted at the call sites):**
@@ -87,7 +89,7 @@ guessing. The contract:
 - Each alias resolves to the right-nested `And`-chain of `crate::permissions::*` markers
   (`junius_sdk::permissions::And<…, …>`); a method with no annotation → `()` (the empty witness).
 - **the author** writes that path in the ctx parameter:
-  `ctx: GreetingCtx<crate::__rpc_requires::greeting_service::CreateGreeting>`.
+  `ctx: EventCtx<crate::__rpc_requires::event_service::CreateEvent>`.
 - **the macro** ignores naming entirely — it calls `<written type>::from_rpc(&__ctx)?`.
 - **`junius rpc scaffold`** and **`junius check`** reconstruct the path the *safe* direction:
   `UpperCamel` of the snake fn ident + `snake` of the service name. Both Pascal-case the same snake
@@ -99,30 +101,30 @@ The alias is used **directly** as the `P` type parameter. It must **not** be wra
 
 ## Authoring shape (before → after)
 
-Today ([`plugins/greetings/src/lib.rs`](../../plugins/greetings/src/lib.rs)):
+Before ([`plugins/events/src/lib.rs`](../../plugins/events/src/lib.rs) at M13):
 
 ```rust
-impl GreetingService for GreetingRpc {
-    async fn create_greeting(&self, ctx: RequestContext, request: OwnedCreateGreetingRequestView)
-        -> ServiceResult<impl Encodable<pb::CreateGreetingResponse>> {
-        let gctx = GreetingCtx::<junius_sdk::permissions!(GreetingsRead & GreetingsWrite)>::from_rpc(&ctx)?;
-        let created = gctx.state.greetings.create(/* … */).await?;
+impl EventService for EventRpc {
+    async fn create_event(&self, ctx: RequestContext, request: OwnedCreateEventRequestView)
+        -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
+        let ectx = EventCtx::<junius_sdk::permissions!(EventsRead & EventsWrite)>::from_rpc(&ctx)?;
+        let created = ectx.state.events.create(/* … */).await?;
         Ok(Response::new(/* … */))
     }
 }
 ```
 
-After:
+After (post-M15, current source):
 
 ```rust
-#[rpc_service(GreetingService)]
-impl GreetingRpc {
-    async fn create_greeting(
+#[junius_sdk::rpc_service(EventService)]
+impl EventRpc {
+    async fn create_event(
         &self,
-        ctx: GreetingCtx<crate::__rpc_requires::greeting_service::CreateGreeting>,
-        request: OwnedCreateGreetingRequestView,
-    ) -> ServiceResult<impl Encodable<pb::CreateGreetingResponse>> {
-        let created = ctx.state.greetings.create(/* … */).await?;   // ctx already resolved + checked
+        ectx: EventCtx<crate::__rpc_requires::event_service::CreateEvent>,
+        request: OwnedCreateEventRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
+        let created = ectx.state.events.create(/* … */).await?;   // ectx already resolved + checked
         Ok(Response::new(/* … */))
     }
 }
@@ -131,18 +133,18 @@ impl GreetingRpc {
 Expansion (conceptual):
 
 ```rust
-impl GreetingService for GreetingRpc {
-    async fn create_greeting(&self, __ctx: RequestContext, request: OwnedCreateGreetingRequestView)
-        -> ServiceResult<impl Encodable<pb::CreateGreetingResponse>> {
-        let ctx = GreetingCtx::<crate::__rpc_requires::greeting_service::CreateGreeting>::from_rpc(&__ctx)?;
-        let created = ctx.state.greetings.create(/* … */).await?;
+impl EventService for EventRpc {
+    async fn create_event(&self, __ctx: RequestContext, request: OwnedCreateEventRequestView)
+        -> ServiceResult<impl Encodable<pb::CreateEventResponse>> {
+        let ectx = EventCtx::<crate::__rpc_requires::event_service::CreateEvent>::from_rpc(&__ctx)?;
+        let created = ectx.state.events.create(/* … */).await?;
         Ok(Response::new(/* … */))
     }
 }
 ```
 
 The permission set now exists only in the proto; the alias the author writes is generated *from* it.
-Registration is unchanged — `Arc::new(GreetingRpc).register(router)` in `register_rpc` is orthogonal.
+Registration is unchanged — `Arc::new(EventRpc).register(router)` in `register_rpc` is orthogonal.
 
 ## Stages
 
@@ -154,7 +156,7 @@ De-risk the two things that historically sink signature-rewriting macros: (a) **
 behaviour on an `#[rpc_service]`-rewritten handler — completion + inline diagnostics inside the body;
 (b) confirm `connectrpc-build`'s exact names for the request-view type (`Owned<Method>RequestView`),
 the response type, and the trait fn ident, and **pin the `connectrpc` version**.
-**Verify:** a hand-written expansion compiles for one greetings method and RA stays usable. If RA
+**Verify:** a hand-written expansion compiles for one events method and RA stays usable. If RA
 degrades, the explicit-alias decision already keeps the macro minimal — fall back to a macro that does
 *only* the `RequestContext`→`from_rpc` rewrite (no other behaviour change). Go/no-go gate.
 
@@ -170,30 +172,30 @@ nothing).
 
 ### Stage 2 — build-time `__rpc_requires` generation
 Add a one-call helper to `junius-rpc-meta` (`emit_rpc_requires(&proto_files, out_dir)`) so each
-plugin's [`build.rs`](../../plugins/greetings/build.rs) grows ~2 lines after the existing
+plugin's [`build.rs`](../../plugins/events/build.rs) grows ~2 lines after the existing
 `connectrpc_build` call. It writes `_rpc_requires.rs` (a `pub mod __rpc_requires`) into `OUT_DIR`,
-`include!`d from `lib.rs`. Land it in `greetings` only first.
-**Verify:** `greetings` compiles with the module present; a temporary
-`GreetingCtx::<__rpc_requires::greeting_service::CreateGreeting>::from_rpc(&ctx)` type-checks and
-`Has<GreetingsWrite>` still resolves (this is exactly where the `permissions!`-double-wrap bug would
+`include!`d from `lib.rs`. Land it in `events` first.
+**Verify:** `events` compiles with the module present; a temporary
+`EventCtx::<crate::__rpc_requires::event_service::CreateEvent>::from_rpc(&ctx)` type-checks and
+`Has<EventsWrite>` still resolves (this is exactly where the `permissions!`-double-wrap bug would
 bite — the alias is used directly as `P`).
 
 ### Stage 3 — the `#[rpc_service]` macro (plumbing-only, per decision #1)
 New proc-macro in [`junius-sdk-macros`](../../crates/junius-sdk-macros). Scope: unary methods. It
-consumes an inherent `impl GreetingRpc`, and for each method: replaces the ctx parameter with
+consumes an inherent `impl EventRpc`, and for each method: replaces the ctx parameter with
 `__ctx: RequestContext`, prepends `let <ident> = <written ctx type>::from_rpc(&__ctx)?;`, passes the
-body through with **preserved spans** (for error quality), and emits `impl GreetingService for
-GreetingRpc`. It reads the ctx parameter's *written* type verbatim — it never constructs a witness.
+body through with **preserved spans** (for error quality), and emits `impl EventService for
+EventRpc`. It reads the ctx parameter's *written* type verbatim — it never constructs a witness.
 The ctx parameter is identified by position (first non-`&self` parameter, the `RequestContext` slot);
 a non-unary/streaming shape → a clear `compile_error!`.
 **Verify:** a `trybuild` suite — passing case; compile-fail cases for a too-weak witness (the repo
 method is unnameable), a missing ctx parameter, and a streaming-shaped method.
 
 ### Stage 4 — Adopt
-Migrate `greetings` (1 service) and validate the whole chain end-to-end: the host guard still rejects
-pre-dispatch, `from_rpc` still runtime-checks, repo `Has<X>` gating is intact. Then `hello`
-(`HelloService`, `NoteService`). **Gate `events` (`EventService`, `InviteService`, `CalendarService`)
-on M13 finishing** to avoid colliding with the in-flight rewrite.
+Migrate `events` (`EventService` 6 methods, `InviteService` 7 methods,
+`CalendarService` 5 methods — the only plugin with an RPC surface) and
+validate end-to-end: the host guard still rejects pre-dispatch, `from_rpc`
+still runtime-checks, repo `Has<X>` gating is intact.
 **Verify:** per plugin, `task ci` green and the existing RPC integration tests pass unchanged; the diff
 shows handlers lost their `permissions!(…)` / `from_rpc` lines and gained the typed ctx parameter.
 
@@ -205,7 +207,7 @@ all syn-parsing the plugin's `src/**/*.rs`:
   (this also produces the worklist for Stage 6).
 - `RPC.WITNESS.MISMATCH` — a handler whose ctx-parameter alias path does **not** correspond to its
   method/service. This is a purely *syntactic* check, enabled by decision #1: the alias path names the
-  method (`…::greeting_service::CreateGreeting` ↔ `fn create_greeting` under `#[rpc_service(GreetingService)]`),
+  method (`…::event_service::CreateEvent` ↔ `fn create_event` under `#[rpc_service(EventService)]`),
   so no type evaluation is required. This is the drift guard the explicit-alias form buys back.
 **Verify:** snapshot tests — all migrated plugins pass; fixtures with (a) a raw trait impl, (b) a
 missing service, and (c) a mismatched alias each fail with the right code.
