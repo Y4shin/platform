@@ -70,6 +70,11 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: NewCmd,
     },
+    /// Inspect and validate per-plugin i18n catalogs (M14).
+    I18n {
+        #[command(subcommand)]
+        subcommand: I18nCmd,
+    },
 }
 
 #[derive(clap::Args, Debug)]
@@ -184,6 +189,18 @@ pub enum PluginCmd {
     /// plugin requires it) and re-sync.
     Disable {
         name: String,
+        /// Path to platform.toml. Defaults to ./platform.toml.
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum I18nCmd {
+    /// Validate every enabled plugin's `i18n/*.po` catalogs: parse, schema
+    /// agreement against `en.po`, and translator-introduced placeholders.
+    /// Returns non-zero on the first failure with <file:line> spans.
+    Check {
         /// Path to platform.toml. Defaults to ./platform.toml.
         #[arg(long)]
         config: Option<PathBuf>,

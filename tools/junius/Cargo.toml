@@ -20,7 +20,8 @@ default = ["develop"]
 develop = []
 
 [dependencies]
-junius-manifest = { workspace = true }
+junius-manifest   = { workspace = true }
+junius-i18n-build = { workspace = true }
 
 clap               = { workspace = true }
 miette             = { workspace = true }

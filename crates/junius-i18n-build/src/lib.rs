@@ -98,6 +98,18 @@ pub fn generate(opts: Options<'_>) -> Result<PathBuf, Error> {
     let out_dir = std::env::var("OUT_DIR").map_err(|_| Error::Env("OUT_DIR not set"))?;
     let i18n_dir = Path::new(&manifest_dir).join(opts.i18n_dir);
     let out_path = Path::new(&out_dir).join(opts.out_file);
+    // Build-script context: emit cargo:rerun-if-changed for every shipped
+    // locale that exists, so cargo picks up `.po` edits.
+    println!(
+        "cargo:rerun-if-changed={}",
+        i18n_dir.join("en.po").display()
+    );
+    for locale in opts.locales {
+        let path = i18n_dir.join(format!("{locale}.po"));
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
     generate_at(opts.domain, opts.locales, &i18n_dir, &out_path)
 }
 
@@ -117,7 +129,6 @@ pub fn generate_at(
         Ok(s) => s,
         Err(e) => return Err(Error::ReadSource(en_path.clone(), e.to_string())),
     };
-    println!("cargo:rerun-if-changed={}", en_path.display());
     let en_entries = po::parse(&en_src).map_err(|e| Error::Parse(en_path.clone(), e))?;
 
     // Build the per-msgid schema from en: msgid, placeholders (in first-seen
@@ -136,7 +147,6 @@ pub fn generate_at(
     for &locale in locales {
         let path = i18n_dir.join(format!("{locale}.po"));
         if path.exists() {
-            println!("cargo:rerun-if-changed={}", path.display());
             let src = std::fs::read_to_string(&path)
                 .map_err(|e| Error::ReadSource(path.clone(), e.to_string()))?;
             let entries = po::parse(&src).map_err(|e| Error::Parse(path.clone(), e))?;

@@ -1,0 +1,7 @@
+# M14: hello plugin German translations.
+
+msgid "hello.page.title"
+msgstr "Hallo"
+
+msgid "hello.page.greeting"
+msgstr "Hallo, {name}"

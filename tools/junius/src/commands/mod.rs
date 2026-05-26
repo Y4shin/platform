@@ -4,6 +4,7 @@ pub mod check;
 pub mod cross_check;
 #[cfg(feature = "develop")]
 pub mod dev;
+pub mod i18n;
 pub mod migrate;
 #[cfg(feature = "develop")]
 pub mod new;

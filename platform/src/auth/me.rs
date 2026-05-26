@@ -51,4 +51,3 @@ pub async fn update_locale(
         }
     }
 }
-

@@ -2680,6 +2680,7 @@ dependencies = [
  "blake3",
  "clap",
  "insta",
+ "junius-i18n-build",
  "junius-manifest",
  "miette",
  "petgraph",
