@@ -53,6 +53,14 @@ fn sync_with_hello_writes_expected_files() {
     .unwrap();
     insta::assert_snapshot!("registry_ts_empty", registry_ts);
 
+    let i18n_ts = fs::read_to_string(
+        tmp.path()
+            .join("platform/frontend/src/generated/i18n-catalogs.ts"),
+    )
+    .unwrap();
+    // hello fixture has no `frontend/i18n/`, so the array is empty.
+    insta::assert_snapshot!("i18n_catalogs_empty", i18n_ts);
+
     let rpc_barrel = fs::read_to_string(
         tmp.path()
             .join("packages/generated/src/plugins/hello/rpc.ts"),

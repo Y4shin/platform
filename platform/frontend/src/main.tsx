@@ -1,7 +1,6 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { loadI18n as loadEventsI18n } from '@junius/plugin-events';
 import {
   AuthProvider,
   type CatalogLoader,
@@ -14,13 +13,14 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { componentRegistry } from './generated/component-registry.js';
+import { PLUGIN_I18N_CATALOGS } from './generated/i18n-catalogs.js';
 import { PUBLIC_ROUTE_PREFIXES, routeTree } from './generated/routes.js';
 import { loadShellI18n } from './i18n.js';
 
-// Lingui catalog loaders, one per participating package. Hand-listed for now;
-// `junius sync` will codegen this array against the deployment's plugin list
-// (same way it owns routes + the component registry) in a follow-up.
-const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n, loadEventsI18n];
+// Host shell catalog + plugin catalogs (codegen'd by `junius sync` against
+// the deployment's plugin list — same source-of-truth as routes + the
+// component registry).
+const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n, ...PLUGIN_I18N_CATALOGS];
 
 import './styles.css';
 
