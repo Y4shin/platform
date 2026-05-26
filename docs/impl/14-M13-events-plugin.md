@@ -1,6 +1,6 @@
 # M13 — First Real Domain Plugin: Events
 
-> **Status:** 🚧 Planned.
+> **Status:** ✅ Implemented.
 >
 > *(This milestone was originally scoped as a "speakers" plugin; it was re-scoped
 > to an **events** plugin — a more relatable calendar-style first real plugin that
