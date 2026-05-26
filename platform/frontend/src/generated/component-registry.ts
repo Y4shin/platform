@@ -5,8 +5,9 @@
 // `[exposes.components]`. Per-key types come from each consumer's
 // generated `ComponentRegistry` augmentation.
 
-import { EventCard as Events_EventCard, EventPicker as Events_EventPicker } from '@junius/plugin-events';
 import type { ComponentRegistryValue } from '@junius/sdk';
+import { EventCard as Events_EventCard } from '@junius/plugin-events';
+import { EventPicker as Events_EventPicker } from '@junius/plugin-events';
 
 export const componentRegistry: ComponentRegistryValue = {
   'events.EventCard': Events_EventCard,
