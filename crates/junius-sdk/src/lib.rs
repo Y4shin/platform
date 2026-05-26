@@ -14,6 +14,7 @@ pub mod email;
 pub mod error;
 pub mod i18n;
 pub mod jobs;
+pub mod localizer;
 pub mod metadata;
 pub mod permissions;
 pub mod plugin;
@@ -23,7 +24,9 @@ pub mod secrets;
 pub mod storage;
 pub mod telemetry;
 
-pub use junius_sdk_macros::{PluginCtx, impl_repository, permissions, plugin_metadata, repository};
+pub use junius_sdk_macros::{
+    PluginCtx, i18n_catalog, impl_repository, permissions, plugin_metadata, repository,
+};
 
 pub use authz::{Authz, Principal, ShareRecord};
 pub use context::{ApiError, BuildState, PluginContext, system_context};
@@ -39,8 +42,11 @@ pub use config::PluginConfig;
 pub use db::PluginDb;
 pub use email::{Attachment, Email, EmailMessage, Transport, TransportError};
 pub use error::{PluginError, RepoError};
-pub use i18n::{Locale, LocaleResolver};
+pub use i18n::{
+    Domain, FALLBACK_TEMPLATE, Locale, LocaleResolver, Message, Template, TemplatePart,
+};
 pub use jobs::{Job, JobBackend, JobEnvelope, JobError, JobHandler, Jobs};
+pub use localizer::{Localizer, LocalizerBuilder, ScopedLocalizer};
 pub use metadata::{
     DependencyDecl, ExposedComponentDecl, ExposedTableDecl, MountPoints, PermissionDecl,
     PluginMetadata,

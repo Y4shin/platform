@@ -3,8 +3,8 @@
 //! `on_shutdown` with a caller-less [`PluginResources`] built from it.
 
 use junius_sdk::{
-    AuditEmitter, Auth, Authz, Groups, Plugin, PluginDb, PluginMetadata, PluginResourceCtx,
-    PluginResources, Telemetry, Users,
+    AuditEmitter, Auth, Authz, Groups, Locale, Localizer, LocalizerBuilder, Plugin, PluginDb,
+    PluginMetadata, PluginResourceCtx, PluginResources, Telemetry, Users,
 };
 use sqlx::PgPool;
 
@@ -22,6 +22,7 @@ pub fn build_ctx(
     platform_pool: &PgPool,
     runtime: &PluginRuntime,
     infra: &HostInfra,
+    localizer: &Localizer,
 ) -> PluginResourceCtx {
     PluginResourceCtx {
         config: runtime.config.clone(),
@@ -35,9 +36,21 @@ pub fn build_ctx(
         email: infra.email_handle(meta.name, meta.capabilities),
         jobs: infra.jobs_handle(platform_pool, meta.name, meta.capabilities),
         storage: infra.storage_handle(platform_pool, meta.name, meta.capabilities),
+        localizer: localizer.clone(),
         secrets: runtime.secrets.clone(),
         capabilities: meta.capabilities,
     }
+}
+
+/// Build a single shared [`Localizer`] from every plugin's `register_i18n` plus
+/// the deployment's configured default locale. Called once at host boot; the
+/// result is cloned into each plugin's `PluginResourceCtx`.
+pub fn build_localizer(plugins: &[Box<dyn Plugin>], default_locale: Locale) -> Localizer {
+    let mut builder = LocalizerBuilder::new(default_locale);
+    for plugin in plugins {
+        plugin.register_i18n(&mut builder);
+    }
+    builder.build()
 }
 
 /// Run `on_startup` for every plugin in registration order. Fails on the first
@@ -48,6 +61,7 @@ pub async fn run_startup(
     platform_pool: &PgPool,
     runtimes: &std::collections::BTreeMap<String, PluginRuntime>,
     infra: &HostInfra,
+    localizer: &Localizer,
 ) -> anyhow::Result<()> {
     for plugin in plugins {
         let meta = plugin.metadata();
@@ -56,7 +70,7 @@ pub async fn run_startup(
             anyhow::bail!("no database pool was built for plugin {name}");
         };
         let runtime = runtimes.get(name).cloned().unwrap_or_default();
-        let ctx = build_ctx(meta, db, platform_pool, &runtime, infra);
+        let ctx = build_ctx(meta, db, platform_pool, &runtime, infra, localizer);
         let resources = PluginResources::from_ctx(&ctx, None);
         plugin
             .on_startup(&resources)
@@ -74,6 +88,7 @@ pub async fn run_shutdown(
     platform_pool: &PgPool,
     runtimes: &std::collections::BTreeMap<String, PluginRuntime>,
     infra: &HostInfra,
+    localizer: &Localizer,
 ) {
     for plugin in plugins.iter().rev() {
         let meta = plugin.metadata();
@@ -82,7 +97,7 @@ pub async fn run_shutdown(
             continue;
         };
         let runtime = runtimes.get(name).cloned().unwrap_or_default();
-        let ctx = build_ctx(meta, db, platform_pool, &runtime, infra);
+        let ctx = build_ctx(meta, db, platform_pool, &runtime, infra, localizer);
         let resources = PluginResources::from_ctx(&ctx, None);
         if let Err(e) = plugin.on_shutdown(&resources).await {
             tracing::error!(plugin = name, error = %e, "on_shutdown failed");

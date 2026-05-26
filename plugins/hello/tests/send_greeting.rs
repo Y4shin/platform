@@ -56,6 +56,7 @@ async fn send_greeting_job_emails_via_capability() {
         email,
         jobs: Jobs::disabled("hello", CAPS),
         storage: PluginStorage::empty("hello", CAPS),
+        localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
         secrets: SecretStore::default(),
         capabilities: CAPS,
     };

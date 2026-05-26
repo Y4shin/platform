@@ -1,0 +1,17 @@
+[package]
+name         = "junius-i18n-build"
+version      = "0.0.0"
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+publish      = false
+
+# This crate is invoked from plugin build.rs files. It deliberately keeps its
+# dependencies tiny (no proc-macros, no async runtime, no SDK) so adding i18n
+# to a plugin doesn't blow up the build graph. The runtime-facing types live
+# in `junius-sdk`; this crate emits source code referencing them by path.
+
+[dependencies]
+
+[lints]
+workspace = true

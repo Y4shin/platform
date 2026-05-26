@@ -1,16 +1,28 @@
 //! Internationalization primitives shared by every plugin and the host.
 //!
-//! Stage A (M14) introduces the [`Locale`] enum and the request-time / async
-//! resolution helpers in [`LocaleResolver`]. Stage B builds the [`Message`],
-//! [`Template`], `Domain`, and `Localizer` on top.
+//! Stage A introduces the [`Locale`] enum and [`LocaleResolver`]. Stage B
+//! layers the catalog runtime on top: the [`Domain`] enum, the
+//! [`TemplatePart`]/[`Template`] parsed-msgstr types, the [`Message`] trait
+//! that codegen'd per-msgid structs implement, and the runtime
+//! [`crate::localizer::Localizer`] that pulls templates from a fixed-shape
+//! 2D `[Domain × Locale]` array — no hashmaps on the hot path.
 //!
-//! The set of shipped locales is **closed at the SDK level** — adding a new
-//! locale is a one-line SDK edit plus per-plugin `.po` files. Encoding it as an
-//! enum (rather than a string) gives compile-time exhaustiveness, an O(1)
-//! `as usize` array index for the upcoming catalog tables, and rules out the
-//! `"en-US"` vs `"en_us"` typo class of bugs entirely.
+//! ## Why enums
 //!
-//! Locale resolution priority (per the M14 plan):
+//! Both the locale set (closed at the SDK level) and the plugin-domain set
+//! (closed at the host's build) are known at compile time. Encoding them as
+//! enums (rather than strings) gives:
+//!
+//! - compile-time exhaustiveness in `match`,
+//! - an `as usize` index into the catalog tables (zero-cost lookup),
+//! - rejection of `"en-US"` vs `"en_us"` and `"events"` vs `"event"` typos.
+//!
+//! Adding a new locale is a one-line SDK edit + new `.po` files. Adding a new
+//! plugin is a [`Domain`] variant edit (a future `junius sync` step will
+//! regenerate this from `dev/platform.toml`; for M14 it is hand-written).
+//!
+//! ## Locale resolution priority
+//!
 //! 1. The user's stored preference (`platform.user.locale`).
 //! 2. The request's `Accept-Language` header — first variant we recognise.
 //! 3. The deployment-wide default (`HostConfig.default_locale`, itself
@@ -120,6 +132,109 @@ impl LocaleResolver {
     pub fn resolve_for_stored(&self, stored: Option<&str>) -> Locale {
         stored.and_then(Locale::from_code).unwrap_or(self.default)
     }
+}
+
+/// The set of installed plugin domains. Hand-written for M14 — a future
+/// `junius sync` enhancement will codegen this from `dev/platform.toml` so it
+/// tracks the deployment's installed plugin set automatically. `Platform = 0`
+/// is reserved for the host's own catalog (deployment-wide strings).
+#[repr(usize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Domain {
+    Platform = 0,
+    Hello = 1,
+    Greetings = 2,
+    Widgets = 3,
+    Events = 4,
+}
+
+impl Domain {
+    pub const COUNT: usize = 5;
+    pub const ALL: [Domain; Self::COUNT] = [
+        Self::Platform,
+        Self::Hello,
+        Self::Greetings,
+        Self::Widgets,
+        Self::Events,
+    ];
+
+    /// Catalog domain name as it appears in `.po` headers and in the build
+    /// helper's `Options.domain` field.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Platform => "platform",
+            Self::Hello => "hello",
+            Self::Greetings => "greetings",
+            Self::Widgets => "widgets",
+            Self::Events => "events",
+        }
+    }
+
+    /// Parse a domain name. `None` for unknown names — callers should treat
+    /// that as a configuration error.
+    #[must_use]
+    pub fn from_name(s: &str) -> Option<Self> {
+        match s {
+            "platform" => Some(Self::Platform),
+            "hello" => Some(Self::Hello),
+            "greetings" => Some(Self::Greetings),
+            "widgets" => Some(Self::Widgets),
+            "events" => Some(Self::Events),
+            _ => None,
+        }
+    }
+}
+
+/// One parsed piece of a msgstr, produced by the build-time `.po` parser.
+/// Stored as `&'static` data in the codegen'd per-locale catalog arrays.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TemplatePart {
+    Literal(&'static str),
+    /// Placeholder name as it appears between `{...}` in the msgid/msgstr.
+    /// Validated at codegen against the message's typed-struct fields.
+    Placeholder {
+        name: &'static str,
+    },
+}
+
+/// A msgstr after build-time parsing. Stored in the per-locale catalog array
+/// and walked by the codegen'd `Message::render` impl.
+#[derive(Copy, Clone, Debug)]
+pub struct Template {
+    pub parts: &'static [TemplatePart],
+}
+
+impl Template {
+    /// Fallback template used when nothing else resolves. Kept as a unique
+    /// `&'static Template` so the localizer never returns a heap allocation.
+    pub const FALLBACK: Template = Template { parts: &[] };
+}
+
+/// Convenience: a unit `Template` value pointer the localizer falls back to
+/// when no catalog row exists for the active or default locale. The render
+/// impl in that case emits the empty string; the message's `KEY` is still
+/// available for diagnostics. The `junius i18n check` gate keeps this from
+/// happening in CI.
+pub static FALLBACK_TEMPLATE: Template = Template::FALLBACK;
+
+/// A statically-known catalog entry. The build-time codegen
+/// (`junius_i18n_build::generate`) emits one implementing type per msgid;
+/// `Localizer::t` is generic over it. No hand-written impls in user code.
+pub trait Message {
+    /// Owning domain — supplied by the build helper, which knows the plugin's
+    /// domain name from its `Options.domain` field at codegen time.
+    const DOMAIN: Domain;
+    /// Stable, dense index assigned by codegen: the position of this msgid in
+    /// the canonical (sorted) `en.po` ordering. Used as the inner index into
+    /// the per-locale catalog slice.
+    const ID: usize;
+    /// Catalog key (the msgid), e.g. `"event.signup.subject"`. For diagnostics
+    /// and the optional dynamic lookup path (e.g. translating an error code).
+    const KEY: &'static str;
+    /// Walk the parsed template, emitting literal text and typed substitutions.
+    /// Implementations are generated; callers never write this.
+    fn render(&self, template: &Template) -> String;
 }
 
 /// Pick the first `Accept-Language` tag we recognise. Ignores q-values for v1

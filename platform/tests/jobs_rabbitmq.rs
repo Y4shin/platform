@@ -116,6 +116,7 @@ async fn jobs_round_trip_and_dead_letter() {
         email: Email::disabled("testjobs", &[]),
         jobs: Jobs::disabled("testjobs", &[]),
         storage: PluginStorage::empty("testjobs", &[]),
+        localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
         secrets: SecretStore::default(),
         capabilities: &["job.enqueue"],
     };

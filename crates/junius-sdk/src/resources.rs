@@ -22,6 +22,7 @@ use crate::db::PluginDb;
 use crate::email::Email;
 use crate::error::PluginError;
 use crate::jobs::Jobs;
+use crate::localizer::Localizer;
 use crate::secrets::SecretStore;
 use crate::storage::PluginStorage;
 use crate::telemetry::Telemetry;
@@ -64,6 +65,10 @@ pub struct PluginResources {
     pub jobs: Jobs,
     /// Object storage (gated on `storage.read`/`storage.write`).
     pub storage: PluginStorage,
+    /// Catalog-backed translator (always-on; static data, no capability gate).
+    /// Built once at host boot from every plugin's `register_i18n` and cloned
+    /// per request.
+    pub localizer: Localizer,
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
     /// The plugin's declared `[requires].capabilities` (for runtime gating of
@@ -88,6 +93,7 @@ impl PluginResources {
             email: ctx.email.clone(),
             jobs: ctx.jobs.clone(),
             storage: ctx.storage.clone(),
+            localizer: ctx.localizer.clone(),
             secrets: ctx.secrets.clone(),
             capabilities: ctx.capabilities,
         }
@@ -135,6 +141,7 @@ pub struct PluginResourceCtx {
     pub email: Email,
     pub jobs: Jobs,
     pub storage: PluginStorage,
+    pub localizer: Localizer,
     pub secrets: SecretStore,
     pub capabilities: &'static [&'static str],
 }

@@ -55,6 +55,7 @@ async fn send_signup_confirmation_emails_via_capability() {
         email,
         jobs: Jobs::disabled("events", CAPS),
         storage: PluginStorage::empty("events", CAPS),
+        localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
         secrets: SecretStore::default(),
         capabilities: CAPS,
     };

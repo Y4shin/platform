@@ -88,6 +88,7 @@ async fn greetings_route_enforces_hello_read() {
         email: Email::disabled("hello", &[]),
         jobs: Jobs::disabled("hello", &[]),
         storage: PluginStorage::empty("hello", &[]),
+        localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
         secrets: SecretStore::default(),
         capabilities: &[],
     };

@@ -7,6 +7,7 @@ use axum::Router;
 
 use crate::error::PluginError;
 use crate::jobs::JobHandler;
+use crate::localizer::LocalizerBuilder;
 use crate::metadata::PluginMetadata;
 use crate::resources::PluginResources;
 
@@ -55,4 +56,10 @@ pub trait Plugin: Send + Sync + 'static {
     fn jobs(&self) -> Vec<JobHandler> {
         Vec::new()
     }
+
+    /// Install the plugin's i18n catalog into the host's [`LocalizerBuilder`]
+    /// (M14). Plugins with no strings (or no catalog yet) inherit the default
+    /// no-op; the `junius_sdk::i18n_catalog!()` macro generates a
+    /// `catalog::register(b)` function plugins forward to here.
+    fn register_i18n(&self, _builder: &mut LocalizerBuilder) {}
 }

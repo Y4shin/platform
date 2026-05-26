@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::routing::get;
 use axum::{Extension, Router};
-use junius_sdk::{MetricSink, Plugin, PluginResourceCtx};
+use junius_sdk::{Locale, Localizer, MetricSink, Plugin, PluginResourceCtx};
 use sqlx::PgPool;
 use tokio_util::sync::CancellationToken;
 
@@ -33,8 +33,12 @@ pub fn build_app_with_services(
     runtimes: &BTreeMap<String, PluginRuntime>,
     auth_state: AuthState,
     infra: &HostInfra,
+    localizer: &Localizer,
 ) -> Router {
-    let http = compose_http(plugins, Some((pools, platform_pool, runtimes, infra)));
+    let http = compose_http(
+        plugins,
+        Some((pools, platform_pool, runtimes, infra, localizer)),
+    );
 
     // All plugins' Connect services are folded into one router under `/rpc`. Two
     // layers run before dispatch (inside the session middleware, so
@@ -47,6 +51,7 @@ pub fn build_app_with_services(
         platform_pool,
         runtimes,
         infra,
+        localizer,
     ));
     let rpc = build_rpc(plugins)
         .layer(axum::middleware::from_fn(
@@ -71,25 +76,29 @@ pub fn build_app_with_services(
         .layer(tower_cookies::CookieManagerLayer::new())
 }
 
+/// Tuple of host services needed to assemble a plugin's request context.
+/// Factored out so `compose_http`'s signature reads cleanly and clippy stops
+/// flagging it as "very complex type"; the tuple is purely a transport for
+/// the boot-time references.
+type HttpServices<'a> = (
+    &'a PluginPools,
+    &'a PgPool,
+    &'a BTreeMap<String, PluginRuntime>,
+    &'a HostInfra,
+    &'a Localizer,
+);
+
 /// Nest every plugin's HTTP routes under its `http_prefix`, attaching the
 /// per-plugin `PluginResourceCtx` as an `Extension` when `services` is provided.
-fn compose_http(
-    plugins: &[Box<dyn Plugin>],
-    services: Option<(
-        &PluginPools,
-        &PgPool,
-        &BTreeMap<String, PluginRuntime>,
-        &HostInfra,
-    )>,
-) -> Router {
+fn compose_http(plugins: &[Box<dyn Plugin>], services: Option<HttpServices<'_>>) -> Router {
     let mut http = Router::new();
     for plugin in plugins {
         let metadata = plugin.metadata();
         let mut plugin_http = plugin.routes();
-        if let Some((pools, platform_pool, runtimes, infra)) = services {
+        if let Some((pools, platform_pool, runtimes, infra, localizer)) = services {
             if let Some(db) = pools.get(metadata.name) {
                 let runtime = runtimes.get(metadata.name).cloned().unwrap_or_default();
-                let ctx = boot::build_ctx(metadata, db, platform_pool, &runtime, infra);
+                let ctx = boot::build_ctx(metadata, db, platform_pool, &runtime, infra, localizer);
                 plugin_http = plugin_http.layer(Extension(ctx));
             } else {
                 tracing::error!(plugin = metadata.name, "no DB pool; resources unavailable");
@@ -118,6 +127,7 @@ fn build_ctx_map(
     platform_pool: &PgPool,
     runtimes: &BTreeMap<String, PluginRuntime>,
     infra: &HostInfra,
+    localizer: &Localizer,
 ) -> HashMap<String, PluginResourceCtx> {
     let mut map = HashMap::new();
     for plugin in plugins {
@@ -126,7 +136,7 @@ fn build_ctx_map(
             let runtime = runtimes.get(meta.name).cloned().unwrap_or_default();
             map.insert(
                 meta.name.to_string(),
-                boot::build_ctx(meta, db, platform_pool, &runtime, infra),
+                boot::build_ctx(meta, db, platform_pool, &runtime, infra, localizer),
             );
         }
     }
@@ -145,6 +155,10 @@ fn base_app() -> Router {
 
 /// Boot the platform end-to-end: connect the DB, build per-plugin pools and auth
 /// state, run `on_startup`, serve until Ctrl-C, then run `on_shutdown`.
+#[allow(
+    clippy::too_many_lines,
+    reason = "boot wiring is inherently linear: each step (db → pools → infra → localizer → startup → worker → router → serve → shutdown) is one short block; splitting it would just push the wiring through tuple-returning helpers"
+)]
 pub async fn run(
     config: HostConfig,
     plugins: Vec<Box<dyn Plugin>>,
@@ -168,7 +182,25 @@ pub async fn run(
     // OTel metric sink) — built once, shared across plugins via `build_ctx`.
     let infra = HostInfra::build(resolved, metric_sink).await?;
 
-    boot::run_startup(&plugins, &pools, &platform_pool, &config.plugins, &infra).await?;
+    // i18n catalog: one Localizer built once from every plugin's register_i18n,
+    // then cloned into each plugin's request context. Static `&[…]` data, so the
+    // build itself is just slice writes.
+    let default_locale = resolved
+        .default_locale
+        .as_deref()
+        .and_then(Locale::from_code)
+        .unwrap_or_default();
+    let localizer = boot::build_localizer(&plugins, default_locale);
+
+    boot::run_startup(
+        &plugins,
+        &pools,
+        &platform_pool,
+        &config.plugins,
+        &infra,
+        &localizer,
+    )
+    .await?;
 
     // Background job worker: consume each plugin's jobs with that plugin's own
     // (caller-less) resources. Cancelled first on shutdown so in-flight jobs drain
@@ -180,6 +212,7 @@ pub async fn run(
         &platform_pool,
         &config,
         &infra,
+        &localizer,
         &worker_cancel,
     );
 
@@ -210,6 +243,7 @@ pub async fn run(
         &config.plugins,
         auth_state,
         &infra,
+        &localizer,
     );
 
     // juniusd-mediated storage endpoints (token-authed, no session) — mounted
@@ -250,7 +284,15 @@ pub async fn run(
     }
     audit_prune.abort();
 
-    boot::run_shutdown(&plugins, &pools, &platform_pool, &config.plugins, &infra).await;
+    boot::run_shutdown(
+        &plugins,
+        &pools,
+        &platform_pool,
+        &config.plugins,
+        &infra,
+        &localizer,
+    )
+    .await;
     Ok(())
 }
 
@@ -262,6 +304,7 @@ fn spawn_worker(
     platform_pool: &PgPool,
     config: &HostConfig,
     infra: &HostInfra,
+    localizer: &Localizer,
     cancel: &CancellationToken,
 ) -> Option<tokio::task::JoinHandle<()>> {
     let pool = infra.jobs.pool.clone()?;
@@ -277,7 +320,7 @@ fn spawn_worker(
             continue;
         };
         let runtime = config.plugins.get(meta.name).cloned().unwrap_or_default();
-        let ctx = boot::build_ctx(meta, db, platform_pool, &runtime, infra);
+        let ctx = boot::build_ctx(meta, db, platform_pool, &runtime, infra, localizer);
         registry.register_plugin(handlers, &ctx);
     }
     if registry.is_empty() {

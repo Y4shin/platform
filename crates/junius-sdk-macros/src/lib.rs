@@ -1,14 +1,14 @@
 //! Proc-macros for Junius plugins.
 //!
-//! At M02 this crate exposes a single macro:
-//!
 //! - [`plugin_metadata!`] — invoked once per plugin crate; reads the crate's
 //!   `plugin.toml` at compile time and emits `pub static METADATA`, the typed
 //!   `Config`/`Secrets` accessors, and a `pub mod permissions` of marker types.
 //! - [`permissions!`] — builds a type-level permission witness from a `&`-list of
 //!   marker types (`permissions!(A & B)` → `And<A, And<B, ()>>`).
+//! - [`i18n_catalog!`] — invoked once per plugin crate, expands to an `include!`
+//!   of the per-plugin codegen file written by `junius-i18n-build` from `build.rs`.
 //!
-//! The `Repository`/`PluginCtx` derives arrive later in M07.
+//! `Repository` / `PluginCtx` derives land in M07.
 
 mod ctx;
 mod expand;
@@ -90,4 +90,27 @@ pub fn impl_repository(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(PluginCtx, attributes(repo))]
 pub fn plugin_ctx(input: TokenStream) -> TokenStream {
     ctx::derive(input.into()).into()
+}
+
+/// Expands to `include!(concat!(env!("OUT_DIR"), "/i18n_messages.rs"))`. The
+/// plugin's `build.rs` produces that file by calling
+/// `junius_i18n_build::generate(...)`, which parses the plugin's `i18n/*.po`
+/// catalogs and emits one `messages::<Msgid>` struct per msgid plus the
+/// per-locale `catalog::CATALOG_<LOCALE>` arrays + a `register` function.
+///
+/// Example (inside a plugin's `lib.rs`):
+/// ```ignore
+/// junius_sdk::i18n_catalog!();
+///
+/// // somewhere later, in a job handler:
+/// ctx.localizer
+///    .for_locale(locale)
+///    .t(crate::messages::EventSignupSubject { title: &event.title });
+/// ```
+#[proc_macro]
+pub fn i18n_catalog(_input: TokenStream) -> TokenStream {
+    quote::quote! {
+        include!(concat!(env!("OUT_DIR"), "/i18n_messages.rs"));
+    }
+    .into()
 }
