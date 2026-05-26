@@ -1,12 +1,12 @@
 import { useMutation, useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { usePluginNavigate } from '@junius/sdk';
 import { Trans } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 
 import { formatWhen } from '../../domain.js';
 import { useEventsError } from '../../errors.js';
-import { usePluginNavigate } from '../../nav.js';
 
 /** A single event's detail, with owner actions (edit / delete / manage invite)
  * gated on the server-computed `viewerCanEdit` flag. */

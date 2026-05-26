@@ -17,8 +17,9 @@ export {
   useLingui,
   useLocale,
 } from './i18n/index.js';
+export type { PluginLinkProps } from './navigation/PluginNavigate.js';
+export { PluginLink, usePluginNavigate } from './navigation/PluginNavigate.js';
 export { requirePermissions } from './permissions/requirePermissions.js';
-
 export {
   useHasAllPermissions,
   useHasAnyPermission,
@@ -28,7 +29,6 @@ export type {
   ComponentRegistryProviderProps,
   ComponentRegistryValue,
 } from './registry/ComponentRegistryProvider.js';
-
 export {
   ComponentRegistryProvider,
   useComponentRegistry,

@@ -75,6 +75,25 @@ where
     }
 }
 
+impl<S> PluginContext<S, ()>
+where
+    S: BuildState,
+{
+    /// No-permission ("public") context for an ungated RPC handler. Equivalent
+    /// to `PluginContext::<S, ()>::from_rpc(&ctx)` but named so the intent is
+    /// legible at the call site: this is a public-surface method whose access
+    /// control is enforced by the runtime SQL ACL, not a compile-time witness.
+    ///
+    /// In practice the M15 `#[rpc_service]` macro path is what authors use: a
+    /// method with no `(platform.v1.requires)` annotation gets the unit alias
+    /// `crate::__rpc_requires::<service>::<Method> = ()`, which the macro feeds
+    /// into `from_rpc` automatically. Reach for `public()` only when writing
+    /// a handler outside the macro (rare).
+    pub fn public(ctx: &connectrpc::RequestContext) -> Result<Self, ApiError> {
+        Self::from_rpc(ctx)
+    }
+}
+
 /// Error returned by the `PluginCtx` extractor / RPC entry point: a missing
 /// caller (401), a missing permission (403), or unconfigured resources (500).
 /// Rendered as a small JSON body matching the Connect error envelope so HTTP and

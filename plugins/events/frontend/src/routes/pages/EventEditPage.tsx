@@ -11,14 +11,13 @@ import {
   Textarea,
 } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
-import { useUser } from '@junius/sdk';
+import { usePluginNavigate, useUser } from '@junius/sdk';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 import { useMemo } from 'react';
 import { z } from 'zod';
 
 import { toInputValue, toRfc3339 } from '../../domain.js';
-import { usePluginNavigate } from '../../nav.js';
 
 /** Schema shape (validators are filled in inside the component so error
  * messages pick up the active locale). */

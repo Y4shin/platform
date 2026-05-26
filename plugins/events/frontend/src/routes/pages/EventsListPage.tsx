@@ -1,11 +1,11 @@
 import { useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { usePluginNavigate } from '@junius/sdk';
 import { Trans } from '@lingui/react/macro';
 
 import { useEventsError } from '../../errors.js';
 import { EventCard } from '../../lib/EventCard.js';
-import { usePluginNavigate } from '../../nav.js';
 
 /** The events landing page: every event the caller can see, plus a "New event"
  * action. Public events appear to everyone; private ones only to those with
