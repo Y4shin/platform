@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Extension, Router};
 use junius_sdk::{Locale, Localizer, MetricSink, Plugin, PluginResourceCtx};
 use sqlx::PgPool;
@@ -65,6 +65,10 @@ pub fn build_app_with_services(
     let protected = http
         .nest("/rpc", rpc)
         .route("/api/me", get(auth::me::handler))
+        .route(
+            "/api/me/locale",
+            post(auth::me::update_locale).with_state(auth_state.clone()),
+        )
         .layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
             auth::session::middleware,

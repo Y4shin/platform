@@ -139,6 +139,7 @@ interface WireUser {
   id: string;
   email: string;
   displayName: string;
+  locale: string | null;
   memberships: WireMembership[];
 }
 
@@ -153,6 +154,7 @@ async function fetchMe(): Promise<User | null> {
     id: raw.id,
     email: raw.email,
     displayName: raw.displayName,
+    locale: raw.locale ?? null,
     memberships: (raw.memberships ?? []).map(
       (m): Membership => ({
         groupId: m.groupId,

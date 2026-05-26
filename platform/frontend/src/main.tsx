@@ -1,7 +1,12 @@
 import { Code, ConnectError } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import { createConnectTransport } from '@connectrpc/connect-web';
-import { AuthProvider, ComponentRegistryProvider, goToLoginUnlessPublic } from '@junius/sdk';
+import {
+  AuthProvider,
+  ComponentRegistryProvider,
+  goToLoginUnlessPublic,
+  I18nProvider,
+} from '@junius/sdk';
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
@@ -47,13 +52,15 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <AuthProvider publicPaths={PUBLIC_ROUTE_PREFIXES}>
-      <QueryClientProvider client={queryClient}>
-        <TransportProvider transport={transport}>
-          <ComponentRegistryProvider registry={componentRegistry}>
-            <RouterProvider router={router} />
-          </ComponentRegistryProvider>
-        </TransportProvider>
-      </QueryClientProvider>
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <TransportProvider transport={transport}>
+            <ComponentRegistryProvider registry={componentRegistry}>
+              <RouterProvider router={router} />
+            </ComponentRegistryProvider>
+          </TransportProvider>
+        </QueryClientProvider>
+      </I18nProvider>
     </AuthProvider>
   </StrictMode>,
 );

@@ -2,6 +2,7 @@ import { Stack } from '@junius/design';
 import { useUser } from '@junius/sdk';
 import type { ReactNode } from 'react';
 
+import { LocaleSwitcher } from './LocaleSwitcher.js';
 import { NavLinks } from './NavLinks.js';
 
 export interface ShellProps {
@@ -16,7 +17,10 @@ export function Shell({ children }: ShellProps) {
         <Stack direction="row" gap="md" className="items-center justify-between">
           <strong className="text-base">Junius</strong>
           <NavLinks />
-          <span className="text-fg-2 text-sm">{user?.displayName ?? 'Anonymous'}</span>
+          <Stack direction="row" gap="sm" className="items-center">
+            <LocaleSwitcher />
+            <span className="text-fg-2 text-sm">{user?.displayName ?? 'Anonymous'}</span>
+          </Stack>
         </Stack>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 p-6">{children}</main>

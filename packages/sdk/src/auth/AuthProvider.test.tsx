@@ -18,6 +18,7 @@ const SAMPLE_ME = {
   id: 'u1',
   email: 'alice@local',
   displayName: 'Alice',
+  locale: null,
   memberships: [
     {
       groupId: 'g1',
@@ -32,6 +33,7 @@ const OVERRIDE_USER: User = {
   id: 'u2',
   email: 'bob@local',
   displayName: 'Bob',
+  locale: null,
   memberships: [],
 };
 

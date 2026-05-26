@@ -27,6 +27,12 @@ export interface User {
   id: UserId;
   email: string;
   displayName: string;
+  /**
+   * Persisted locale preference (e.g. `"en"`, `"de"`). `null` means the host
+   * falls back to `Accept-Language` and then the deployment default. Updated
+   * via `useLocale().setLocale(...)` from `@junius/sdk`.
+   */
+  locale: string | null;
   memberships: ReadonlyArray<Membership>;
 }
 
