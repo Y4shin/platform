@@ -8,10 +8,11 @@
 //!   to the witness alias the author writes in a handler.
 //!
 //! Consumed by `junius sync`, `junius check`, the `#[rpc_service]` proc-macro,
-//! `junius rpc scaffold`, and plugin `build.rs` (via `emit_rpc_requires` in
-//! M15 Stage 2). See `docs/impl/17-M15-rpc-service-macro.md`, "the naming
-//! contract".
+//! `junius rpc scaffold`, and plugin `build.rs` (via `emit_rpc_requires`). See
+//! `docs/impl/17-M15-rpc-service-macro.md`, "the naming contract".
 
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 // -- proto scanning ---------------------------------------------------------
@@ -88,6 +89,42 @@ pub fn scan_proto_requires(content: &str) -> Vec<(String, String, Vec<String>)> 
     out
 }
 
+/// Extract `(service_simple_name, [method_name])` for every service in a proto,
+/// associating each `rpc` with the nearest preceding `service`. Method names
+/// are the proto (`PascalCase`) spelling.
+#[allow(
+    clippy::unwrap_used,
+    reason = "compile-constant regexes are known-valid"
+)]
+pub fn scan_proto_service_methods(content: &str) -> Vec<(String, Vec<String>)> {
+    let svc_re = regex::Regex::new(r"\bservice\s+(\w+)").unwrap();
+    let rpc_re = regex::Regex::new(r"\brpc\s+(\w+)").unwrap();
+
+    let services: Vec<(usize, String)> = svc_re
+        .captures_iter(content)
+        .map(|c| (c.get(0).unwrap().start(), c[1].to_string()))
+        .collect();
+    let mut out: Vec<(String, Vec<String>)> = services
+        .iter()
+        .map(|(_, n)| (n.clone(), Vec::new()))
+        .collect();
+
+    for cap in rpc_re.captures_iter(content) {
+        let at = cap.get(0).unwrap().start();
+        let method = cap[1].to_string();
+        if let Some(idx) = services
+            .iter()
+            .enumerate()
+            .filter(|(_, (o, _))| *o < at)
+            .map(|(i, _)| i)
+            .next_back()
+        {
+            out[idx].1.push(method);
+        }
+    }
+    out
+}
+
 // -- casing helpers ---------------------------------------------------------
 
 /// Convert a permission key like `hello:read` or `speakers:book_slot` into a
@@ -160,6 +197,121 @@ fn snake_to_pascal(s: &str) -> String {
         .collect()
 }
 
+// -- build-time codegen -----------------------------------------------------
+
+/// Emit a `__rpc_requires` Rust module to `<out_dir>/_rpc_requires.rs`. Plugin
+/// `build.rs` files `include!` it from `lib.rs`; the resulting type aliases are
+/// what authors write in handler ctx parameter types.
+///
+/// Shape:
+///
+/// ```ignore
+/// pub mod __rpc_requires {
+///     pub mod event_service {
+///         pub type ListEvents =
+///             ::junius_sdk::permissions::And<crate::permissions::EventsRead, ()>;
+///         pub type Signup = ();  // unannotated method
+///         // …
+///     }
+/// }
+/// ```
+///
+/// Each alias is the right-nested `And` chain corresponding to the proto
+/// method's `(platform.v1.requires)` annotation, or `()` if the method has
+/// none. The alias is intended to be used **directly** as the `P` type
+/// parameter on `PluginContext`/`<X>Ctx`; wrapping it in `permissions!(…)` would
+/// produce `And<And<…>, ()>` and silently break `Has<X>` resolution (the chain
+/// head must be a `Permission`, not an `And`).
+///
+/// Cross-plugin permission requirements are out of scope: an annotation segment
+/// that doesn't exist in the calling crate's `permissions::*` becomes an
+/// unresolved-path build error by construction.
+pub fn emit_rpc_requires(proto_files: &[PathBuf]) -> std::io::Result<()> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "OUT_DIR is the Cargo-supplied build-script path of the caller's crate, not deployment config"
+    )]
+    let out_dir = std::env::var("OUT_DIR").map(PathBuf::from).map_err(|_| {
+        std::io::Error::other("OUT_DIR not set; emit_rpc_requires must be called from a build.rs")
+    })?;
+    emit_rpc_requires_to(proto_files, &out_dir)
+}
+
+/// As [`emit_rpc_requires`], but with an explicit `out_dir`. Use this in tests
+/// or to direct output to a non-`OUT_DIR` location; production `build.rs` files
+/// should call [`emit_rpc_requires`] (which reads `OUT_DIR` itself).
+pub fn emit_rpc_requires_to(proto_files: &[PathBuf], out_dir: &Path) -> std::io::Result<()> {
+    // Collect every (service simple name) → (method → Option<perms>). `None`
+    // means "method present in proto, no annotation"; `Some(vec![])` would
+    // mean an empty annotation, which we treat the same.
+    let mut by_service: BTreeMap<String, BTreeMap<String, Vec<String>>> = BTreeMap::new();
+
+    for path in proto_files {
+        let content = std::fs::read_to_string(path)?;
+        // Seed every method with an empty perms list.
+        for (svc, methods) in scan_proto_service_methods(&content) {
+            let svc_entry = by_service.entry(svc).or_default();
+            for m in methods {
+                svc_entry.entry(m).or_default();
+            }
+        }
+        // Override with declared perms where present.
+        for (svc_fqn, method, perms) in scan_proto_requires(&content) {
+            let svc = svc_fqn
+                .rsplit('.')
+                .next()
+                .map(str::to_string)
+                .unwrap_or(svc_fqn);
+            if let Some(svc_entry) = by_service.get_mut(&svc) {
+                svc_entry.insert(method, perms);
+            }
+        }
+    }
+
+    let mut buf = String::new();
+    buf.push_str(
+        "// Generated by junius_rpc_meta::emit_rpc_requires from proto annotations.\n\
+         // DO NOT EDIT BY HAND. Re-runs of `cargo build` regenerate this file.\n\
+         \n\
+         /// Per-method permission-witness aliases derived from each proto method's\n\
+         /// `(platform.v1.requires)` annotation. Author handler ctx parameters write\n\
+         /// `<PluginCtx>::<crate::__rpc_requires::<service>::<Method>>` to pin the\n\
+         /// witness to the proto-declared set; the `#[rpc_service]` macro then\n\
+         /// rewrites the handler into the shape `connectrpc` expects.\n\
+         #[allow(dead_code, non_snake_case)]\n\
+         pub mod __rpc_requires {\n",
+    );
+    for (svc, methods) in &by_service {
+        let module = service_module_name(svc);
+        let _ = writeln!(buf, "    pub mod {module} {{");
+        for (method, perms) in methods {
+            let alias = alias_type_name(&rust_method_ident(method));
+            let chain = render_witness_chain(perms);
+            let _ = writeln!(buf, "        pub type {alias} = {chain};");
+        }
+        buf.push_str("    }\n");
+    }
+    buf.push_str("}\n");
+
+    let formatted = rustfmt_str(buf);
+    std::fs::write(out_dir.join("_rpc_requires.rs"), formatted)
+}
+
+/// Render `[a, b, c]` as `And<a, And<b, And<c, ()>>>`. Empty → `()`. The
+/// markers resolve under the plugin's own `crate::permissions::*` — which is
+/// what `plugin_metadata!()` emits.
+fn render_witness_chain(perms: &[String]) -> String {
+    if perms.is_empty() {
+        return "()".to_string();
+    }
+    let mut chain = "()".to_string();
+    for perm in perms.iter().rev() {
+        let marker = permission_marker_pascal(perm);
+        chain = format!("::junius_sdk::permissions::And<crate::permissions::{marker}, {chain}>");
+    }
+    chain
+}
+
 // -- rustfmt ----------------------------------------------------------------
 
 /// Best-effort `rustfmt` of generated Rust *source text* (edition 2024) via
@@ -192,6 +344,8 @@ pub fn rustfmt_str(src: String) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
     use super::*;
 
     #[test]
@@ -270,5 +424,84 @@ mod tests {
         assert_eq!(service_module_name("EventService"), "event_service");
         assert_eq!(service_module_name("InviteService"), "invite_service");
         assert_eq!(service_module_name("CalendarService"), "calendar_service");
+    }
+
+    #[test]
+    fn scan_proto_service_methods_lists_all_rpcs_in_order() {
+        let proto = r"
+            service HelloService {
+              rpc Greet(G) returns (G);
+              rpc ListGreetings(L) returns (L);
+            }
+            service NoteService {
+              rpc CreateNote(C) returns (C);
+            }
+        ";
+        let scanned = scan_proto_service_methods(proto);
+        assert_eq!(
+            scanned,
+            vec![
+                (
+                    "HelloService".into(),
+                    vec!["Greet".into(), "ListGreetings".into()]
+                ),
+                ("NoteService".into(), vec!["CreateNote".into()]),
+            ]
+        );
+    }
+
+    #[test]
+    fn render_witness_chain_shapes() {
+        assert_eq!(render_witness_chain(&[]), "()");
+        assert_eq!(
+            render_witness_chain(&["events:read".to_string()]),
+            "::junius_sdk::permissions::And<crate::permissions::EventsRead, ()>"
+        );
+        // Right-nested, in declaration order. Verifies the chain head stays
+        // a `Permission` (not an `And`), which is what `Has<X, Here>` matches
+        // on — the canary against the "double-wrap bug".
+        assert_eq!(
+            render_witness_chain(&["events:read".to_string(), "events:write".to_string(),]),
+            "::junius_sdk::permissions::And<crate::permissions::EventsRead, \
+             ::junius_sdk::permissions::And<crate::permissions::EventsWrite, ()>>"
+        );
+    }
+
+    #[test]
+    fn emit_rpc_requires_writes_aliases_for_every_method() {
+        let tmp = std::env::temp_dir().join(format!("junius-rpc-meta-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        let proto_path = tmp.join("svc.proto");
+        std::fs::write(
+            &proto_path,
+            r#"
+                syntax = "proto3";
+                package hello.v1;
+                service HelloService {
+                  rpc Greet(G) returns (G) {
+                    option (platform.v1.requires) = "hello:read";
+                  }
+                  rpc Ping(P) returns (P);  // no annotation → ()
+                }
+            "#,
+        )
+        .unwrap();
+
+        emit_rpc_requires_to(&[proto_path], &tmp).unwrap();
+        let emitted = std::fs::read_to_string(tmp.join("_rpc_requires.rs")).unwrap();
+
+        assert!(emitted.contains("pub mod hello_service"), "got: {emitted}");
+        // Annotated → typed chain referencing `crate::permissions::HelloRead`.
+        assert!(
+            emitted.contains("pub type Greet =")
+                && emitted.contains("crate::permissions::HelloRead"),
+            "got: {emitted}"
+        );
+        // Unannotated → unit type.
+        assert!(emitted.contains("pub type Ping = ();"), "got: {emitted}");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

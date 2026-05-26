@@ -35,6 +35,12 @@ mod proto {
     include!(concat!(env!("OUT_DIR"), "/_connectrpc.rs"));
 }
 
+// M15: per-method permission-witness aliases generated from each proto method's
+// `(platform.v1.requires)` annotation. Authors write
+// `EventCtx<crate::__rpc_requires::<service>::<Method>>` in handler signatures
+// to pin the witness to the proto-declared set.
+include!(concat!(env!("OUT_DIR"), "/_rpc_requires.rs"));
+
 pub mod domain;
 mod http;
 pub mod ics;

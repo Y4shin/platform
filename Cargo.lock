@@ -1646,6 +1646,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "junius-i18n-build",
+ "junius-rpc-meta",
  "junius-sdk",
  "rand 0.8.6",
  "serde",

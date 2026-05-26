@@ -9,7 +9,9 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use junius_manifest::{PlatformManifest, PluginManifest};
-use junius_rpc_meta::{collect_proto_files, rustfmt_str, scan_proto_requires};
+use junius_rpc_meta::{
+    collect_proto_files, rustfmt_str, scan_proto_requires, scan_proto_service_methods,
+};
 use serde::Serialize;
 
 use crate::cli::OutputFormat;
@@ -410,43 +412,6 @@ pub(crate) fn scan_proto_services(content: &str) -> Vec<String> {
             }
         })
         .collect()
-}
-
-/// Extract `(service_simple_name, [method_name])` for every service in a proto,
-/// associating each `rpc` with the nearest preceding `service`. Method names are
-/// the proto (`PascalCase`) spelling; callers lower-case the first letter for the
-/// protoc-gen-es method key.
-#[allow(
-    clippy::unwrap_used,
-    reason = "compile-constant regexes are known-valid"
-)]
-pub(crate) fn scan_proto_service_methods(content: &str) -> Vec<(String, Vec<String>)> {
-    let svc_re = regex::Regex::new(r"\bservice\s+(\w+)").unwrap();
-    let rpc_re = regex::Regex::new(r"\brpc\s+(\w+)").unwrap();
-
-    let services: Vec<(usize, String)> = svc_re
-        .captures_iter(content)
-        .map(|c| (c.get(0).unwrap().start(), c[1].to_string()))
-        .collect();
-    let mut out: Vec<(String, Vec<String>)> = services
-        .iter()
-        .map(|(_, n)| (n.clone(), Vec::new()))
-        .collect();
-
-    for cap in rpc_re.captures_iter(content) {
-        let at = cap.get(0).unwrap().start();
-        let method = cap[1].to_string();
-        if let Some(idx) = services
-            .iter()
-            .enumerate()
-            .filter(|(_, (o, _))| *o < at)
-            .map(|(i, _)| i)
-            .next_back()
-        {
-            out[idx].1.push(method);
-        }
-    }
-    out
 }
 
 fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
