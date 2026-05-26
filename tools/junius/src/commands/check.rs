@@ -30,8 +30,9 @@ struct IssueJson {
     doc: String,
 }
 
-/// Map a rule ID to its anchor in the M12 rule reference, e.g.
+/// Map a rule ID to its anchor in the rule reference doc, e.g.
 /// `SQL.PRIVATE_TABLE_ACCESS` → `docs/impl/13-M12-hardening.md#sql-private-table-access`.
+/// `RPC.*` rules ship with M15 and route to the M15 doc instead.
 fn doc_link(code: &str) -> String {
     let anchor: String = code
         .chars()
@@ -40,7 +41,12 @@ fn doc_link(code: &str) -> String {
             other => other.to_ascii_lowercase(),
         })
         .collect();
-    format!("docs/impl/13-M12-hardening.md#{anchor}")
+    let doc = if code.starts_with("RPC.") {
+        "docs/impl/17-M15-rpc-service-macro.md"
+    } else {
+        "docs/impl/13-M12-hardening.md"
+    };
+    format!("{doc}#{anchor}")
 }
 
 impl Renderable for CheckResult {
@@ -122,6 +128,7 @@ fn check_plugin(path: &Path, src: &str, format: OutputFormat) -> i32 {
         Ok(manifest) => {
             let mut validation = manifest.validate();
             check_proto_requires(path, &manifest, &mut validation);
+            crate::commands::check_rpc::check_rpc_handlers(path, &mut validation);
             report(path, src, &validation, format)
         }
         Err(e) => emit_parse_error(path, src, &e, format),

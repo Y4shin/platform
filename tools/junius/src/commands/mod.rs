@@ -1,6 +1,7 @@
 pub mod build;
 pub mod cache_cmd;
 pub mod check;
+pub mod check_rpc;
 pub mod cross_check;
 #[cfg(feature = "develop")]
 pub mod dev;
