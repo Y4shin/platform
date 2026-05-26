@@ -56,7 +56,11 @@ async fn send_greeting_job_emails_via_capability() {
         email,
         jobs: Jobs::disabled("hello", CAPS),
         storage: PluginStorage::empty("hello", CAPS),
-        localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
+        localizer: {
+            let mut b = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En);
+            <HelloPlugin as junius_sdk::Plugin>::register_i18n(&HelloPlugin::new(), &mut b);
+            b.build()
+        },
         secrets: SecretStore::default(),
         capabilities: CAPS,
     };
@@ -73,6 +77,7 @@ async fn send_greeting_job_emails_via_capability() {
         name: "Ada".to_string(),
         body: "hello there".to_string(),
         recipient_email: "ada@example.test".to_string(),
+        recipient_locale: None,
     })
     .unwrap();
     handler.dispatch(payload, resources).await.unwrap();
@@ -81,10 +86,65 @@ async fn send_greeting_job_emails_via_capability() {
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].to, vec!["ada@example.test".to_string()]);
     assert_eq!(sent[0].body_text, "hello there");
+    // Subject rendered via the i18n catalog (en source). M14 end-to-end.
+    assert_eq!(sent[0].subject, "A greeting for Ada");
 
     // The manifest bucket generated a compile-checked typed variant.
     assert_eq!(
         hello_plugin::buckets::Bucket::Attachments.logical(),
         "attachments"
     );
+}
+
+#[tokio::test]
+async fn send_greeting_uses_recipient_locale_for_subject() {
+    let pool = PgPool::connect_lazy("postgres://localhost/unused").unwrap();
+    let transport = Arc::new(CapturingTransport::default());
+    let email = Email::new(
+        Some(transport.clone()),
+        Arc::from("no-reply@local"),
+        Arc::from(vec!["local".to_string()]),
+        "hello",
+        CAPS,
+    );
+    let ctx = PluginResourceCtx {
+        config: PluginConfig::empty(),
+        telemetry: Telemetry::new("hello"),
+        db: PluginDb::new(pool.clone(), "hello"),
+        auth: Auth::new(pool.clone()),
+        users: Users::new(pool.clone()),
+        groups: Groups::new(pool.clone()),
+        audit: AuditEmitter::new(pool.clone()),
+        authz: Authz::new(pool.clone()),
+        email,
+        jobs: Jobs::disabled("hello", CAPS),
+        storage: PluginStorage::empty("hello", CAPS),
+        localizer: {
+            let mut b = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En);
+            <HelloPlugin as junius_sdk::Plugin>::register_i18n(&HelloPlugin::new(), &mut b);
+            b.build()
+        },
+        secrets: SecretStore::default(),
+        capabilities: CAPS,
+    };
+    let resources = PluginResources::from_ctx(&ctx, None);
+    let handler = HelloPlugin::new()
+        .jobs()
+        .into_iter()
+        .find(|h| h.name() == "hello.send_greeting")
+        .expect("hello registers send_greeting");
+
+    let payload = serde_json::to_value(SendGreeting {
+        greeting_id: "00000000-0000-0000-0000-000000000000".to_string(),
+        name: "Anna".to_string(),
+        body: "Hallo".to_string(),
+        recipient_email: "anna@example.test".to_string(),
+        recipient_locale: Some("de".to_string()),
+    })
+    .unwrap();
+    handler.dispatch(payload, resources).await.unwrap();
+
+    let sent = transport.sent.lock().unwrap();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].subject, "Ein Gruß für Anna");
 }

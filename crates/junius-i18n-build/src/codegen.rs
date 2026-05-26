@@ -175,7 +175,7 @@ pub(crate) fn emit(
     let _ = writeln!(out, "pub mod catalog {{");
     let _ = writeln!(
         out,
-        "    use ::junius_sdk::{{Domain, Locale, LocalizerBuilder, Template, TemplatePart}};"
+        "    #[allow(unused_imports)]\n    use ::junius_sdk::{{Domain, Locale, LocalizerBuilder, Template, TemplatePart}};"
     );
     let _ = writeln!(out);
     for (locale, row) in locale_rows {
@@ -303,7 +303,7 @@ fn emit_register(out: &mut String, locale_rows: &[(&str, Vec<TemplateRow>)]) {
     // received that exact set; if not, the codegen falls back to alphabetical
     // order which would break the runtime invariant — surface as a panic at
     // boot so the misconfiguration is loud.
-    let _ = writeln!(out, "        let _slots = [");
+    let _ = writeln!(out, "        let slots = [");
     for (locale, _) in locale_rows {
         let _ = writeln!(
             out,
@@ -331,7 +331,7 @@ fn emit_register(out: &mut String, locale_rows: &[(&str, Vec<TemplateRow>)]) {
     );
     let _ = writeln!(
         out,
-        "            if let Some((_, slot)) = _slots.iter().find(|(code, _)| *code == locale.code()) {{"
+        "            if let Some((_, slot)) = slots.iter().find(|(code, _)| *code == locale.code()) {{"
     );
     let _ = writeln!(out, "                row[i] = *slot;");
     let _ = writeln!(out, "            }}");

@@ -15,6 +15,7 @@ Commands:
   plugin   Plugin inspection and lifecycle
   cache    Manage the junius source cache (`~/.cache/junius`)
   new      Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
+  i18n     Inspect and validate per-plugin i18n catalogs (M14)
 
 Options:
       --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]

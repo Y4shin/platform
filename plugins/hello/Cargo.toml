@@ -23,7 +23,8 @@ uuid        = { workspace = true }
 chrono      = { workspace = true }
 
 [build-dependencies]
-connectrpc-build = { workspace = true }
+connectrpc-build  = { workspace = true }
+junius-i18n-build = { workspace = true }
 
 [dev-dependencies]
 tokio      = { workspace = true }

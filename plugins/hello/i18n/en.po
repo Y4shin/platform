@@ -1,12 +1,9 @@
 # M14: hello plugin source catalog (English).
 #
-# msgid is the stable catalog key (hello.page.title), msgstr is the source-
+# msgid is the stable catalog key (hello.email.subject), msgstr is the source-
 # language template. Translators add a sibling de.po with the same msgids and
 # locale-specific msgstrs. The build helper enforces placeholder agreement;
 # adding a translator-introduced placeholder fails the build.
 
-msgid "hello.page.title"
-msgstr "Hello"
-
-msgid "hello.page.greeting"
-msgstr "Hello, {name}"
+msgid "hello.email.subject"
+msgstr "A greeting for {name}"

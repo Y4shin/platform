@@ -172,16 +172,26 @@ impl Domain {
     }
 
     /// Parse a domain name. `None` for unknown names — callers should treat
-    /// that as a configuration error.
+    /// that as a configuration error. `const` so the build-time codegen can
+    /// emit `const __DOMAIN: Domain = Domain::from_name(...).expect(...)`.
     #[must_use]
-    pub fn from_name(s: &str) -> Option<Self> {
-        match s {
-            "platform" => Some(Self::Platform),
-            "hello" => Some(Self::Hello),
-            "greetings" => Some(Self::Greetings),
-            "widgets" => Some(Self::Widgets),
-            "events" => Some(Self::Events),
-            _ => None,
+    pub const fn from_name(s: &str) -> Option<Self> {
+        // Byte-comparing string literals in a const fn rules out `match s {...}`
+        // (string patterns require runtime equality); a small if-chain on bytes
+        // is the const-compatible idiom.
+        let b = s.as_bytes();
+        if matches_bytes(b, b"platform") {
+            Some(Self::Platform)
+        } else if matches_bytes(b, b"hello") {
+            Some(Self::Hello)
+        } else if matches_bytes(b, b"greetings") {
+            Some(Self::Greetings)
+        } else if matches_bytes(b, b"widgets") {
+            Some(Self::Widgets)
+        } else if matches_bytes(b, b"events") {
+            Some(Self::Events)
+        } else {
+            None
         }
     }
 }
@@ -235,6 +245,22 @@ pub trait Message {
     /// Walk the parsed template, emitting literal text and typed substitutions.
     /// Implementations are generated; callers never write this.
     fn render(&self, template: &Template) -> String;
+}
+
+/// `const`-context byte-slice equality. The standard `PartialEq` impl on `&[u8]`
+/// is not yet `const`-callable; this small helper is.
+const fn matches_bytes(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 /// Pick the first `Accept-Language` tag we recognise. Ignores q-values for v1
