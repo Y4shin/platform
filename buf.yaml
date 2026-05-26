@@ -1,7 +1,9 @@
 version: v2
 modules:
   - path: proto
+  # >>> junius managed start
   - path: plugins/events/proto
+  # <<< junius managed end
 lint:
   use:
     - STANDARD

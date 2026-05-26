@@ -25,6 +25,8 @@ const GENERATED_PLUGINS_RS: &str = "platform/src/generated/plugins.rs";
 const GENERATED_RPC_REQUIRES_RS: &str = "platform/src/generated/rpc_requires.rs";
 const PLATFORM_CARGO_TOML: &str = "platform/Cargo.toml";
 const WORKSPACE_CARGO_TOML: &str = "Cargo.toml";
+const BUF_YAML: &str = "buf.yaml";
+const HOST_FRONTEND_PACKAGE_JSON: &str = "platform/frontend/package.json";
 const GENERATED_ROUTES_TS: &str = "platform/frontend/src/generated/routes.ts";
 const GENERATED_REGISTRY_TS: &str = "platform/frontend/src/generated/component-registry.ts";
 const GENERATED_I18N_TS: &str = "platform/frontend/src/generated/i18n-catalogs.ts";
@@ -103,6 +105,10 @@ pub fn run(args: &SyncArgs, format: OutputFormat) -> i32 {
 /// `source_root` (the resolved platform source tree). `run` passes `.`; `build`
 /// passes the resolved/cached source root so it can compose from a deployment
 /// directory.
+#[allow(
+    clippy::too_many_lines,
+    reason = "linear pipeline (manifest → resolve → generate → apply → subprocess); each step is short"
+)]
 pub(crate) fn run_in(
     source_root: &Path,
     config_path: &Path,
@@ -170,6 +176,33 @@ pub(crate) fn run_in(
         }
     }
 
+    // M16 item A: manage the proto-module list in `buf.yaml` (one entry per
+    // enabled plugin with a `proto/` dir) and the `@junius/plugin-<name>`
+    // entries in the host frontend's `package.json` (one per plugin with a
+    // `frontend/` dir). Both are *optional* — a deployment without proto or
+    // frontend wiring (e.g. some test fixtures) skips them silently.
+    let buf_yaml_path = source_root.join(BUF_YAML);
+    if buf_yaml_path.exists() {
+        let body = buf_yaml_module_lines(&plugins, source_root);
+        match apply_marker_update(&buf_yaml_path, &body, dry_run) {
+            Ok(kind) => changes.push(FileChange {
+                path: BUF_YAML.into(),
+                kind,
+            }),
+            Err(code) => return code,
+        }
+    }
+    let pkg_json_path = source_root.join(HOST_FRONTEND_PACKAGE_JSON);
+    if pkg_json_path.exists() {
+        match apply_host_frontend_deps(&pkg_json_path, &plugins, dry_run) {
+            Ok(kind) => changes.push(FileChange {
+                path: HOST_FRONTEND_PACKAGE_JSON.into(),
+                kind,
+            }),
+            Err(code) => return code,
+        }
+    }
+
     if let Err(code) = apply_rpc_barrels(&plugins, source_root, dry_run, &mut changes) {
         return code;
     }
@@ -178,6 +211,34 @@ pub(crate) fn run_in(
     }
 
     let any_pending = changes.iter().any(|c| c.kind != "unchanged");
+
+    // M16 item A: run the codegen / dep-install subprocesses that downstream
+    // typechecks depend on, but only when the corresponding managed file
+    // actually changed (not every sync run). Skipped in dry-run mode so a
+    // CI drift check stays read-only.
+    if !dry_run {
+        let buf_yaml_changed = changes
+            .iter()
+            .any(|c| c.path == BUF_YAML && c.kind != "unchanged");
+        let pkg_json_changed = changes
+            .iter()
+            .any(|c| c.path == HOST_FRONTEND_PACKAGE_JSON && c.kind != "unchanged");
+        if buf_yaml_changed {
+            if let Err(code) = run_subprocess(
+                "pnpm",
+                &["exec", "buf", "generate"],
+                source_root,
+                "buf generate",
+            ) {
+                return code;
+            }
+        }
+        if pkg_json_changed {
+            if let Err(code) = run_subprocess("pnpm", &["install"], source_root, "pnpm install") {
+                return code;
+            }
+        }
+    }
 
     let result = SyncResult {
         config: config_path.display().to_string(),
@@ -1014,6 +1075,17 @@ fn workspace_cargo_lines(plugins: &[ResolvedPlugin]) -> Vec<String> {
         .collect()
 }
 
+/// One `- path: plugins/<name>/proto` line per enabled plugin that ships a
+/// proto. M16 item A: removes the manual `buf.yaml` edit + `buf generate`
+/// step the M13 friction log called out.
+fn buf_yaml_module_lines(plugins: &[ResolvedPlugin], source_root: &Path) -> Vec<String> {
+    plugins
+        .iter()
+        .filter(|p| plugin_has_proto(source_root, &p.name))
+        .map(|p| format!("- path: plugins/{}/proto", p.name))
+        .collect()
+}
+
 // ---------------------------------------------------------------------------
 // File application
 // ---------------------------------------------------------------------------
@@ -1064,6 +1136,212 @@ fn apply_marker_update(path: &Path, body: &[String], dry_run: bool) -> Result<&'
         })?;
     }
     Ok("updated")
+}
+
+/// Reconcile the host frontend `package.json` `dependencies` with the enabled
+/// plugins that ship a `frontend/` package. Adds `@junius/plugin-<name>:
+/// "workspace:*"` for each (if missing), removes any `@junius/plugin-*` keys
+/// no longer in the enabled set, and leaves every other dep alone. M16 item A:
+/// closes the "no host-FE dep wiring" half of the M13 friction.
+///
+/// JSON has no comments, so we can't use the marker pattern. Instead we
+/// rewrite only the `"dependencies": { … }` block in-place — top-level key
+/// order, surrounding sections (`devDependencies`, `scripts`, etc.), and
+/// trailing whitespace stay byte-identical. Existing `@junius/plugin-*` lines
+/// are left alone if their value is already `"workspace:*"`; new entries are
+/// inserted alphabetically among the other deps. Idempotent.
+fn apply_host_frontend_deps(
+    path: &Path,
+    plugins: &[ResolvedPlugin],
+    dry_run: bool,
+) -> Result<&'static str, i32> {
+    let existing = std::fs::read_to_string(path).map_err(|e| {
+        eprintln!("junius: cannot read {}: {e}", path.display());
+        exit::PARSE_ERROR
+    })?;
+
+    let new_content = match rewrite_deps_block(&existing, plugins) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("junius: cannot rewrite {}: {e}", path.display());
+            return Err(exit::PARSE_ERROR);
+        }
+    };
+
+    if existing == new_content {
+        return Ok("unchanged");
+    }
+    if !dry_run {
+        std::fs::write(path, &new_content).map_err(|e| {
+            eprintln!("junius: cannot write {}: {e}", path.display());
+            exit::PARSE_ERROR
+        })?;
+    }
+    Ok("updated")
+}
+
+/// Replace just the `"dependencies": { … }` block in a package.json. Validates
+/// the file is valid JSON before/after, but never touches anything outside the
+/// dependencies object — preserving the file's top-level key order, scripts,
+/// devDependencies, etc. byte-for-byte.
+fn rewrite_deps_block(src: &str, plugins: &[ResolvedPlugin]) -> Result<String, String> {
+    // Parse to compute the desired dep map (preserves the existing non-plugin
+    // entries — we read their key/values from the parsed JSON, then re-render
+    // a fresh alphabetical block).
+    let json: serde_json::Value = serde_json::from_str(src).map_err(|e| e.to_string())?;
+    let deps = json
+        .get("dependencies")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "no top-level `dependencies` object".to_string())?;
+
+    let desired_plugin_keys: std::collections::BTreeSet<String> = plugins
+        .iter()
+        .filter(|p| p.has_frontend)
+        .map(|p| format!("@junius/plugin-{}", p.name))
+        .collect();
+
+    // Final desired (key, value) set: every existing non-plugin dep + every
+    // desired plugin dep with `workspace:*`. Plugin keys not in `desired` are
+    // dropped (a disabled plugin).
+    let mut final_entries: std::collections::BTreeMap<String, serde_json::Value> =
+        std::collections::BTreeMap::new();
+    for (k, v) in deps {
+        if !k.starts_with("@junius/plugin-") {
+            final_entries.insert(k.clone(), v.clone());
+        }
+    }
+    for key in &desired_plugin_keys {
+        final_entries.insert(key.clone(), serde_json::Value::String("workspace:*".into()));
+    }
+
+    // Render the block content (entries indented under "dependencies"). 2-space
+    // indent + alphabetical keys, matching the file's existing convention.
+    let indent = detect_indent(src);
+    let mut block = String::new();
+    block.push_str("{\n");
+    let mut iter = final_entries.iter().peekable();
+    while let Some((k, v)) = iter.next() {
+        let value_str = serde_json::to_string(v).map_err(|e| e.to_string())?;
+        let comma = if iter.peek().is_some() { "," } else { "" };
+        let _ = writeln!(
+            block,
+            "{indent}{indent}{key}: {value}{comma}",
+            indent = indent,
+            key = serde_json::to_string(k).map_err(|e| e.to_string())?,
+            value = value_str,
+        );
+    }
+    let _ = write!(block, "{indent}}}");
+
+    // Locate and replace the existing `"dependencies": {...}` span. The opening
+    // brace is the first `{` after the key; we walk braces to find its match.
+    let key_pos = src
+        .find("\"dependencies\"")
+        .ok_or_else(|| "could not find `\"dependencies\"` key".to_string())?;
+    let open_pos = src[key_pos..]
+        .find('{')
+        .map(|o| key_pos + o)
+        .ok_or_else(|| "no `{` after `\"dependencies\"`".to_string())?;
+    let close_pos = match_brace(src, open_pos)
+        .ok_or_else(|| "unbalanced braces in `dependencies` block".to_string())?;
+
+    let mut out = String::with_capacity(src.len() + block.len());
+    out.push_str(&src[..open_pos]);
+    out.push_str(&block);
+    out.push_str(&src[close_pos + 1..]);
+
+    // Sanity: the rewritten string must still be valid JSON.
+    serde_json::from_str::<serde_json::Value>(&out)
+        .map_err(|e| format!("rewrite produced invalid JSON: {e}"))?;
+
+    Ok(out)
+}
+
+/// Detect the file's leading indent (2 vs 4 spaces vs a tab). Reads the first
+/// non-empty indented line. Defaults to two spaces.
+fn detect_indent(src: &str) -> String {
+    for line in src.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed == line {
+            continue;
+        }
+        let leading = &line[..line.len() - trimmed.len()];
+        return leading.to_string();
+    }
+    "  ".into()
+}
+
+/// Find the matching closing `}` for the `{` at `open_pos`. Tracks string
+/// literals (with `\` escapes) so a `}` inside a value doesn't terminate the
+/// block. Returns the byte index of the `}`, or `None` if unbalanced.
+fn match_brace(src: &str, open_pos: usize) -> Option<usize> {
+    let bytes = src.as_bytes();
+    if bytes.get(open_pos) != Some(&b'{') {
+        return None;
+    }
+    let mut depth: i32 = 0;
+    let mut i = open_pos;
+    let mut in_str = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => {
+                in_str = true;
+                i += 1;
+            }
+            b'{' => {
+                depth += 1;
+                i += 1;
+            }
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    None
+}
+
+/// Run a managed subprocess from `cwd`. Streams stdout/stderr through to the
+/// terminal so the user sees what's happening (`buf generate` and `pnpm
+/// install` can take seconds). Returns `Err(exit::PARSE_ERROR)` on failure,
+/// after printing a diagnostic.
+fn run_subprocess(program: &str, args: &[&str], cwd: &Path, label: &str) -> Result<(), i32> {
+    eprintln!("junius sync: running {label}…");
+    let status = match std::process::Command::new(program)
+        .args(args)
+        .current_dir(cwd)
+        .status()
+    {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "junius sync: failed to spawn {program} {args:?}: {e}\n\
+                 (managed file changed but the follow-up step did not run; run it manually)"
+            );
+            return Err(exit::PARSE_ERROR);
+        }
+    };
+    if !status.success() {
+        eprintln!("junius sync: {label} exited non-zero");
+        return Err(exit::PARSE_ERROR);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1182,5 +1460,84 @@ mod tests {
 
         // A plugin with no component-exposing deps gets no wrapper.
         assert!(render_consumer_registry_ts(&hello, &plugins).is_none());
+    }
+
+    // M16 item A regression: `rewrite_deps_block` swaps the
+    // `"dependencies": { … }` span and leaves the surrounding JSON
+    // byte-identical (top-level key order, devDependencies, scripts, etc.).
+    #[test]
+    fn rewrite_deps_block_inserts_plugin_dep_alphabetically() {
+        let src = r#"{
+  "name": "@junius/shell",
+  "version": "0.0.0",
+  "dependencies": {
+    "@junius/design": "workspace:*",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
+"#;
+        let plugin = ResolvedPlugin {
+            name: "events".into(),
+            crate_name: "events-plugin".into(),
+            module_name: "events_plugin".into(),
+            struct_name: "EventsPlugin".into(),
+            manifest: PluginManifest::parse(
+                "[plugin]\nname = \"events\"\ndisplay_name = \"Events\"\nmanifest_schema = 1\n",
+            )
+            .unwrap(),
+            has_frontend: true,
+            has_frontend_i18n: false,
+        };
+        let out = rewrite_deps_block(src, std::slice::from_ref(&plugin)).unwrap();
+        // Plugin dep added in the right alphabetical position.
+        assert!(out.contains("\"@junius/design\": \"workspace:*\""));
+        assert!(out.contains("\"@junius/plugin-events\": \"workspace:*\""));
+        assert!(out.contains("\"react\": \"^19.0.0\""));
+        // Surrounding sections still present, in order.
+        assert!(
+            out.find("\"name\"").unwrap() < out.find("\"dependencies\"").unwrap(),
+            "top-level key order disturbed"
+        );
+        assert!(
+            out.find("\"devDependencies\"").unwrap() > out.find("\"dependencies\"").unwrap(),
+            "devDependencies moved"
+        );
+        // Idempotent: re-running produces the same string.
+        assert_eq!(
+            rewrite_deps_block(&out, std::slice::from_ref(&plugin)).unwrap(),
+            out
+        );
+    }
+
+    #[test]
+    fn rewrite_deps_block_removes_disabled_plugin() {
+        let src = r#"{
+  "dependencies": {
+    "@junius/plugin-old": "workspace:*",
+    "react": "^19.0.0"
+  }
+}
+"#;
+        // No plugins → all `@junius/plugin-*` entries are dropped, non-plugin
+        // deps stay.
+        let out = rewrite_deps_block(src, &[]).unwrap();
+        assert!(!out.contains("@junius/plugin-old"));
+        assert!(out.contains("\"react\": \"^19.0.0\""));
+    }
+
+    #[test]
+    fn detect_indent_returns_two_spaces_for_a_two_space_file() {
+        let src = "{\n  \"a\": 1\n}\n";
+        assert_eq!(detect_indent(src), "  ");
+    }
+
+    #[test]
+    fn match_brace_handles_strings_with_braces() {
+        let src = r#"{"key": "value with } inside"}"#;
+        let close = match_brace(src, 0).unwrap();
+        assert_eq!(close, src.len() - 1);
     }
 }
