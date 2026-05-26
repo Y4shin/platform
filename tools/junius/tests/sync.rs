@@ -61,6 +61,14 @@ fn sync_with_hello_writes_expected_files() {
     // hello fixture has no `frontend/i18n/`, so the array is empty.
     insta::assert_snapshot!("i18n_catalogs_empty", i18n_ts);
 
+    let domains_rs = fs::read_to_string(
+        tmp.path()
+            .join("crates/junius-sdk/src/generated/domains.rs"),
+    )
+    .unwrap();
+    // hello fixture → Domain { Platform, Hello }, COUNT = 2.
+    insta::assert_snapshot!("domains_rs_hello", domains_rs);
+
     let rpc_barrel = fs::read_to_string(
         tmp.path()
             .join("packages/generated/src/plugins/hello/rpc.ts"),

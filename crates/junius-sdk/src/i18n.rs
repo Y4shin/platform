@@ -134,49 +134,10 @@ impl LocaleResolver {
     }
 }
 
-/// The set of installed plugin domains. Hand-written for M14 — a future
-/// `junius sync` enhancement will codegen this from `dev/platform.toml` so it
-/// tracks the deployment's installed plugin set automatically. `Platform = 0`
-/// is reserved for the host's own catalog (deployment-wide strings).
-#[repr(usize)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Domain {
-    Platform = 0,
-    Events = 1,
-}
-
-impl Domain {
-    pub const COUNT: usize = 2;
-    pub const ALL: [Domain; Self::COUNT] = [Self::Platform, Self::Events];
-
-    /// Catalog domain name as it appears in `.po` headers and in the build
-    /// helper's `Options.domain` field.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Platform => "platform",
-            Self::Events => "events",
-        }
-    }
-
-    /// Parse a domain name. `None` for unknown names — callers should treat
-    /// that as a configuration error. `const` so the build-time codegen can
-    /// emit `const __DOMAIN: Domain = Domain::from_name(...).expect(...)`.
-    #[must_use]
-    pub const fn from_name(s: &str) -> Option<Self> {
-        // Byte-comparing string literals in a const fn rules out `match s {...}`
-        // (string patterns require runtime equality); a small if-chain on bytes
-        // is the const-compatible idiom.
-        let b = s.as_bytes();
-        if matches_bytes(b, b"platform") {
-            Some(Self::Platform)
-        } else if matches_bytes(b, b"events") {
-            Some(Self::Events)
-        } else {
-            None
-        }
-    }
-}
+// `Domain` is codegen'd by `junius sync` against the deployment's plugin
+// set — see `crates/junius-sdk/src/generated/domains.rs`. Re-exported here
+// so plugin code keeps importing it from `junius_sdk::i18n`.
+pub use crate::generated::domains::Domain;
 
 /// One parsed piece of a msgstr, produced by the build-time `.po` parser.
 /// Stored as `&'static` data in the codegen'd per-locale catalog arrays.
@@ -227,22 +188,6 @@ pub trait Message {
     /// Walk the parsed template, emitting literal text and typed substitutions.
     /// Implementations are generated; callers never write this.
     fn render(&self, template: &Template) -> String;
-}
-
-/// `const`-context byte-slice equality. The standard `PartialEq` impl on `&[u8]`
-/// is not yet `const`-callable; this small helper is.
-const fn matches_bytes(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut i = 0;
-    while i < a.len() {
-        if a[i] != b[i] {
-            return false;
-        }
-        i += 1;
-    }
-    true
 }
 
 /// Pick the first `Accept-Language` tag we recognise. Ignores q-values for v1

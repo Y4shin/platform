@@ -12,6 +12,7 @@ pub mod context;
 pub mod db;
 pub mod email;
 pub mod error;
+pub mod generated;
 pub mod i18n;
 pub mod jobs;
 pub mod localizer;
