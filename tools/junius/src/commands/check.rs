@@ -142,7 +142,7 @@ fn check_proto_requires(
         .unwrap_or_else(|| Path::new("."))
         .join("proto");
     let mut files = Vec::new();
-    crate::commands::sync::collect_proto_files(&proto_dir, &mut files);
+    junius_rpc_meta::collect_proto_files(&proto_dir, &mut files);
     files.sort();
 
     let declared: std::collections::BTreeSet<&str> =
@@ -152,7 +152,7 @@ fn check_proto_requires(
         let Ok(content) = std::fs::read_to_string(&file) else {
             continue;
         };
-        for (service, method, perms) in crate::commands::sync::scan_proto_requires(&content) {
+        for (service, method, perms) in junius_rpc_meta::scan_proto_requires(&content) {
             for perm in perms {
                 if !declared.contains(perm.as_str()) {
                     validation.issues.push(ValidationIssue {

@@ -1,0 +1,25 @@
+[package]
+name         = "junius-rpc-meta"
+version      = "0.0.0"
+edition.workspace      = true
+license.workspace      = true
+rust-version.workspace = true
+publish      = false
+
+# Shared scanner + naming for RPC metadata (M15). Centralizes:
+# - proto `(platform.v1.requires)` scanning (used by `junius sync`, `junius
+#   check`, and plugin `build.rs` via `emit_rpc_requires` in M15 Stage 2),
+# - permission-key → marker Pascal-casing (also driven by `plugin_metadata!`),
+# - connectrpc-build's proto-method → snake fn ident convention,
+# - the `__rpc_requires::<service>::<alias>` path used by `#[rpc_service]` and
+#   `junius rpc scaffold`.
+#
+# Pure-compute. No proc-macro, no async, no SDK. Usable as both a normal
+# dependency (junius CLI, macros crate) and a `build-dependencies` entry (plugin
+# build.rs files), so it doesn't pull a fat build graph into plugin builds.
+
+[dependencies]
+regex = { workspace = true }
+
+[lints]
+workspace = true

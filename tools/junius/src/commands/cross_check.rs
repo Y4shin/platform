@@ -45,7 +45,8 @@ use sqlparser::parser::Parser;
 
 use junius::migrate::header::parse_requires;
 
-use crate::commands::sync::{collect_proto_files, scan_proto_service_methods};
+use crate::commands::sync::scan_proto_service_methods;
+use junius_rpc_meta::collect_proto_files;
 
 /// Run every cross-plugin rule over the enabled plugins. `base` is the git ref
 /// to diff against for `SQL.EXPOSED.NO_BREAKING` (no-op outside a git repo).

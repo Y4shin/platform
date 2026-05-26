@@ -2629,6 +2629,7 @@ dependencies = [
  "insta",
  "junius-i18n-build",
  "junius-manifest",
+ "junius-rpc-meta",
  "miette",
  "petgraph",
  "predicates",
@@ -2669,6 +2670,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "junius-rpc-meta"
+version = "0.0.0"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "junius-sdk"
 version = "0.0.0"
 dependencies = [
@@ -2696,6 +2704,7 @@ name = "junius-sdk-macros"
 version = "0.0.0"
 dependencies = [
  "junius-manifest",
+ "junius-rpc-meta",
  "proc-macro2",
  "quote",
  "syn",

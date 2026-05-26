@@ -5,6 +5,7 @@
 use std::path::Path;
 
 use junius_manifest::{ConfigType, PluginManifest, ValidationReport};
+use junius_rpc_meta::permission_marker_pascal;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
@@ -51,12 +52,12 @@ fn expand_bucket_enum(manifest: &PluginManifest) -> TokenStream {
         return quote! {};
     }
     let variants = manifest.storage.buckets.keys().map(|name| {
-        let ty = format_ident!("{}", pascal_case(name));
+        let ty = format_ident!("{}", permission_marker_pascal(name));
         let doc = format!("Logical bucket `{name}`.");
         quote! { #[doc = #doc] #ty }
     });
     let arms = manifest.storage.buckets.keys().map(|name| {
-        let ty = format_ident!("{}", pascal_case(name));
+        let ty = format_ident!("{}", permission_marker_pascal(name));
         let lit = name.as_str();
         quote! { Bucket::#ty => #lit }
     });
@@ -102,7 +103,7 @@ fn expand_permission_markers(manifest: &PluginManifest) -> TokenStream {
     }
 
     let markers = manifest.permissions.keys().map(|key| {
-        let ty = format_ident!("{}", pascal_case(key));
+        let ty = format_ident!("{}", permission_marker_pascal(key));
         let name_lit = key.as_str();
         let doc = format!("Permission marker for `{key}`.");
         quote! {
@@ -121,21 +122,6 @@ fn expand_permission_markers(manifest: &PluginManifest) -> TokenStream {
             #(#markers)*
         }
     }
-}
-
-/// Convert a permission key like `hello:read` or `speakers:book_slot` into a Rust
-/// type name (`HelloRead`, `SpeakersBookSlot`) by upper-camel-casing each `:`/`_`
-/// segment. Inputs are pre-validated by the manifest's `PERM.NAME.FORMAT` rule.
-fn pascal_case(key: &str) -> String {
-    key.split([':', '_'])
-        .filter(|s| !s.is_empty())
-        .map(|seg| {
-            let mut chars = seg.chars();
-            chars.next().map_or_else(String::new, |first| {
-                first.to_uppercase().collect::<String>() + chars.as_str()
-            })
-        })
-        .collect()
 }
 
 /// Emit a typed `Config` struct + `Config::load` from `[config]`. Empty when the

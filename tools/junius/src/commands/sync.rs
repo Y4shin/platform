@@ -9,6 +9,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 use junius_manifest::{PlatformManifest, PluginManifest};
+use junius_rpc_meta::{collect_proto_files, rustfmt_str, scan_proto_requires};
 use serde::Serialize;
 
 use crate::cli::OutputFormat;
@@ -446,104 +447,6 @@ pub(crate) fn scan_proto_service_methods(content: &str) -> Vec<(String, Vec<Stri
         }
     }
     out
-}
-
-/// Recursively collect `*.proto` files under `dir`.
-pub(crate) fn collect_proto_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(read) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_proto_files(&path, out);
-        } else if path.extension().is_some_and(|e| e == "proto") {
-            out.push(path);
-        }
-    }
-}
-
-/// Extract `(service_fqn, method, perms)` for every method carrying
-/// `option (platform.requires)`. Associates each option with the nearest
-/// preceding `rpc`, and each `rpc` with the nearest preceding `service`, scoped
-/// by the file's `package` — robust for conventionally-formatted protos.
-#[allow(
-    clippy::unwrap_used,
-    reason = "compile-constant regexes are known-valid"
-)]
-pub(crate) fn scan_proto_requires(content: &str) -> Vec<(String, String, Vec<String>)> {
-    let package = regex::Regex::new(r"(?m)^\s*package\s+([\w.]+)\s*;")
-        .unwrap()
-        .captures(content)
-        .map(|c| c[1].to_string())
-        .unwrap_or_default();
-    let svc_re = regex::Regex::new(r"\bservice\s+(\w+)").unwrap();
-    let rpc_re = regex::Regex::new(r"\brpc\s+(\w+)").unwrap();
-    let req_re =
-        regex::Regex::new(r#"option\s*\(\s*platform(?:\.v1)?\.requires\s*\)\s*=\s*"([^"]*)""#)
-            .unwrap();
-
-    let services: Vec<(usize, String)> = svc_re
-        .captures_iter(content)
-        .map(|c| (c.get(0).unwrap().start(), c[1].to_string()))
-        .collect();
-    let rpcs: Vec<(usize, String)> = rpc_re
-        .captures_iter(content)
-        .map(|c| (c.get(0).unwrap().start(), c[1].to_string()))
-        .collect();
-
-    let mut out = Vec::new();
-    for cap in req_re.captures_iter(content) {
-        let at = cap.get(0).unwrap().start();
-        let Some((rpc_at, method)) = rpcs.iter().filter(|(o, _)| *o < at).next_back() else {
-            continue;
-        };
-        let service = services
-            .iter()
-            .filter(|(o, _)| *o < *rpc_at)
-            .next_back()
-            .map(|(_, n)| n.clone())
-            .unwrap_or_default();
-        let fqn = if package.is_empty() {
-            service
-        } else {
-            format!("{package}.{service}")
-        };
-        let perms: Vec<String> = cap[1]
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        out.push((fqn, method.clone(), perms));
-    }
-    out
-}
-
-/// Best-effort `rustfmt` of generated Rust *source text* (edition 2024) via
-/// stdin→stdout, so codegen output is fmt-clean as written. Returns the input
-/// unchanged if `rustfmt` is unavailable or errors.
-fn rustfmt_str(src: String) -> String {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
-    let Ok(mut child) = Command::new("rustfmt")
-        .args(["--edition", "2024", "--emit", "stdout"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-    else {
-        return src;
-    };
-    if let Some(mut stdin) = child.stdin.take() {
-        if stdin.write_all(src.as_bytes()).is_err() {
-            return src;
-        }
-    }
-    match child.wait_with_output() {
-        Ok(out) if out.status.success() => String::from_utf8(out.stdout).unwrap_or(src),
-        _ => src,
-    }
 }
 
 fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
@@ -1228,41 +1131,6 @@ mod tests {
         assert_eq!(to_pascal_case("hello-world"), "HelloWorld");
         assert_eq!(to_pascal_case("speakers"), "Speakers");
         assert_eq!(to_pascal_case("user_admin"), "UserAdmin");
-    }
-
-    #[test]
-    fn scan_proto_requires_extracts_annotated_methods() {
-        let proto = r#"
-            syntax = "proto3";
-            package hello.v1;
-            import "platform/v1/annotations.proto";
-            service HelloService {
-              rpc Greet(GreetRequest) returns (GreetResponse);
-              rpc ListGreetings(L) returns (R) {
-                option (platform.v1.requires) = "hello:read";
-              }
-              rpc CreateGreeting(C) returns (D) {
-                option (platform.v1.requires) = "hello:read,hello:write";
-              }
-            }
-        "#;
-        let mut found = scan_proto_requires(proto);
-        found.sort();
-        assert_eq!(
-            found,
-            vec![
-                (
-                    "hello.v1.HelloService".to_string(),
-                    "CreateGreeting".to_string(),
-                    vec!["hello:read".to_string(), "hello:write".to_string()],
-                ),
-                (
-                    "hello.v1.HelloService".to_string(),
-                    "ListGreetings".to_string(),
-                    vec!["hello:read".to_string()],
-                ),
-            ]
-        );
     }
 
     #[test]
