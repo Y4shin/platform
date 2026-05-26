@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Input, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -26,14 +27,16 @@ const DEFAULT_CONFIG: InviteConfigState = {
   showRemaining: true,
 };
 
-const TOGGLES: Array<{ key: keyof InviteConfigState; label: string }> = [
-  { key: 'signupEnabled', label: 'Collect sign-ups' },
-  { key: 'signupOpen', label: 'Sign-up open' },
-  { key: 'showTitle', label: 'Show title' },
-  { key: 'showDatetime', label: 'Show date/time' },
-  { key: 'showLocation', label: 'Show location' },
-  { key: 'showDescription', label: 'Show description' },
-  { key: 'showRemaining', label: 'Show remaining slots' },
+// Toggle labels are translated inside the component (the `t` macro must run
+// against the active locale, so it can't live at module scope).
+const TOGGLE_KEYS: Array<keyof InviteConfigState> = [
+  'signupEnabled',
+  'signupOpen',
+  'showTitle',
+  'showDatetime',
+  'showLocation',
+  'showDescription',
+  'showRemaining',
 ];
 
 /** Owner-side: configure an event's invite page (create or update) and review its
@@ -84,14 +87,31 @@ export function InviteManagePage() {
   const set = (key: keyof InviteConfigState, value: boolean) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
+  const { t } = useLingui();
+  const toggleLabels: Record<keyof InviteConfigState, string> = {
+    signupEnabled: t`Collect sign-ups`,
+    signupOpen: t`Sign-up open`,
+    slotLimit: '', // not a toggle; handled separately below
+    showTitle: t`Show title`,
+    showDatetime: t`Show date/time`,
+    showLocation: t`Show location`,
+    showDescription: t`Show description`,
+    showRemaining: t`Show remaining slots`,
+  };
+  const anonymousLabel = t`(anonymous)`;
+
   return (
     <Stack gap="md">
-      <h1 className="font-semibold text-xl">Invite</h1>
+      <h1 className="font-semibold text-xl">
+        <Trans>Invite</Trans>
+      </h1>
 
       {existing && (
         <Card>
           <Stack gap="sm">
-            <h2 className="font-semibold text-base">Shareable link</h2>
+            <h2 className="font-semibold text-base">
+              <Trans>Shareable link</Trans>
+            </h2>
             <code className="text-sm">/i/events/{existing.slug}</code>
           </Stack>
         </Card>
@@ -99,19 +119,21 @@ export function InviteManagePage() {
 
       <Card>
         <Stack gap="sm">
-          <h2 className="font-semibold text-base">Configuration</h2>
-          {TOGGLES.map(({ key, label }) => (
+          <h2 className="font-semibold text-base">
+            <Trans>Configuration</Trans>
+          </h2>
+          {TOGGLE_KEYS.map((key) => (
             <label key={key} className="inline-flex items-center gap-2 text-fg-1 text-sm">
               <input
                 type="checkbox"
                 checked={config[key] as boolean}
                 onChange={(e) => set(key, e.target.checked)}
               />
-              {label}
+              {toggleLabels[key]}
             </label>
           ))}
           <label className="text-fg-1 text-sm" htmlFor="slot-limit">
-            Slot limit (0 = unlimited)
+            <Trans>Slot limit (0 = unlimited)</Trans>
           </label>
           <Input
             id="slot-limit"
@@ -127,12 +149,12 @@ export function InviteManagePage() {
                 checked={presignupGroup}
                 onChange={(e) => setPresignupGroup(e.target.checked)}
               />
-              Pre-sign-up current group members (group events)
+              <Trans>Pre-sign-up current group members (group events)</Trans>
             </label>
           )}
           <div>
             <Button onClick={save} disabled={create.isPending || update.isPending}>
-              {existing ? 'Save invite' : 'Create invite'}
+              {existing ? <Trans>Save invite</Trans> : <Trans>Create invite</Trans>}
             </Button>
           </div>
         </Stack>
@@ -140,17 +162,21 @@ export function InviteManagePage() {
 
       <Card>
         <Stack gap="sm">
-          <h2 className="font-semibold text-base">Sign-ups</h2>
+          <h2 className="font-semibold text-base">
+            <Trans>Sign-ups</Trans>
+          </h2>
           {signups.data?.signups.length ? (
             <ul className="text-sm">
               {signups.data.signups.map((s) => (
                 <li key={s.id} className={s.status === 'opted_out' ? 'text-fg-2 line-through' : ''}>
-                  {s.displayName || s.email || '(anonymous)'} — {s.status}
+                  {s.displayName || s.email || anonymousLabel} — {s.status}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-fg-2 text-sm">No sign-ups yet.</p>
+            <p className="text-fg-2 text-sm">
+              <Trans>No sign-ups yet.</Trans>
+            </p>
           )}
         </Stack>
       </Card>

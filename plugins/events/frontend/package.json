@@ -19,6 +19,8 @@
     "@junius/design": "workspace:*",
     "@junius/generated": "workspace:*",
     "@junius/sdk": "workspace:*",
+    "@lingui/core": "^5.9.5",
+    "@lingui/react": "^5.9.5",
     "zod": "^3.23.8"
   },
   "peerDependencies": {
@@ -26,6 +28,7 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
+    "@lingui/macro": "^5.9.5",
     "@tanstack/react-router": "^1.95.0",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
@@ -33,6 +36,7 @@
     "jsdom": "^25.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "vite": "^6.0.0",
     "vitest": "^2.1.0"
   }
 }

@@ -1,29 +1,41 @@
 # M14 — Internationalization
 
-> **Status:** ⏳ Seam + Lingui FE integration landed; retrofit of the other
-> three plugins is the remaining work.
+> **Status:** ✅ Implemented. The seam + Lingui integration + a full
+> events-plugin retrofit ship together.
 >
-> Stages A–F shipped (locale storage, typed-codegen backend localizer, FE
-> locale seam + persistence, `junius i18n check` + CI gate, end-to-end
-> retrofit of `hello`). Stage G then layered Lingui v5 on top of the seam:
-> the host shell + the hello plugin frontend use `t` / `<Trans>` / `useLingui`
-> from `@lingui/react/macro` (the macros must be imported from a Lingui-
-> recognised path; the SDK re-exports the runtime `i18n` singleton +
-> `useLingui` + the `I18nProvider`). `junius i18n extract` wraps Lingui's
-> CLI; `@lingui/vite-plugin` compiles `.po` → JS on demand. The locale
-> switcher round-trips: English ↔ German.
+> Stages A–F land the host-side locale storage, the typed-codegen backend
+> localizer, the library-agnostic FE seam, `junius i18n check` + CI gate, and
+> the original hello retrofit. Stage G layered Lingui v5 on top (`t` /
+> `<Trans>` / `useLingui` from `@lingui/react/macro`; the macros must be
+> imported from a Lingui-recognised path, so the SDK re-exports only the
+> runtime `i18n` singleton + `useLingui` + the `I18nProvider`). The
+> three test plugins were then dropped, and the events plugin retrofitted
+> end-to-end:
 >
-> Remaining follow-ups:
+> - BE: `events/build.rs` calls `junius_i18n_build::generate`, `lib.rs`
+>   invokes `i18n_catalog!()`, `register_i18n` installs the catalog;
+>   `SendSignupConfirmation.recipient_locale` carries the recipient's locale
+>   through the job queue; the email handler renders subject + body in EN/DE
+>   via `messages::EventsSignupEmail{Subject,Body,RecipientFallback}`.
+>   Three unit tests cover EN, DE, and the locale-specific empty-name
+>   fallback ("there" / "zusammen").
+> - FE: `plugins/events/frontend` ships 51 wrapped strings across
+>   `EventsListPage`, `EventDetailPage`, `EventEditPage`, `InviteManagePage`,
+>   `PublicInvitePage`, and `EventPicker`, with a `<Plural>` for "N slots
+>   remaining" on the public invite page. Full DE translations committed.
+>   `loadI18n` is exposed from the plugin index; the host shell wires it
+>   into `<I18nProvider catalogs={[loadShellI18n, loadEventsI18n]}>`.
 >
-> - **`greetings` / `widgets` / `events` retrofit** — both BE (build.rs +
->   `i18n_catalog!()` + `register_i18n`) and FE (Lingui macros + per-plugin
->   `loadI18n` loader + `.po` files). The hello plugin is the worked example.
-> - **`junius sync` codegen for FE catalogs**: the host's `main.tsx` hand-lists
->   the catalog-loader array today; it should generate the same way
->   `generated/routes.ts` does.
-> - **Playwright locale-switch spec** runs under `JUNIUS_E2E=1` against the
->   live dev stack ([e2e/locale.spec.ts](../../e2e/locale.spec.ts)); a
->   CI-default unattended version is a future enhancement.
+> `task ci:i18n` reports `events: ok (3 messages)`; `pnpm exec lingui
+> extract` reports 5 host strings + 51 events strings, no missing translations.
+>
+> Open follow-ups (not blocking M14):
+>
+> - `junius sync` codegen for the FE catalog-loader array (today
+>   `main.tsx` hand-lists it; same pattern as `generated/routes.ts`).
+> - Playwright locale-switch spec ([e2e/locale.spec.ts](../../e2e/locale.spec.ts))
+>   runs under `JUNIUS_E2E=1`; a CI-default unattended version is a future
+>   enhancement.
 
 ## Goal
 

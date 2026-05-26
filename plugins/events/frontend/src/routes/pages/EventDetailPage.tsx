@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { Trans } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 
 import { formatWhen } from '../../domain.js';
@@ -30,7 +31,9 @@ export function EventDetailPage() {
   if (isPending || !data.event) {
     return (
       <Card>
-        <p className="text-fg-2 text-sm">Loading…</p>
+        <p className="text-fg-2 text-sm">
+          <Trans>Loading…</Trans>
+        </p>
       </Card>
     );
   }
@@ -61,20 +64,20 @@ export function EventDetailPage() {
               variant="secondary"
               onClick={() => nav('/p/events/$eventId/edit', { eventId: event.id })}
             >
-              Edit
+              <Trans>Edit</Trans>
             </Button>
             <Button
               variant="secondary"
               onClick={() => nav('/p/events/$eventId/invite', { eventId: event.id })}
             >
-              Manage invite
+              <Trans>Manage invite</Trans>
             </Button>
             <Button
               variant="ghost"
               disabled={del.isPending}
               onClick={() => del.mutate({ id: event.id })}
             >
-              Delete
+              <Trans>Delete</Trans>
             </Button>
           </Stack>
         </Card>

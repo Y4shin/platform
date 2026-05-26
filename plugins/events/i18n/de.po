@@ -1,0 +1,10 @@
+# M14: events plugin German translations.
+
+msgid "events.signup.email.subject"
+msgstr "Du bist angemeldet: {title}"
+
+msgid "events.signup.email.body"
+msgstr "Hallo {name},\n\ndeine Anmeldung für „{title}“ ist bestätigt.\n\nBis bald!"
+
+msgid "events.signup.email.recipient_fallback"
+msgstr "zusammen"

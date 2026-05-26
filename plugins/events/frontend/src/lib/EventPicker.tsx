@@ -1,6 +1,7 @@
 import { useQuery } from '@connectrpc/connect-query';
 import { Input, Select, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { useLingui } from '@lingui/react/macro';
 import { useMemo, useState } from 'react';
 
 export interface EventPickerProps {
@@ -14,11 +15,13 @@ export interface EventPickerProps {
 /**
  * A searchable event selector: a text filter over `EventService.ListEvents` plus
  * a `<select>` of the matches. Exposed via `[exposes.components.EventPicker]` for
- * cross-plugin reuse (the `widgets`/`VenuePicker` pattern, but RPC-backed).
+ * cross-plugin reuse.
  */
-export function EventPicker({ value, onChange, label = 'Event' }: EventPickerProps) {
+export function EventPicker({ value, onChange, label }: EventPickerProps) {
   const [filter, setFilter] = useState('');
   const { data } = useQuery(rpc.EventService.listEvents, {});
+  const { t } = useLingui();
+  const effectiveLabel = label ?? t`Event`;
 
   const options = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -29,16 +32,16 @@ export function EventPicker({ value, onChange, label = 'Event' }: EventPickerPro
 
   return (
     <Stack gap="sm">
-      <span className="font-medium text-fg-1 text-sm">{label}</span>
+      <span className="font-medium text-fg-1 text-sm">{effectiveLabel}</span>
       <Input
         type="search"
-        placeholder="Filter events…"
+        placeholder={t`Filter events…`}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
       <Select
         value={value ?? ''}
-        placeholder="Select an event…"
+        placeholder={t`Select an event…`}
         options={options}
         onChange={(e) => onChange?.(e.target.value)}
       />

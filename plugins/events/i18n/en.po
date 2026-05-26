@@ -1,0 +1,15 @@
+# M14: events plugin source catalog (English).
+#
+# msgid is the stable catalog key (events.signup.email.subject), msgstr is the
+# source-language template. Translators add a sibling de.po with the same
+# msgids and locale-specific msgstrs. The build helper enforces placeholder
+# agreement; a translator-introduced extra placeholder fails the build.
+
+msgid "events.signup.email.subject"
+msgstr "You're signed up: {title}"
+
+msgid "events.signup.email.body"
+msgstr "Hi {name},\n\nYou're confirmed for \"{title}\".\n\nSee you there!"
+
+msgid "events.signup.email.recipient_fallback"
+msgstr "there"

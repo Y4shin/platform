@@ -1,3 +1,4 @@
+export { loadI18n } from './i18n.js';
 export type { EventCardProps, EventSummary } from './lib/EventCard.js';
 export { EventCard } from './lib/EventCard.js';
 export type { EventPickerProps } from './lib/EventPicker.js';

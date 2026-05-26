@@ -12,6 +12,7 @@ import {
 } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
 import { useUser } from '@junius/sdk';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 import { z } from 'zod';
 
@@ -50,11 +51,15 @@ export function EventEditPage() {
   const update = useMutation(rpc.EventService.updateEvent, {
     onSuccess: (res) => res.event && nav('/p/events/$eventId', { eventId: res.event.id }),
   });
+  // Hooks must precede any conditional return (React rules-of-hooks).
+  const { t } = useLingui();
 
   if (isEdit && existing.isPending) {
     return (
       <Card>
-        <p className="text-fg-2 text-sm">Loading…</p>
+        <p className="text-fg-2 text-sm">
+          <Trans>Loading…</Trans>
+        </p>
       </Card>
     );
   }
@@ -83,7 +88,7 @@ export function EventEditPage() {
       };
 
   const ownerOptions = [
-    { value: 'user', label: 'Myself' },
+    { value: 'user', label: t`Myself` },
     ...(user?.memberships ?? []).map((m) => ({ value: `group:${m.groupId}`, label: m.groupName })),
   ];
 
@@ -113,41 +118,43 @@ export function EventEditPage() {
 
   return (
     <Stack gap="md">
-      <h1 className="font-semibold text-xl">{isEdit ? 'Edit event' : 'New event'}</h1>
+      <h1 className="font-semibold text-xl">
+        {isEdit ? <Trans>Edit event</Trans> : <Trans>New event</Trans>}
+      </h1>
       <Card>
         <Form schema={schema} defaultValues={defaultValues} onSubmit={onSubmit}>
           <Stack gap="md">
-            <Field name="title" label="Title">
-              {(field) => <Input {...field} placeholder="Team offsite" />}
+            <Field name="title" label={t`Title`}>
+              {(field) => <Input {...field} placeholder={t`Team offsite`} />}
             </Field>
-            <Field name="description" label="Description">
+            <Field name="description" label={t`Description`}>
               {(field) => <Textarea {...field} />}
             </Field>
-            <Field name="location" label="Location">
-              {(field) => <Input {...field} placeholder="Where" />}
+            <Field name="location" label={t`Location`}>
+              {(field) => <Input {...field} placeholder={t`Where`} />}
             </Field>
-            <Field name="schedule" label="When">
+            <Field name="schedule" label={t`When`}>
               {(field) => <DateRange value={field.value} onChange={field.onChange} />}
             </Field>
-            <Field name="visibility" label="Visibility">
+            <Field name="visibility" label={t`Visibility`}>
               {(field) => (
                 <Select
                   {...field}
                   options={[
-                    { value: 'private', label: 'Private' },
-                    { value: 'public', label: 'Public (world-readable)' },
+                    { value: 'private', label: t`Private` },
+                    { value: 'public', label: t`Public (world-readable)` },
                   ]}
                 />
               )}
             </Field>
             {!isEdit && (
-              <Field name="owner" label="Owner">
+              <Field name="owner" label={t`Owner`}>
                 {(field) => <Select {...field} options={ownerOptions} />}
               </Field>
             )}
             <div>
               <Button type="submit" disabled={create.isPending || update.isPending}>
-                {isEdit ? 'Save changes' : 'Create event'}
+                {isEdit ? <Trans>Save changes</Trans> : <Trans>Create event</Trans>}
               </Button>
             </div>
           </Stack>

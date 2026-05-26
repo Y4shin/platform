@@ -1,0 +1,224 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-05-26 15:13+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:101
+msgid "(anonymous)"
+msgstr "(anonymous)"
+
+#. placeholder {0}: page.slotsRemaining
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:63
+msgid "{0, plural, one {# slot remaining.} other {# slots remaining.}}"
+msgstr "{0, plural, one {# slot remaining.} other {# slots remaining.}}"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:92
+msgid "Collect sign-ups"
+msgstr "Collect sign-ups"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:123
+msgid "Configuration"
+msgstr "Configuration"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:156
+msgid "Create event"
+msgstr "Create event"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:157
+msgid "Create invite"
+msgstr "Create invite"
+
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:80
+msgid "Delete"
+msgstr "Delete"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:129
+msgid "Description"
+msgstr "Description"
+
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:67
+msgid "Edit"
+msgstr "Edit"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:121
+msgid "Edit event"
+msgstr "Edit event"
+
+#: plugins/events/frontend/src/lib/EventPicker.tsx:24
+msgid "Event"
+msgstr "Event"
+
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:20
+msgid "Events"
+msgstr "Events"
+
+#: plugins/events/frontend/src/lib/EventPicker.tsx:38
+msgid "Filter events…"
+msgstr "Filter events…"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:105
+msgid "I’m going"
+msgstr "I’m going"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:106
+msgid "Invite"
+msgstr "Invite"
+
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:35
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:59
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:34
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:35
+msgid "Loading…"
+msgstr "Loading…"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:132
+msgid "Location"
+msgstr "Location"
+
+#: plugins/events/frontend/src/routes/pages/EventDetailPage.tsx:73
+msgid "Manage invite"
+msgstr "Manage invite"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:90
+msgid "Myself"
+msgstr "Myself"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:121
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:23
+msgid "New event"
+msgstr "New event"
+
+#: plugins/events/frontend/src/routes/pages/EventsListPage.tsx:40
+msgid "No events yet. Create your first one."
+msgstr "No events yet. Create your first one."
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:178
+msgid "No sign-ups yet."
+msgstr "No sign-ups yet."
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:113
+msgid "Opt out"
+msgstr "Opt out"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:150
+msgid "Owner"
+msgstr "Owner"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:152
+msgid "Pre-sign-up current group members (group events)"
+msgstr "Pre-sign-up current group members (group events)"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:143
+msgid "Private"
+msgstr "Private"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:144
+msgid "Public (world-readable)"
+msgstr "Public (world-readable)"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:156
+msgid "Save changes"
+msgstr "Save changes"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:157
+msgid "Save invite"
+msgstr "Save invite"
+
+#: plugins/events/frontend/src/lib/EventPicker.tsx:44
+msgid "Select an event…"
+msgstr "Select an event…"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:113
+msgid "Shareable link"
+msgstr "Shareable link"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:96
+msgid "Show date/time"
+msgstr "Show date/time"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:98
+msgid "Show description"
+msgstr "Show description"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:97
+msgid "Show location"
+msgstr "Show location"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:99
+msgid "Show remaining slots"
+msgstr "Show remaining slots"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:95
+msgid "Show title"
+msgstr "Show title"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:77
+msgid "Sign up"
+msgstr "Sign up"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:123
+msgid "Sign-up is closed."
+msgstr "Sign-up is closed."
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:93
+msgid "Sign-up open"
+msgstr "Sign-up open"
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:166
+msgid "Sign-ups"
+msgstr "Sign-ups"
+
+#. placeholder {0}: user.displayName
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:81
+msgid "Signing up as {0}."
+msgstr "Signing up as {0}."
+
+#: plugins/events/frontend/src/routes/pages/InviteManagePage.tsx:136
+msgid "Slot limit (0 = unlimited)"
+msgstr "Slot limit (0 = unlimited)"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:127
+msgid "Team offsite"
+msgstr "Team offsite"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:44
+msgid "This invite is not available."
+msgstr "This invite is not available."
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:126
+msgid "Title"
+msgstr "Title"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:138
+msgid "Visibility"
+msgstr "Visibility"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:135
+msgid "When"
+msgstr "When"
+
+#: plugins/events/frontend/src/routes/pages/EventEditPage.tsx:133
+msgid "Where"
+msgstr "Where"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:57
+msgid "You’re invited"
+msgstr "You’re invited"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:91
+msgid "Your email"
+msgstr "Your email"
+
+#: plugins/events/frontend/src/routes/pages/PublicInvitePage.tsx:86
+msgid "Your name"
+msgstr "Your name"

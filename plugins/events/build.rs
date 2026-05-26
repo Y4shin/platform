@@ -23,4 +23,10 @@ fn main() {
     {
         panic!("connectrpc-build codegen failed: {e}");
     }
+
+    // M14: parse `i18n/*.po` into typed message structs + per-locale catalog
+    // arrays. `junius_sdk::i18n_catalog!()` in lib.rs `include!`s the output.
+    if let Err(e) = junius_i18n_build::generate(junius_i18n_build::Options::new("events")) {
+        panic!("junius-i18n-build codegen failed: {e}");
+    }
 }

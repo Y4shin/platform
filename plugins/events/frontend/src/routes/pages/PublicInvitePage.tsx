@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Input, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
 import { useUser } from '@junius/sdk';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 
@@ -26,17 +27,22 @@ export function PublicInvitePage() {
   const signup = useMutation(rpc.InviteService.signup, { onSuccess: onChanged });
   const optOut = useMutation(rpc.InviteService.optOut, { onSuccess: onChanged });
 
+  const { t } = useLingui();
   if (invite.isPending) {
     return (
       <Card>
-        <p className="text-fg-2 text-sm">Loading…</p>
+        <p className="text-fg-2 text-sm">
+          <Trans>Loading…</Trans>
+        </p>
       </Card>
     );
   }
   if (invite.error || !invite.data) {
     return (
       <Card>
-        <p className="text-fg-2 text-sm">This invite is not available.</p>
+        <p className="text-fg-2 text-sm">
+          <Trans>This invite is not available.</Trans>
+        </p>
       </Card>
     );
   }
@@ -48,12 +54,18 @@ export function PublicInvitePage() {
     <Stack gap="md">
       <Card>
         <Stack gap="sm">
-          <h1 className="font-semibold text-xl">{page.title || 'You’re invited'}</h1>
+          <h1 className="font-semibold text-xl">{page.title || <Trans>You’re invited</Trans>}</h1>
           {when && <p className="text-fg-2 text-sm">{when}</p>}
           {page.location && <p className="text-fg-2 text-sm">📍 {page.location}</p>}
           {page.description && <p className="text-fg-1 text-sm">{page.description}</p>}
           {page.showRemaining && !page.unlimitedSlots && (
-            <p className="text-fg-2 text-sm">{page.slotsRemaining} slot(s) remaining.</p>
+            <p className="text-fg-2 text-sm">
+              <Plural
+                value={page.slotsRemaining}
+                one="# slot remaining."
+                other="# slots remaining."
+              />
+            </p>
           )}
         </Stack>
       </Card>
@@ -61,18 +73,22 @@ export function PublicInvitePage() {
       {page.canSignup ? (
         <Card>
           <Stack gap="sm">
-            <h2 className="font-semibold text-base">Sign up</h2>
+            <h2 className="font-semibold text-base">
+              <Trans>Sign up</Trans>
+            </h2>
             {user ? (
-              <p className="text-fg-2 text-sm">Signing up as {user.displayName}.</p>
+              <p className="text-fg-2 text-sm">
+                <Trans>Signing up as {user.displayName}.</Trans>
+              </p>
             ) : (
               <>
                 <Input
-                  placeholder="Your name"
+                  placeholder={t`Your name`}
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                 />
                 <Input
-                  placeholder="Your email"
+                  placeholder={t`Your email`}
                   type="email"
                   value={guestEmail}
                   onChange={(e) => setGuestEmail(e.target.value)}
@@ -86,7 +102,7 @@ export function PublicInvitePage() {
                   signup.mutate(user ? { slug: s } : { slug: s, guestName, guestEmail })
                 }
               >
-                I’m going
+                <Trans>I’m going</Trans>
               </Button>
               {user && (
                 <Button
@@ -94,7 +110,7 @@ export function PublicInvitePage() {
                   disabled={optOut.isPending}
                   onClick={() => optOut.mutate({ slug: s })}
                 >
-                  Opt out
+                  <Trans>Opt out</Trans>
                 </Button>
               )}
             </div>
@@ -103,7 +119,9 @@ export function PublicInvitePage() {
         </Card>
       ) : (
         <Card>
-          <p className="text-fg-2 text-sm">Sign-up is closed.</p>
+          <p className="text-fg-2 text-sm">
+            <Trans>Sign-up is closed.</Trans>
+          </p>
         </Card>
       )}
     </Stack>

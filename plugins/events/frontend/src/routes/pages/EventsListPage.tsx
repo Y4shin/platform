@@ -1,6 +1,7 @@
 import { useQuery } from '@connectrpc/connect-query';
 import { Button, Card, Stack } from '@junius/design';
 import { rpc } from '@junius/generated/events/rpc';
+import { Trans } from '@lingui/react/macro';
 
 import { EventCard } from '../../lib/EventCard.js';
 import { usePluginNavigate } from '../../nav.js';
@@ -15,8 +16,12 @@ export function EventsListPage() {
   return (
     <Stack gap="md">
       <div className="flex items-center justify-between">
-        <h1 className="font-semibold text-xl">Events</h1>
-        <Button onClick={() => nav('/p/events/new')}>New event</Button>
+        <h1 className="font-semibold text-xl">
+          <Trans>Events</Trans>
+        </h1>
+        <Button onClick={() => nav('/p/events/new')}>
+          <Trans>New event</Trans>
+        </Button>
       </div>
 
       {error ? (
@@ -25,11 +30,15 @@ export function EventsListPage() {
         </Card>
       ) : isPending ? (
         <Card>
-          <p className="text-fg-2 text-sm">Loading…</p>
+          <p className="text-fg-2 text-sm">
+            <Trans>Loading…</Trans>
+          </p>
         </Card>
       ) : data.events.length === 0 ? (
         <Card>
-          <p className="text-fg-2 text-sm">No events yet. Create your first one.</p>
+          <p className="text-fg-2 text-sm">
+            <Trans>No events yet. Create your first one.</Trans>
+          </p>
         </Card>
       ) : (
         data.events.map((event) => (
