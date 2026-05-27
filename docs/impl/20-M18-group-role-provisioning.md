@@ -294,9 +294,34 @@ After `upsert_user`, take `claims.additional_claims().get("groups")` (a
    already `managed_by='oidc'`; a manual override wins).
 3. **Reap stale OIDC memberships**: `DELETE FROM platform.group_membership WHERE user_id = $1 AND managed_by = 'oidc' AND managed_source NOT IN ($current_oidc_groups)`.
 
-Manual memberships are untouched. Reconciliation runs **only at login** in v1
-(the simplest correct point); a `junius oidc resync` CLI is added in scope
-below for ops who need to force a sweep without waiting for re-login.
+Manual memberships are untouched. The reconciler is a single helper
+`reconcile_oidc_memberships(user_id, oidc_groups)` so the four trigger points
+share one implementation.
+
+**Trigger points (four total):**
+
+1. **Login** — the OIDC callback runs the reconciler with the claim's `groups`.
+2. **On-demand REST** — `POST /api/me/refresh-groups`, authenticated. The
+   handler refreshes the access token from the session's stored OIDC tokens,
+   calls the IdP's userinfo endpoint (cheaper than the admin API; uses
+   what the user already has), reconciles, returns the updated `User` JSON.
+3. **On-demand Connect-RPC** — `UserService.RefreshOidcGroups` on a new host
+   `user.v1` proto. Same body as the REST endpoint; reuses session auth.
+4. **CLI sweep** — `junius oidc resync [--all | <user>]` for ops who need to
+   force a refresh without a session (e.g. fixing drift batch-style).
+
+Use case for the on-demand endpoints: Authentik fires a webhook on group
+membership change → n8n / similar receives it → calls the REST endpoint *as
+the affected user* (Authentik holds that user's refresh token via a service
+flow). Junius itself doesn't ship the webhook listener; the endpoint surface
+is the seam.
+
+> **Caveat (out of scope for v1).** Authenticating an automation client *as*
+> an arbitrary user requires either user API tokens (a real feature, not
+> yet built) or Authentik service-account impersonation. v1 ships the
+> self-refresh endpoint + the CLI sweep; admin-side
+> `POST /api/admin/users/<id>/refresh-groups` is left for a follow-up
+> milestone alongside user API tokens.
 
 **Authentik blueprint update.** `dev/authentik/blueprints/junius.yaml` gains:
 - the `groups` scope mapping in the provider's `property_mappings`;
@@ -375,10 +400,47 @@ role        = "organiser"
   longer present. This is the destructive-action guardrail mirroring how the
   M11 deployment workflow gates `cache prune`.
 
-**Boot-time auto-apply (default off).** A `[provisioning] auto_apply_on_boot = true`
-opt-in runs `provision apply` at host start, after migrations. Useful for
-ephemeral deployments / E2E; off by default to keep prod admin actions
-auditable through the CLI rather than implicit at startup.
+**Boot-time auto-apply (default on; cheap when nothing changed).** The host
+runs `provision apply` automatically at start, after migrations. To keep
+restarts from spamming the audit log when nothing has changed:
+
+- The provisioning block (groups + roles + permissions + assignments +
+  OIDC mappings) is hashed (blake3) at apply time. The hash + the
+  applied-at timestamp persist in a new `platform.provisioning_state` row.
+- On boot, the host computes the current config's hash; if it matches the
+  stored hash, `apply` short-circuits and emits a single
+  `provisioning.skipped_unchanged` audit event. No diff, no writes.
+- A drift sweep against actual DB state can be forced via
+  `junius provision apply --force` (re-applies regardless of hash) or
+  `junius provision diff` (read-only, always inspects state).
+
+This makes the boot path cheap on every restart while keeping the
+`junius provision apply` CLI semantically explicit when ops need it.
+`[provisioning] auto_apply_on_boot = false` opts a deployment out of the
+boot-time pass entirely (kept for advanced cases — e.g. an operator who
+wants the audit trail anchored at a human-triggered command, not at every
+process restart).
+
+**Lock-on-managed (forbids manual edits to config-owned rows).** A new
+`[provisioning] lock_managed = true` (default) enforces that:
+
+- Groups / roles / role-permissions / memberships / user-roles /
+  user-role-assignments / OIDC mappings with `managed_by='config'` are
+  **read-only** through every mutation seam: the `PlatformAdminApi`
+  accessor rejects writes with a typed `ManagedByConfig` error, the
+  admin UI hides edit affordances and shows a "locked by provisioning"
+  badge, and the host's session-level group-membership mutations refuse
+  too. Removal is only possible by removing the entity from the config
+  + `junius provision apply --allow-delete`.
+- A `managed_by='manual'` row that someone wants to bring under config
+  control is moved by adding it to the config; `apply` upserts (with the
+  unique-key conflict path flipping `managed_by` to `'config'`) and
+  audit-emits the takeover.
+
+`lock_managed = false` is the escape hatch: `managed_by='config'` becomes
+purely informational (the original v1 plan), and admin UI can edit any
+row regardless of provenance. Useful for deployments using the TOML as a
+seed rather than a source-of-truth; not the default.
 
 **Dev migration.** `dev/dev-seed.sql` is **deleted** and replaced by
 `dev/provisioning.toml`; the dev README points contributors to
@@ -478,10 +540,11 @@ cleaner during the build).
 | **Permission picker UI** | A custom `<PermissionPicker>` in `plugins/admin/frontend/src/lib`, grouped by plugin | One screen-friendly multi-select; exposed for cross-plugin reuse | Forms use the M13 `react-hook-form` + `zod` default. |
 | **`managed_by` discriminator** | A `TEXT` column with a `CHECK ... IN ('manual','oidc','config')` constraint | Trivially extensible; readable in psql | Alternative: a Postgres enum. Rejected — small set, doesn't justify a migration when a value is added. |
 | **OIDC groups claim key** | `groups` (Authentik default) | Matches the Authentik blueprint update in Stage 3 | Configurable in `[config]` (`oidc_groups_claim = "groups"`) for IdPs that name it differently. |
-| **OIDC reconciliation timing** | On login only, plus an opt-in `junius oidc resync --all` CLI | Simplest correct point; matches industry convention | Alternative: a background job polling Authentik's API. Rejected — adds a second dependency on Authentik's data plane. |
+| **OIDC reconciliation triggers** | (1) login, (2) `POST /api/me/refresh-groups`, (3) `UserService.RefreshOidcGroups` Connect-RPC, (4) `junius oidc resync` CLI — single shared reconciler | Login is the minimum correct point; the two on-demand endpoints (REST + RPC) let user-side automation (Authentik webhook → n8n → endpoint) push the refresh without re-login; the CLI is the admin sweep | All four call the same `reconcile_oidc_memberships(user_id, groups)` helper. Admin-side "refresh arbitrary user" stays out of scope (needs user API tokens — future milestone). |
 | **Config user identity** | `oidc_sub` preferred, `email` accepted with a warning | `sub` is stable; email can change in the IdP | The `apply` step resolves email → `oidc_sub` via the upserted `platform.user` row, errors if the user has never logged in. |
 | **Config file format** | TOML, inline or `[provisioning] file = "…"` pointer | Existing host config is TOML; consistent | — |
-| **Boot-time auto-apply** | Off by default; opt-in via `[provisioning] auto_apply_on_boot = true` | Keeps prod admin changes auditable through the CLI; convenient for ephemeral envs | E2E suite (M17) sets this on. |
+| **Boot-time auto-apply** | **On** by default, **hash-guarded** so an unchanged config is a no-op (emits one `provisioning.skipped_unchanged` audit event); opt out via `[provisioning] auto_apply_on_boot = false` | Cheap on every restart; declarative state stays converged automatically; the audit log isn't spammed because the no-diff path doesn't run | `junius provision apply --force` re-applies regardless of hash. State stored in a new `platform.provisioning_state` table (one row per deployment, holds the last hash + apply timestamp). |
+| **Lock on `managed_by='config'`** | `[provisioning] lock_managed = true` (default) — config-owned rows are read-only at every mutation seam (`PlatformAdminApi`, admin UI, session reconciler); takeover only via the config | The user's hard guarantee: a deployment that wants the TOML to *be* the truth doesn't have to police drift through the UI; admins literally cannot edit a config-managed group without first removing it from the file | `lock_managed = false` makes `managed_by='config'` purely informational. A separate, typed `ManagedByConfig` error is what the SDK / UI raise. |
 | **Destructive provisioning** | Removed entities `WARN` by default; `--allow-delete` required to drop | Mirrors the M11 `cache prune` guardrail; protects against a copy-paste deleting a real group | — |
 
 ## Open questions resolved
