@@ -2674,6 +2674,7 @@ dependencies = [
  "toml_edit",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2684,6 +2685,7 @@ version = "0.0.0"
 name = "junius-manifest"
 version = "0.0.0"
 dependencies = [
+ "blake3",
  "hmac",
  "insta",
  "regex",

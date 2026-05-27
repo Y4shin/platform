@@ -1,0 +1,46 @@
+# Dev provisioning (M18 Stage D). Replaces dev/dev-seed.sql.
+#
+#   junius provision apply --config dev/platform.toml
+#
+# Idempotent: a re-run with this content unchanged is a single audit event
+# (the hash matches `platform.provisioning_state.last_hash` and `apply`
+# short-circuits).
+#
+# What this declares:
+# - The Organisers group with an `organiser` role that holds every plugin
+#   permission a dev session needs.
+# - Alice as `admin` (full platform admin via the user-role wildcard).
+#   Resolution by email requires alice to have logged in once first;
+#   re-run `apply` after that. The auto_apply_on_boot in `platform.toml`
+#   makes the next juniusd restart pick it up automatically.
+# - A single OIDC mapping: the Authentik `junius-organisers` group →
+#   Organisers/organiser. Useful even for the local Authentik blueprint
+#   so that a user added to that group at the IdP gets the role on next
+#   login.
+
+[[groups]]
+name        = "Organisers"
+description = "Dev test group (granted every plugin permission)."
+
+[[groups.roles]]
+name        = "organiser"
+permissions = [
+  "events:read",
+  "events:write",
+  "events:share",
+]
+
+[[user_roles]]
+name        = "admin"
+description = "Full platform admin — wildcard permission."
+builtin     = true
+permissions = ["*"]
+
+[[user_role_assignments]]
+email     = "alice@example.com"
+user_role = "admin"
+
+[[oidc_mappings]]
+oidc_group = "junius-organisers"
+group      = "Organisers"
+role       = "organiser"

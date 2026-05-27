@@ -75,6 +75,11 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: I18nCmd,
     },
+    /// Apply the deployment's declarative provisioning (M18 Stage D).
+    Provision {
+        #[command(subcommand)]
+        subcommand: ProvisionCmd,
+    },
     /// `#[rpc_service]` codemods (M15). Source-tree-only.
     #[cfg(feature = "develop")]
     Rpc {
@@ -175,6 +180,32 @@ pub struct DevArgs {
     /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
     #[arg(long)]
     pub config: Option<PathBuf>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProvisionCmd {
+    /// Apply the `[provisioning]` block to the deployment's database.
+    /// Idempotent: a second run with the same config is hash-guarded to a
+    /// single audit event. Pass `--force` to bypass the hash and re-apply.
+    Apply {
+        /// Path to the deployment's `platform.toml`.
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Re-apply even if the config hash matches the last-applied hash.
+        #[arg(long)]
+        force: bool,
+        /// Permit deleting `managed_by='config'` rows whose declaration is
+        /// missing from the current config. Without this flag, drift is
+        /// reported as a warning + the apply refuses to proceed.
+        #[arg(long)]
+        allow_delete: bool,
+    },
+    /// Show the planned changes (additive only — destructive drift is
+    /// reported separately, never executed) without applying them.
+    Diff {
+        #[arg(long)]
+        config: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

@@ -7,6 +7,14 @@ path = "."
 [plugins]
 enabled = ["events", "admin"]
 
+# M18 Stage D: declarative starting state. The block lives in a separate
+# file so a re-`apply` is grep-friendly + diff-friendly. `apply` is
+# hash-guarded — re-runs with the same content are a single audit event;
+# `auto_apply_on_boot = true` (default) means juniusd reconciles on every
+# restart at near-zero cost.
+[provisioning]
+file = "provisioning.toml"
+
 # Host configuration. Secrets use `env:VAR` indirection so they aren't committed;
 # export OIDC_CLIENT_SECRET / SESSION_KEY / ROLE_PW_SECRET before running the
 # host or `junius migrate`. See dev/docker-compose.yml for the local stack.

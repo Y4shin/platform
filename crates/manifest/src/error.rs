@@ -4,6 +4,9 @@
 pub enum ManifestError {
     #[error("TOML parse error: {0}")]
     Toml(#[from] toml::de::Error),
+    /// IO failure reading a referenced file (e.g. `[provisioning] file = "…"`).
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 /// Failures resolving a `[config]` value or secret indirection.

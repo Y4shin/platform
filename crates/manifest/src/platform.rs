@@ -13,6 +13,11 @@ pub struct PlatformManifest {
     pub plugins: PluginsConfig,
     #[serde(default)]
     pub config: BTreeMap<String, toml::Value>,
+    /// M18 Stage D — declarative starting state for groups/roles/perms/
+    /// memberships/user-roles/OIDC mappings. Applied by
+    /// `junius provision apply` (and at host boot, hash-guarded).
+    #[serde(default)]
+    pub provisioning: Option<crate::provisioning::ProvisioningConfig>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

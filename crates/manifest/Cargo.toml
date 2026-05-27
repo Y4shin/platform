@@ -15,6 +15,9 @@ regex      = { workspace = true }
 # Role-password derivation (HMAC-SHA256). Pure compute; no IO.
 hmac       = { workspace = true }
 sha2       = { workspace = true }
+# M18 provisioning: stable content-hash of the `[provisioning]` block so a
+# host restart with an unchanged config short-circuits the apply.
+blake3     = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

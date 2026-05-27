@@ -39,6 +39,7 @@ fn main() -> ExitCode {
         #[cfg(feature = "develop")]
         cli::Command::New { subcommand } => commands::new::run(&subcommand),
         cli::Command::I18n { subcommand } => commands::i18n::run(&subcommand, args.format),
+        cli::Command::Provision { subcommand } => commands::provision::run(&subcommand),
         #[cfg(feature = "develop")]
         cli::Command::Rpc { subcommand } => match subcommand {
             cli::RpcCmd::Scaffold(a) => commands::rpc_scaffold::run(&a),

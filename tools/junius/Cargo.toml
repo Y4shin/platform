@@ -40,6 +40,8 @@ tracing-subscriber = { workspace = true }
 sqlx     = { workspace = true }
 sha2     = { workspace = true }
 petgraph = { workspace = true }
+# M18 `junius provision` resolves UUID-keyed group/role rows from the DB.
+uuid     = { workspace = true }
 
 # Cross-plugin SQL analysis (M09 `junius check`); `visitor` (M12) enables
 # `visit_relations` to collect every table reference generically.

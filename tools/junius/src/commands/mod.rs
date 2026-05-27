@@ -10,6 +10,7 @@ pub mod migrate;
 #[cfg(feature = "develop")]
 pub mod new;
 pub mod plugin_cmd;
+pub mod provision;
 #[cfg(feature = "develop")]
 pub mod rpc_scaffold;
 // `sync` stays compiled even without `develop`: `build` (and, in M11, `plugin

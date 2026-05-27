@@ -9,6 +9,7 @@ pub mod infra_config;
 pub mod lock;
 pub mod platform;
 pub mod plugin;
+pub mod provisioning;
 pub mod secrets;
 pub mod validate;
 
@@ -25,5 +26,9 @@ pub use platform::{PlatformManifest, PluginsConfig, SourceConfig};
 pub use plugin::{
     BucketDecl, ConfigField, ConfigType, ExposedComponent, ExposedTable, PluginDep, PluginExposes,
     PluginIdentity, PluginManifest, PluginMount, PluginRequires, PluginStorageDecl, SecretDecl,
+};
+pub use provisioning::{
+    GroupDecl, GroupRoleDecl, OidcMappingDecl, ProvisioningConfig, UserRoleAssignmentDecl,
+    UserRoleDecl,
 };
 pub use secrets::{ResolvedConfig, SecretRef, resolve_config};

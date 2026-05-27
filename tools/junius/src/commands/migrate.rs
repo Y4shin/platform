@@ -173,7 +173,7 @@ fn load(config: Option<PathBuf>) -> Result<Loaded, i32> {
 
 /// Lookup closure for `env:` secret indirections. This is the single sanctioned
 /// direct environment read in the CLI.
-fn env_lookup() -> impl Fn(&str) -> Option<String> {
+pub(crate) fn env_lookup() -> impl Fn(&str) -> Option<String> {
     #[allow(
         clippy::disallowed_methods,
         reason = "resolving env: secret indirections from platform.toml [config]"
