@@ -69,6 +69,10 @@ pub fn build_app_with_services(
             "/api/me/locale",
             post(auth::me::update_locale).with_state(auth_state.clone()),
         )
+        .route(
+            "/api/me/refresh-groups",
+            post(auth::me::refresh_groups).with_state(auth_state.clone()),
+        )
         .layer(axum::middleware::from_fn_with_state(
             auth_state.clone(),
             auth::session::middleware,

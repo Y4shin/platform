@@ -217,3 +217,39 @@ message FindUserByEmailResponse {
   string user_id = 1;
   string display_name = 2;
 }
+
+// ---- OIDC group mappings ---------------------------------------------------
+
+service OidcMappingAdminService {
+  rpc ListOidcMappings(ListOidcMappingsRequest) returns (ListOidcMappingsResponse) {
+    option (platform.v1.requires) = "admin:oidc_read";
+  }
+  rpc CreateOidcMapping(CreateOidcMappingRequest) returns (CreateOidcMappingResponse) {
+    option (platform.v1.requires) = "admin:oidc_write";
+  }
+  rpc DeleteOidcMapping(DeleteOidcMappingRequest) returns (DeleteOidcMappingResponse) {
+    option (platform.v1.requires) = "admin:oidc_write";
+  }
+}
+
+message OidcMapping {
+  string id = 1;
+  string oidc_group_name = 2;
+  string group_id = 3;
+  string group_name = 4;
+  string role_id = 5;
+  string role_name = 6;
+}
+
+message ListOidcMappingsRequest {}
+message ListOidcMappingsResponse { repeated OidcMapping mappings = 1; }
+
+message CreateOidcMappingRequest {
+  string oidc_group_name = 1;
+  string group_id = 2;
+  string role_id = 3;
+}
+message CreateOidcMappingResponse { string id = 1; }
+
+message DeleteOidcMappingRequest { string id = 1; }
+message DeleteOidcMappingResponse {}

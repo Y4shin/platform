@@ -5,7 +5,7 @@
 // cross-plugin methods declared in [dependencies.<dep>].rpc_methods.
 // An undeclared method is not a key here → a type error on use.
 
-import { GroupAdminService, PermissionCatalogService, UserAdminService, UserRoleAdminService } from '../../proto/admin/v1/admin_pb.js';
+import { GroupAdminService, OidcMappingAdminService, PermissionCatalogService, UserAdminService, UserRoleAdminService } from '../../proto/admin/v1/admin_pb.js';
 
 export const rpc = {
   GroupAdminService: {
@@ -20,6 +20,11 @@ export const rpc = {
     removeGroupMember: GroupAdminService.method.removeGroupMember,
     setGroupRolePermissions: GroupAdminService.method.setGroupRolePermissions,
     updateGroup: GroupAdminService.method.updateGroup,
+  },
+  OidcMappingAdminService: {
+    createOidcMapping: OidcMappingAdminService.method.createOidcMapping,
+    deleteOidcMapping: OidcMappingAdminService.method.deleteOidcMapping,
+    listOidcMappings: OidcMappingAdminService.method.listOidcMappings,
   },
   PermissionCatalogService: {
     listPermissions: PermissionCatalogService.method.listPermissions,

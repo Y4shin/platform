@@ -24,6 +24,7 @@ const HOST_MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0011_user_locale.up.sql"),
     include_str!("../migrations/0012_forget_resource.up.sql"),
     include_str!("../migrations/0013_user_roles.up.sql"),
+    include_str!("../migrations/0014_oidc_group_mapping.up.sql"),
 ];
 
 async fn seed_user(pool: &PgPool, sub: &str) -> UserId {

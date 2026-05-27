@@ -45,11 +45,13 @@ include!(concat!(env!("OUT_DIR"), "/_rpc_requires.rs"));
 
 use proto::admin::v1 as pb;
 use proto::admin::v1::{
-    GroupAdminService, GroupAdminServiceExt, OwnedAddGroupMemberRequestView,
-    OwnedAssignUserRoleRequestView, OwnedCreateGroupRequestView, OwnedCreateGroupRoleRequestView,
+    GroupAdminService, GroupAdminServiceExt, OidcMappingAdminService, OidcMappingAdminServiceExt,
+    OwnedAddGroupMemberRequestView, OwnedAssignUserRoleRequestView, OwnedCreateGroupRequestView,
+    OwnedCreateGroupRoleRequestView, OwnedCreateOidcMappingRequestView,
     OwnedCreateUserRoleRequestView, OwnedDeleteGroupRequestView, OwnedDeleteGroupRoleRequestView,
-    OwnedDeleteUserRoleRequestView, OwnedFindUserByEmailRequestView,
-    OwnedListGroupMembersRequestView, OwnedListGroupRolesRequestView, OwnedListGroupsRequestView,
+    OwnedDeleteOidcMappingRequestView, OwnedDeleteUserRoleRequestView,
+    OwnedFindUserByEmailRequestView, OwnedListGroupMembersRequestView,
+    OwnedListGroupRolesRequestView, OwnedListGroupsRequestView, OwnedListOidcMappingsRequestView,
     OwnedListPermissionsRequestView, OwnedListUserRoleAssignmentsRequestView,
     OwnedListUserRolesRequestView, OwnedRemoveGroupMemberRequestView,
     OwnedRevokeUserRoleRequestView, OwnedSetGroupRolePermissionsRequestView,
@@ -115,6 +117,7 @@ impl Plugin for AdminPlugin {
         let router = Arc::new(GroupAdminRpc).register(router);
         let router = Arc::new(UserRoleAdminRpc).register(router);
         let router = Arc::new(UserAdminRpc).register(router);
+        let router = Arc::new(OidcMappingAdminRpc).register(router);
         Arc::new(PermissionCatalogRpc).register(router)
     }
 }
@@ -510,6 +513,65 @@ impl UserAdminRpc {
             display_name,
             ..Default::default()
         }))
+    }
+}
+
+// =============================================================================
+// OidcMappingAdminService
+// =============================================================================
+
+struct OidcMappingAdminRpc;
+
+#[junius_sdk::rpc_service(OidcMappingAdminService)]
+impl OidcMappingAdminRpc {
+    async fn list_oidc_mappings(
+        &self,
+        actx: AdminCtx<crate::__rpc_requires::oidc_mapping_admin_service::ListOidcMappings>,
+        _request: OwnedListOidcMappingsRequestView,
+    ) -> ServiceResult<impl Encodable<pb::ListOidcMappingsResponse>> {
+        let rows = admin(&actx).list_oidc_mappings().await?;
+        Ok(Response::new(pb::ListOidcMappingsResponse {
+            mappings: rows
+                .into_iter()
+                .map(|m| pb::OidcMapping {
+                    id: m.id.to_string(),
+                    oidc_group_name: m.oidc_group_name,
+                    group_id: m.group_id.to_string(),
+                    group_name: m.group_name,
+                    role_id: m.role_id.to_string(),
+                    role_name: m.role_name,
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }))
+    }
+
+    async fn create_oidc_mapping(
+        &self,
+        actx: AdminCtx<crate::__rpc_requires::oidc_mapping_admin_service::CreateOidcMapping>,
+        request: OwnedCreateOidcMappingRequestView,
+    ) -> ServiceResult<impl Encodable<pb::CreateOidcMappingResponse>> {
+        let oidc_group_name = require_nonempty(request.oidc_group_name, "oidc_group_name")?;
+        let group = GroupId(parse_uuid(request.group_id, "group_id")?);
+        let role = RoleId(parse_uuid(request.role_id, "role_id")?);
+        let id = admin(&actx)
+            .create_oidc_mapping(&oidc_group_name, group, role)
+            .await?;
+        Ok(Response::new(pb::CreateOidcMappingResponse {
+            id: id.to_string(),
+            ..Default::default()
+        }))
+    }
+
+    async fn delete_oidc_mapping(
+        &self,
+        actx: AdminCtx<crate::__rpc_requires::oidc_mapping_admin_service::DeleteOidcMapping>,
+        request: OwnedDeleteOidcMappingRequestView,
+    ) -> ServiceResult<impl Encodable<pb::DeleteOidcMappingResponse>> {
+        let id = parse_uuid(request.id, "id")?;
+        admin(&actx).delete_oidc_mapping(id).await?;
+        Ok(Response::new(pb::DeleteOidcMappingResponse::default()))
     }
 }
 

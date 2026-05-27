@@ -31,8 +31,8 @@ pub use junius_sdk_macros::{
 };
 
 pub use admin::{
-    AdminGroup, AdminGroupRole, AdminMembership, AdminUserRole, AdminUserRoleAssignment,
-    PlatformAdminApi, PluginPermissionEntry, PluginPermissionsSummary,
+    AdminGroup, AdminGroupRole, AdminMembership, AdminOidcMapping, AdminUserRole,
+    AdminUserRoleAssignment, PlatformAdminApi, PluginPermissionEntry, PluginPermissionsSummary,
 };
 pub use authz::{Authz, Principal, ShareRecord};
 pub use context::{ApiError, BuildState, PluginContext, system_context};

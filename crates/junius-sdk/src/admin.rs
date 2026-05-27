@@ -671,4 +671,91 @@ impl PlatformAdminApi {
     pub fn plugin_name(&self) -> &'static str {
         self.plugin_name
     }
+
+    // ---- OIDC group mappings (M18 Stage C) ----------------------------------
+
+    pub async fn list_oidc_mappings(&self) -> Result<Vec<AdminOidcMapping>, PluginError> {
+        self.check()?;
+        let rows = sqlx::query_as::<_, (Uuid, String, Uuid, String, Uuid, String)>(
+            "SELECT m.id, m.oidc_group_name, \
+                    g.id, g.name, \
+                    r.id, r.name \
+             FROM platform.oidc_group_mapping m \
+             JOIN platform.\"group\" g ON g.id = m.group_id \
+             JOIN platform.group_role r ON r.id = m.role_id \
+             ORDER BY m.oidc_group_name, g.name",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, oidc_group_name, gid, gname, rid, rname)| AdminOidcMapping {
+                    id,
+                    oidc_group_name,
+                    group_id: GroupId(gid),
+                    group_name: gname,
+                    role_id: RoleId(rid),
+                    role_name: rname,
+                },
+            )
+            .collect())
+    }
+
+    pub async fn create_oidc_mapping(
+        &self,
+        oidc_group_name: &str,
+        group: GroupId,
+        role: RoleId,
+    ) -> Result<Uuid, PluginError> {
+        self.check()?;
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO platform.oidc_group_mapping (oidc_group_name, group_id, role_id) \
+             VALUES ($1, $2, $3) RETURNING id",
+        )
+        .bind(oidc_group_name)
+        .bind(group.0)
+        .bind(role.0)
+        .fetch_one(&self.pool)
+        .await?;
+        self.audit_event(
+            "admin:oidc_mapping.create",
+            "platform:oidc_group_mapping",
+            Some(id),
+            serde_json::json!({
+                "oidc_group_name": oidc_group_name,
+                "group_id": group.0,
+                "role_id":  role.0,
+            }),
+        )
+        .await?;
+        Ok(id)
+    }
+
+    pub async fn delete_oidc_mapping(&self, id: Uuid) -> Result<(), PluginError> {
+        self.check()?;
+        sqlx::query("DELETE FROM platform.oidc_group_mapping WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        self.audit_event(
+            "admin:oidc_mapping.delete",
+            "platform:oidc_group_mapping",
+            Some(id),
+            serde_json::json!({}),
+        )
+        .await
+    }
+}
+
+/// An OIDC group → Junius group/role mapping, joined with names for the UI.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminOidcMapping {
+    pub id: Uuid,
+    pub oidc_group_name: String,
+    pub group_id: GroupId,
+    pub group_name: String,
+    pub role_id: RoleId,
+    pub role_name: String,
 }

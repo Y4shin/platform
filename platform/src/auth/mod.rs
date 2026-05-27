@@ -9,6 +9,7 @@
 pub mod crypto;
 pub mod me;
 pub mod oidc;
+pub mod oidc_groups;
 pub mod session;
 pub mod user_query;
 
@@ -32,6 +33,9 @@ pub struct AuthState {
     pub(crate) cipher: Aes256Gcm,
     pub(crate) cookie_key: Key,
     pub(crate) oidc: Option<Arc<CoreClient>>,
+    /// Discovered userinfo endpoint URL — used by the M18 refresh-groups
+    /// REST handler to GET fresh claims with the caller's access token.
+    pub(crate) oidc_userinfo_url: Option<String>,
     pub(crate) cookie_secure: bool,
     pub(crate) session_ttl_secs: i64,
 }
@@ -45,7 +49,7 @@ impl AuthState {
         redirect_uri: &str,
         cookie_secure: bool,
     ) -> Self {
-        let oidc = match oidc::build_client(
+        let (oidc, oidc_userinfo_url) = match oidc::build_client(
             &cfg.oidc_issuer,
             &cfg.oidc_client_id,
             &cfg.oidc_client_secret,
@@ -53,10 +57,10 @@ impl AuthState {
         )
         .await
         {
-            Ok(client) => Some(Arc::new(client)),
+            Ok((client, userinfo_url)) => (Some(Arc::new(client)), userinfo_url),
             Err(e) => {
                 tracing::warn!(error = %e, "OIDC discovery failed; /api/auth/login disabled");
-                None
+                (None, None)
             }
         };
         Self {
@@ -65,6 +69,7 @@ impl AuthState {
                 crypto::cookie_key_material(&cfg.session_encryption_key).as_slice(),
             ),
             oidc,
+            oidc_userinfo_url,
             cookie_secure,
             session_ttl_secs: SESSION_TTL_SECS,
             pool,
@@ -78,6 +83,7 @@ impl AuthState {
             cipher: crypto::cipher_from_key(session_encryption_key),
             cookie_key: Key::from(crypto::cookie_key_material(session_encryption_key).as_slice()),
             oidc: None,
+            oidc_userinfo_url: None,
             cookie_secure: false,
             session_ttl_secs: SESSION_TTL_SECS,
             pool,

@@ -60,6 +60,21 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
         &["admin:groups_write"],
     ),
     (
+        "admin.v1.OidcMappingAdminService",
+        "CreateOidcMapping",
+        &["admin:oidc_write"],
+    ),
+    (
+        "admin.v1.OidcMappingAdminService",
+        "DeleteOidcMapping",
+        &["admin:oidc_write"],
+    ),
+    (
+        "admin.v1.OidcMappingAdminService",
+        "ListOidcMappings",
+        &["admin:oidc_read"],
+    ),
+    (
         "admin.v1.PermissionCatalogService",
         "ListPermissions",
         &["admin:groups_read"],
@@ -165,6 +180,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
     ("admin.v1.GroupAdminService", "admin"),
+    ("admin.v1.OidcMappingAdminService", "admin"),
     ("admin.v1.PermissionCatalogService", "admin"),
     ("admin.v1.UserAdminService", "admin"),
     ("admin.v1.UserRoleAdminService", "admin"),
