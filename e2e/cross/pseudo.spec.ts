@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '@junius/e2e';
 
 // "No hardcoded strings" DOM-level enforcement. The pseudo locale runs every
 // wrapped string through a diacritic transform (a→à, e→ē, h→ĥ, …); any visible
@@ -9,14 +9,13 @@ import { expect, test } from '@playwright/test';
 // `plugins/events/frontend/src/i18n.test.ts` — that one runs in vitest and
 // proves Lingui's pipeline produced non-ASCII entries for every msgid.
 //
-// Gated behind JUNIUS_E2E because it needs the dev stack + an authed session.
+// Gated behind JUNIUS_E2E because it needs the dev stack. The session is
+// fixture-seeded (no Authentik round-trip).
 test.describe('pseudo locale', () => {
-  test.skip(
-    !process.env.JUNIUS_E2E,
-    'set JUNIUS_E2E=1 against a running, logged-in dev stack',
-  );
+  test.skip(!process.env.JUNIUS_E2E, 'set JUNIUS_E2E=1 against a running dev stack');
 
-  test('every visible string on /p/events is pseudo-localised', async ({ page }) => {
+  test('every visible string on /p/events is pseudo-localised', async ({ page, loginAs }) => {
+    await loginAs('alice', { permissions: ['events:read'] });
     await page.goto('/p/events');
     await page.getByRole('combobox', { name: /Locale|Sprache/i }).selectOption('pseudo');
 

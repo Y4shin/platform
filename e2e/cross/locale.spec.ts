@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '@junius/e2e';
 
 // Locale-switch round-trip in a real browser. Picking a non-default locale in
 // the header `<LocaleSwitcher>` should:
@@ -6,19 +6,19 @@ import { expect, test } from '@playwright/test';
 //   2. re-activate Lingui so visible strings flip immediately,
 //   3. survive a hard reload (the persisted preference re-applies).
 //
-// Gated behind JUNIUS_E2E because it needs the dev stack + an authenticated
-// session. The deterministic counterpart is the SDK's I18nProvider vitest
+// Gated behind JUNIUS_E2E because it needs the dev stack with `hello` sourced.
+// The session is fixture-seeded (no Authentik round-trip). The deterministic
+// counterpart is the SDK's I18nProvider vitest
 // (`packages/sdk/src/i18n/I18nProvider.test.tsx`), which covers the same
 // state machine in isolation.
 test.describe('locale switch', () => {
-  test.skip(
-    !process.env.JUNIUS_E2E,
-    'set JUNIUS_E2E=1 against a running, logged-in dev stack',
-  );
+  test.skip(!process.env.JUNIUS_E2E, 'set JUNIUS_E2E=1 against a running dev stack');
 
   test('persists the choice across reload and translates host + plugin strings', async ({
     page,
+    loginAs,
   }) => {
+    await loginAs('alice');
     // Start on a page that mixes host shell strings (the header's "Anonymous"
     // fallback isn't visible if we're logged in; the locale-switcher labels
     // always are) and a plugin string (HelloPage's greeting).
