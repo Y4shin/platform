@@ -127,7 +127,7 @@ tasks:
   # --- gates ----------------------------------------------------------------
 
   ci:
-    desc: Full local CI gate (formatting, lint, tests, buf format, i18n).
+    desc: Full local CI gate (formatting, lint, tests, buf format, i18n, E2E if Docker present).
     aliases: [check]
     cmds:
       - cargo fmt --check
@@ -136,6 +136,7 @@ tasks:
       - task: test:js
       - pnpm exec buf format --diff --exit-code
       - task: ci:i18n
+      - task: test:e2e # auto-skips when Docker is unreachable
 
   # --- CI jobs (mirror the four parallel GitHub Actions jobs) ----------------
   # `task ci` above runs everything serially for local use; CI runs these
@@ -168,6 +169,14 @@ tasks:
     cmds:
       - cargo build -p junius --release
       - cd examples/example-deployment && ../../target/release/junius build --check-config
+
+  ci:e2e:
+    desc: M17 sixth job — Playwright E2E. Ephemeral testcontainers stack + embedded juniusd; no skip-on-no-Docker (CI always has it).
+    cmds:
+      - pnpm exec lingui compile
+      - pnpm --filter @junius/shell build
+      - cargo build --release -p platform --features embed-frontend
+      - pnpm exec playwright test --config e2e/playwright.config.ts
 
   ci:i18n:
     desc: M14 fifth job — full i18n gate (BE + FE catalogs, drift, pseudo).

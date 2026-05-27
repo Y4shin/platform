@@ -12,7 +12,7 @@ concurrency:
 # Repository `query!` macros check against the committed `.sqlx/` offline cache
 # rather than a live DB; the `integration` job re-derives + verifies it against a
 # real Postgres. A query changed without re-running `cargo sqlx prepare` fails
-# there. The four jobs run in parallel; a merge requires all of them green.
+# there. The six jobs run in parallel; a merge requires all of them green.
 env:
   SQLX_OFFLINE: "true"
 
@@ -130,3 +130,44 @@ jobs:
           workspaces: "."
       - name: Validate catalogs (task ci:i18n)
         run: nix develop --command task ci:i18n
+
+  # M17: Playwright browser E2E. Per-plugin specs + cross-cutting host
+  # journeys. Brings up an ephemeral testcontainers stack (Postgres + RabbitMQ
+  # + MinIO + mailpit) — Authentik is omitted because `loginAs` seeds sessions
+  # directly. The runner has Docker out of the box; no `services:` block is
+  # needed because globalSetup orchestrates containers via testcontainers.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pw-${{ runner.os }}-
+      - run: nix develop --command pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: nix develop --command pnpm exec playwright install --with-deps chromium
+      - name: E2E (task ci:e2e)
+        run: nix develop --command task ci:e2e
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
