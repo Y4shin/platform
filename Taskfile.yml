@@ -88,7 +88,7 @@ tasks:
         pnpm exec lingui compile
         pnpm --filter @junius/shell build
         cargo build --release -p platform --features embed-frontend
-        pnpm exec playwright test --config e2e/playwright.config.ts
+        pnpm exec tsx e2e/run-suite.ts
 
   test:e2e:clean:
     desc: Force-remove any leftover testcontainers from interrupted E2E runs.
@@ -176,7 +176,7 @@ tasks:
       - pnpm exec lingui compile
       - pnpm --filter @junius/shell build
       - cargo build --release -p platform --features embed-frontend
-      - pnpm exec playwright test --config e2e/playwright.config.ts
+      - pnpm exec tsx e2e/run-suite.ts
 
   ci:i18n:
     desc: M14 fifth job — full i18n gate (BE + FE catalogs, drift, pseudo).

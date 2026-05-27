@@ -1,11 +1,10 @@
 # 19. M17 — Unified end-to-end testing (per-plugin Playwright)
 
-> **Status:** ✅ harness landed (code), 🚧 first-green run blocked on a
-> pre-existing upstream issue (see below). The per-plugin discovery,
-> `@junius/e2e` fixtures (session-seed `loginAs`, ephemeral testcontainers
-> stack), and the sixth CI job all landed and lint+typecheck clean. `events`
-> ships harness-smoke + ICS endpoint specs as the first per-plugin coverage;
-> the other M13 walk journeys ship as `.fixme` scaffolds with the user-story
+> **Status:** ✅ implemented. Per-plugin discovery, `@junius/e2e` fixtures
+> (session-seed `loginAs`, ephemeral testcontainers stack), and the sixth
+> CI job all landed. `task test:e2e` cold-starts unattended: the live
+> specs (harness-smoke + the three ICS negative-path assertions) pass;
+> the rest of the M13 walk ships as `.fixme` scaffolds with the user-story
 > shape captured for follow-up.
 
 > **Notes vs. the original plan:**
@@ -15,18 +14,20 @@
 > - CI gained a **sixth** parallel job (not the fifth — i18n landed in M14).
 > - The `JUNIUS_E2E` env-var gate is gone; `task test:e2e` and `task ci`
 >   auto-skip only when `docker info` fails locally. CI always runs E2E.
-
-> **Pre-existing upstream blocker:** `pnpm --filter @junius/shell build`
-> (the embedded-frontend bundle this milestone needs) is broken on `main`
-> before this milestone — `@lingui/vite-plugin` emits
-> `Requested resource platform/frontend/i18n/de.po is not matched to any of
-> your catalogs paths specified in "lingui.config"`. Reproducible with the
-> M17 changes stashed; out of scope for this milestone. Either the lingui
-> catalog config in `lingui.config.cjs` needs adjustment or
-> `@lingui/vite-plugin` needs a version bump. Once that's fixed,
-> `task test:e2e` should go green end-to-end (the rest of the pipeline —
-> testcontainers, migrate, host boot, session seed — is exercised in the
-> linked code).
+> - Stack lifecycle moved out of Playwright. The original plan put stack
+>   start/migrate in `globalSetup` and pre-built juniusd into `webServer`,
+>   but Playwright starts `webServer` *before* `globalSetup` — the two
+>   would race on the state file. The orchestrator (`e2e/run-suite.ts`,
+>   invoked by `task test:e2e`) now sits *above* Playwright: it brings the
+>   stack up, runs migrate, spawns juniusd, waits for `/api/me` readiness,
+>   then `pnpm exec playwright test` against `JUNIUS_E2E_BASE_URL`. Teardown
+>   always runs (signal-handled), with a label-filter `docker rm -f` sweep
+>   as the kill-9 backstop.
+> - A pre-existing `@lingui/vite-plugin@5.9.5` cwd-resolution bug blocked
+>   the embedded frontend build until this milestone (CI never ran
+>   `vite build` in production mode before, so it was latent). Fixed
+>   alongside this milestone by anchoring `lingui.config.cjs` catalog
+>   paths at `__dirname`. See that fix's commit for the full diagnosis.
 
 One-line goal: let **each plugin own its Playwright E2E specs** (`plugins/<name>/frontend/e2e/**`),
 auto-discovered by a single **`task test:e2e`** that provisions the dev stack + a logged-in session,

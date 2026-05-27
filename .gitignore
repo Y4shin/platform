@@ -38,3 +38,10 @@ Thumbs.db
 # `<locale>.po`; only the `.po` source is committed. Dev/CI regenerate the
 # `.js` files on demand.
 **/i18n/*.js
+
+# E2E run state: per-invocation rendered host config + stack URLs + juniusd
+# log. Regenerated on every `task test:e2e`. Playwright's trace/screenshot
+# output also lands at the repo root.
+e2e/.playwright-state/
+/test-results/
+/playwright-report/

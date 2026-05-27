@@ -1,11 +1,20 @@
-# Template used by Playwright globalSetup to materialise an ephemeral juniusd
-# config pointing at the testcontainers stack. `${TOKEN}` placeholders are
-# replaced verbatim by global-setup.ts.
+# Template used by e2e/run-suite.ts to materialise an ephemeral juniusd
+# config pointing at the testcontainers stack. `$<TOKEN>` placeholders (with
+# braces, e.g. ${DATABASE_URL}) are replaced verbatim by the orchestrator.
 #
 # Authentik is intentionally NOT in the E2E stack — sessions are seeded by the
 # `loginAs` fixture, so the host's session middleware works without a real OIDC
 # round-trip. The host warns "OIDC discovery failed; /api/auth/login disabled"
 # on boot, which is expected here.
+
+# The rendered config lives in e2e/.playwright-state/host.toml; the source root
+# is two levels up.
+[source]
+path = "../.."
+
+[plugins]
+enabled = ["events"]
+
 [config]
 bind_addr              = "127.0.0.1:18888"
 database_url           = "${DATABASE_URL}"
@@ -14,7 +23,7 @@ oidc_client_id         = "platform"
 oidc_client_secret     = "e2e-noop"
 session_encryption_key = "e2e-session-key-0123456789abcdef"
 role_password_secret   = "e2e-role-pw-secret"
-oidc_redirect_url      = "http://127.0.0.1:${HOST_PORT}/api/auth/callback"
+oidc_redirect_url      = "http://127.0.0.1:18888/api/auth/callback"
 job_workers            = 1
 
 [config.jobs]
