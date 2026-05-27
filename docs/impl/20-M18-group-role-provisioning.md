@@ -1,10 +1,22 @@
 # 20. M18 — Group & Role Provisioning
 
-> **Status:** 🚧 planned. Independent of [M14](16-M14-internationalization.md)/[M15](17-M15-rpc-service-macro.md)/[M16](18-M16-authoring-ergonomics.md)/[M17](19-M17-e2e-testing.md);
-> can land any time after [M13](14-M13-events-plugin.md). Picks up the carve-out
-> M16 explicitly deferred: *"a group/role management UI (assigning permissions
-> without raw SQL) — a much larger platform feature surfaced separately during
-> M13 testing"* ([M16 §Out of scope](18-M16-authoring-ergonomics.md#out-of-scope)).
+> **Status:** ⏳ in progress. Stages 1–4 implemented (the core of the
+> milestone — user-roles + admin override, admin plugin with CRUD over
+> groups / group-roles / user-roles / OIDC mappings, OIDC group
+> reconciliation with REST refresh endpoint, declarative TOML
+> provisioning with hash-guarded apply). Two integration paths are
+> deferred to follow-up: `lock_managed` runtime enforcement at the
+> `PlatformAdminApi` seam (the flag is parsed + persisted, but the
+> SDK's mutators don't yet reject writes against `managed_by='config'`
+> rows); and `auto_apply_on_boot = true` host-side startup integration
+> (parsed but `server::run` doesn't yet invoke `provision apply` after
+> `migrate up`). Both are small, isolated changes against well-defined
+> seams; punting them lets each commit stay reviewable.
+>
+> Picks up the carve-out M16 explicitly deferred: *"a group/role
+> management UI (assigning permissions without raw SQL) — a much larger
+> platform feature surfaced separately during M13 testing"*
+> ([M16 §Out of scope](18-M16-authoring-ergonomics.md#out-of-scope)).
 
 One-line goal: end the era where the only way to create a group, add a role, or
 grant a permission is `psql`. After M18, an **admin** logs into a UI to do all

@@ -643,6 +643,50 @@ test('alice sees an empty state on first visit', async ({ page, loginAs }) => {
 
 ---
 
+## 16. Permissions, admin, and provisioning (M18)
+
+Permission strings declared in your plugin's `[permissions]` block automatically
+appear in the **admin plugin's permission picker** (`/p/admin/groups/<id>` → each
+group-role's permission set; `/p/admin/user-roles` → user-role permission set). The
+picker is sourced from `PermissionCatalogService.ListPermissions`, which reads
+the host's compiled-in plugin registry — there's no second catalogue to keep in
+sync with `plugin.toml`.
+
+Two user-facing things to know about how M18 changes the runtime:
+
+- The built-in **`admin` user-role** holds the wildcard permission `*`. A user
+  assigned to it passes every static RPC `requires` gate (the host's RPC guard
+  sees `has_permission` return true) *and* every per-resource ACL
+  (`platform.user_can_access` short-circuits before evaluating ownership /
+  membership / shares). Your plugin needs no special handling for admins — they
+  just see everything.
+- **OIDC group memberships** flow in automatically. Each successful login
+  reconciles `managed_by='oidc'` group memberships against the user's `groups`
+  claim through the admin-UI-managed
+  [`platform.oidc_group_mapping`](../platform/migrations/0014_oidc_group_mapping.up.sql)
+  table. A user added to a mapped Authentik group at the IdP shows up in the
+  Junius group on next login; removed at the IdP, reaped on next login. Manual
+  (`managed_by='manual'`) and config (`managed_by='config'`) memberships are
+  untouched.
+
+For an operator who wants to **trigger a refresh without a re-login** (e.g. on
+an Authentik webhook → n8n flow), `POST /api/me/refresh-groups` is the seam:
+authenticated as the user, returns `{oidcGroupsClaimed, membershipsAdded,
+membershipsReaped}` as JSON. It re-fetches `groups` from the IdP's userinfo
+endpoint using the stored access token; 401 + a re-login hint when the token
+has expired.
+
+**Declarative provisioning** (`[provisioning]` in `platform.toml`, or a `file =
+"…"` pointer) declares groups, group-roles + their permissions, user-roles +
+their permissions, user-role assignments (by `oidc_sub` or `email`), and OIDC
+mappings. `junius provision apply --config <toml>` reconciles the DB toward the
+declaration; the block is blake3-hashed and the apply short-circuits when
+nothing has changed (`platform.provisioning_state.last_hash` matches). This is
+the replacement for `dev/dev-seed.sql`; see [`dev/provisioning.toml`](../dev/provisioning.toml)
+as a worked example.
+
+---
+
 ## Inspecting a plugin
 
 ```bash
