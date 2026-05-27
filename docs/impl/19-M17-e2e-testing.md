@@ -1,8 +1,32 @@
 # 19. M17 — Unified end-to-end testing (per-plugin Playwright)
 
-> **Status:** 🚧 planned. Independent of [M14](16-M14-internationalization.md)/[M15](17-M15-rpc-service-macro.md)/[M16](18-M16-authoring-ergonomics.md);
-> can land any time after [M13](14-M13-events-plugin.md) (which is the first plugin with enough UI —
-> events list/detail/edit, invite, public pages — to make real browser E2E worth automating).
+> **Status:** ✅ harness landed (code), 🚧 first-green run blocked on a
+> pre-existing upstream issue (see below). The per-plugin discovery,
+> `@junius/e2e` fixtures (session-seed `loginAs`, ephemeral testcontainers
+> stack), and the sixth CI job all landed and lint+typecheck clean. `events`
+> ships harness-smoke + ICS endpoint specs as the first per-plugin coverage;
+> the other M13 walk journeys ship as `.fixme` scaffolds with the user-story
+> shape captured for follow-up.
+
+> **Notes vs. the original plan:**
+> - The locale + pseudo specs added in M14 moved to `e2e/cross/` alongside
+>   `greetings.spec.ts` (not into a plugin dir — they're cross-plugin
+>   journeys; `greetings` source isn't tracked in this repo).
+> - CI gained a **sixth** parallel job (not the fifth — i18n landed in M14).
+> - The `JUNIUS_E2E` env-var gate is gone; `task test:e2e` and `task ci`
+>   auto-skip only when `docker info` fails locally. CI always runs E2E.
+
+> **Pre-existing upstream blocker:** `pnpm --filter @junius/shell build`
+> (the embedded-frontend bundle this milestone needs) is broken on `main`
+> before this milestone — `@lingui/vite-plugin` emits
+> `Requested resource platform/frontend/i18n/de.po is not matched to any of
+> your catalogs paths specified in "lingui.config"`. Reproducible with the
+> M17 changes stashed; out of scope for this milestone. Either the lingui
+> catalog config in `lingui.config.cjs` needs adjustment or
+> `@lingui/vite-plugin` needs a version bump. Once that's fixed,
+> `task test:e2e` should go green end-to-end (the rest of the pipeline —
+> testcontainers, migrate, host boot, session seed — is exercised in the
+> linked code).
 
 One-line goal: let **each plugin own its Playwright E2E specs** (`plugins/<name>/frontend/e2e/**`),
 auto-discovered by a single **`task test:e2e`** that provisions the dev stack + a logged-in session,

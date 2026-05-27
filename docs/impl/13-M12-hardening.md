@@ -218,6 +218,12 @@ A merge requires all four green. **As built** differs from the original sketch:
 not `check`; testcontainers integration tests run in `check` (they self-provision
 via the runner's Docker); Playwright stays gated behind `JUNIUS_E2E`.
 
+> **Updated by [M14](16-M14-internationalization.md):** a fifth parallel job
+> `i18n` (`task ci:i18n`) was added for catalog validation.
+> **Updated by [M17](19-M17-e2e-testing.md):** a sixth parallel job `e2e`
+> (`task ci:e2e`) was added. It spins an ephemeral testcontainers stack and
+> runs the per-plugin Playwright suite, replacing the old `JUNIUS_E2E` gate.
+
 ## Scope (out)
 
 - Layer 3 schema snapshot enforcement. Deferred.

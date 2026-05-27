@@ -593,6 +593,56 @@ cascades inside your own schema; make cross-schema FKs nullable + non-cascading)
 
 ---
 
+## 15. Writing E2E tests
+
+Real-browser, full-stack assertions for your plugin live under
+`plugins/<name>/frontend/e2e/*.spec.ts`. Auto-discovery is glob-based — there's
+nothing to register; drop a spec in and `task test:e2e` runs it.
+
+```ts
+// plugins/myplugin/frontend/e2e/list.spec.ts
+import { expect, test } from '@junius/e2e';
+
+test('alice sees an empty state on first visit', async ({ page, loginAs }) => {
+  await loginAs('alice', { permissions: ['myplugin:read'] });
+  await page.goto('/p/myplugin');
+  await expect(page.getByText(/no items yet/i)).toBeVisible();
+});
+```
+
+**The harness** (`@junius/e2e`):
+
+- **`loginAs(name, { permissions })`** seeds a session *directly into Postgres*
+  (`platform.user` upsert + a per-call group/role with the requested
+  permission set + a `platform.session` row), then sets the `session` cookie
+  on the Playwright `BrowserContext`. No Authentik UI, no OIDC round-trip — a
+  spec starts already logged in. Subjects use `e2e:<name>` so they can't
+  collide with real Authentik subjects.
+- **`db`** is a `pg.Pool` against the same ephemeral Postgres for seed/cleanup
+  helpers in your spec (rows that need direct insertion, post-assertions, …).
+- **Stack lifecycle.** `task test:e2e` starts an ephemeral Postgres + RabbitMQ
+  + MinIO + mailpit via testcontainers (a unique `junius-e2e-run=<uuid>`
+  label on every container), runs migrations, boots juniusd with
+  `--features embed-frontend`, runs the suite, then tears the stack down.
+  The dev stack from `task dev` is **never** touched. Authentik is
+  intentionally absent — `loginAs` doesn't need it.
+
+**Conventions:**
+
+- Don't import another plugin's internals from a spec. Cross-plugin journeys
+  go under `e2e/cross/**`.
+- Tests are run with `retries: 2` only under `CI=true`. Locally a flaky
+  spec fails the first run — fix the flake, don't paper over it.
+- On failure, `trace: 'on-first-retry'` produces a Playwright trace; CI
+  uploads `playwright-report/` + `test-results/` as artifacts.
+- The fixture's `loginAs` creates a *fresh per-call* group. For scenarios
+  needing two users in the *same* group (group-owned visibility, etc.), use
+  the `db` fixture to seed the shared group + memberships directly.
+- A spec gone wrong locally can leave containers behind — `task test:e2e:clean`
+  force-removes anything labeled `junius-e2e-run=*`.
+
+---
+
 ## Inspecting a plugin
 
 ```bash
