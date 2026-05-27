@@ -219,6 +219,7 @@ mod tests {
             display_name: "U".into(),
             locale: locale.map(String::from),
             memberships: vec![],
+            user_roles: vec![],
         }
     }
 

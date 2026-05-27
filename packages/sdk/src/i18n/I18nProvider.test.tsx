@@ -28,6 +28,7 @@ const USER_NO_PREF: User = {
   displayName: 'A',
   locale: null,
   memberships: [],
+  userRoles: [],
 };
 
 const USER_DE: User = { ...USER_NO_PREF, locale: 'de' };

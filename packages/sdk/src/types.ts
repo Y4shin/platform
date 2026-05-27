@@ -9,6 +9,7 @@
 export type UserId = string;
 export type GroupId = string;
 export type RoleId = string;
+export type UserRoleId = string;
 
 export interface Role {
   id: RoleId;
@@ -23,6 +24,20 @@ export interface Membership {
   permissions: ReadonlySet<string>;
 }
 
+/**
+ * A user-role assignment (M18). Global-scope — not per-group. A grant whose
+ * `permissions` contains `'*'` makes the user a platform admin: every
+ * permission check + every resource ACL fast-paths to true.
+ */
+export interface UserRoleGrant {
+  roleId: UserRoleId;
+  roleName: string;
+  permissions: ReadonlySet<string>;
+}
+
+/** The wildcard permission an admin user-role holds. */
+export const ADMIN_WILDCARD = '*';
+
 export interface User {
   id: UserId;
   email: string;
@@ -34,6 +49,8 @@ export interface User {
    */
   locale: string | null;
   memberships: ReadonlyArray<Membership>;
+  /** Global-scope role assignments (M18). Empty for non-admin users. */
+  userRoles: ReadonlyArray<UserRoleGrant>;
 }
 
 export interface RouterContext {

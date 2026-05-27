@@ -51,6 +51,11 @@ id_newtype!(
     /// A `platform.group_role` id.
     RoleId
 );
+id_newtype!(
+    /// A `platform.user_role` id — the global-scope role axis added in M18.
+    /// Distinct from [`RoleId`], which is always per-group.
+    UserRoleId
+);
 
 /// A role within a group.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -69,6 +74,23 @@ pub struct Membership {
     pub permissions: HashSet<String>,
 }
 
+/// A user-role assignment (M18). Global scope — not per-group. The built-in
+/// `admin` role's permission set contains the wildcard `"*"`, which
+/// [`User::is_admin`] short-circuits on and which `platform.user_can_access`
+/// honours at the SQL layer.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserRoleGrant {
+    pub role_id: UserRoleId,
+    pub role_name: String,
+    pub permissions: HashSet<String>,
+}
+
+/// The wildcard permission a user-role can hold to grant access to everything.
+/// `platform.user_can_access` checks for this literal value before evaluating
+/// ownership / membership / shares.
+pub const ADMIN_WILDCARD: &str = "*";
+
 /// The authenticated user, as returned by `/api/me` and carried in request
 /// extensions by the host's session middleware. Serialized camelCase to match
 /// the frontend `User` type.
@@ -83,18 +105,40 @@ pub struct User {
     /// [`crate::i18n::LocaleResolver`].
     pub locale: Option<String>,
     pub memberships: Vec<Membership>,
+    /// Global-scope role assignments (M18). Any grant whose `permissions`
+    /// contains [`ADMIN_WILDCARD`] makes the user a platform admin.
+    /// Optional in deserialisation for backwards-compat with older `/api/me`
+    /// payloads that pre-date this field.
+    #[serde(default)]
+    pub user_roles: Vec<UserRoleGrant>,
 }
 
 impl User {
-    /// Whether the user holds `permission` (e.g. `"hello:read"`) through any of
-    /// their group memberships. The host's session middleware populates
-    /// `memberships[].permissions`; the `PluginCtx` extractor and the RPC guard
+    /// Whether the user holds the [`ADMIN_WILDCARD`] permission via any
+    /// user-role grant. Mirrors the `platform.user_can_access` fast-path.
+    #[must_use]
+    pub fn is_admin(&self) -> bool {
+        self.user_roles
+            .iter()
+            .any(|r| r.permissions.contains(ADMIN_WILDCARD))
+    }
+
+    /// Whether the user holds `permission` (e.g. `"hello:read"`) through any
+    /// user-role grant *or* any group membership. The host's session
+    /// middleware populates both; the `PluginCtx` extractor and the RPC guard
     /// use this to enforce a handler's declared permission witness at runtime.
+    /// An admin (any user-role with `"*"`) passes every check.
     #[must_use]
     pub fn has_permission(&self, permission: &str) -> bool {
-        self.memberships
-            .iter()
-            .any(|m| m.permissions.contains(permission))
+        self.is_admin()
+            || self
+                .user_roles
+                .iter()
+                .any(|r| r.permissions.contains(permission))
+            || self
+                .memberships
+                .iter()
+                .any(|m| m.permissions.contains(permission))
     }
 
     /// Whether the user holds `permission` **within** `group` — i.e. is a
@@ -102,12 +146,15 @@ impl User {
     /// not enough: `platform.user_can_access` step 2 requires the member's role
     /// to hold the plugin's permission via `platform.role_permission`. Use this
     /// for per-group authorization beyond the static RPC gate (publishing a
-    /// group's calendar, minting a group key, etc.).
+    /// group's calendar, minting a group key, etc.). An admin passes every
+    /// per-group check.
     #[must_use]
     pub fn has_permission_in_group(&self, group: GroupId, permission: &str) -> bool {
-        self.memberships
-            .iter()
-            .any(|m| m.group_id == group && m.permissions.contains(permission))
+        self.is_admin()
+            || self
+                .memberships
+                .iter()
+                .any(|m| m.group_id == group && m.permissions.contains(permission))
     }
 }
 
@@ -134,12 +181,28 @@ mod user_tests {
     }
 
     fn user_with(memberships: Vec<Membership>) -> User {
+        user_with_roles(memberships, vec![])
+    }
+
+    fn user_with_roles(memberships: Vec<Membership>, user_roles: Vec<UserRoleGrant>) -> User {
         User {
             id: UserId(uuid::Uuid::nil()),
             email: "u@x".into(),
             display_name: "U".into(),
             locale: None,
             memberships,
+            user_roles,
+        }
+    }
+
+    fn user_role(name: &str, perms: &[&str]) -> UserRoleGrant {
+        UserRoleGrant {
+            role_id: UserRoleId(uuid::Uuid::new_v4()),
+            role_name: name.into(),
+            permissions: perms
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect::<HashSet<_>>(),
         }
     }
 
@@ -169,6 +232,57 @@ mod user_tests {
         let user = user_with(vec![membership(g1, &["events:write"])]);
         assert!(user.has_permission("events:write"));
         assert!(!user.has_permission("events:read"));
+    }
+
+    #[test]
+    fn admin_wildcard_grants_every_permission_everywhere() {
+        let admin = user_with_roles(vec![], vec![user_role("admin", &[ADMIN_WILDCARD])]);
+        assert!(admin.is_admin());
+        assert!(admin.has_permission("events:write"));
+        assert!(admin.has_permission("anything:at-all"));
+        // Even for a group they aren't a member of.
+        let g = GroupId(uuid::Uuid::from_u128(99));
+        assert!(admin.has_permission_in_group(g, "events:write"));
+    }
+
+    #[test]
+    fn non_wildcard_user_role_grants_only_its_permissions() {
+        let user = user_with_roles(
+            vec![],
+            vec![user_role("support", &["events:read", "events:share"])],
+        );
+        assert!(!user.is_admin());
+        assert!(user.has_permission("events:read"));
+        assert!(user.has_permission("events:share"));
+        assert!(!user.has_permission("events:write"));
+        // User-roles are global-scope but **not** the per-group admin path: a
+        // non-admin user-role does not bypass `has_permission_in_group`'s
+        // group-membership requirement.
+        let g = GroupId(uuid::Uuid::from_u128(1));
+        assert!(!user.has_permission_in_group(g, "events:read"));
+    }
+
+    #[test]
+    fn admin_overrides_when_user_also_has_memberships() {
+        // Realistic: alice is admin and also happens to be in `Organisers`.
+        let g = GroupId(uuid::Uuid::from_u128(1));
+        let user = user_with_roles(
+            vec![membership(g, &["events:read"])],
+            vec![user_role("admin", &[ADMIN_WILDCARD])],
+        );
+        // Group-scoped permission she actually holds.
+        assert!(user.has_permission_in_group(g, "events:read"));
+        // Group-scoped permission she does NOT hold via the membership — admin lifts it.
+        assert!(user.has_permission_in_group(g, "events:write"));
+        // Group she isn't a member of — admin lifts it.
+        let other = GroupId(uuid::Uuid::from_u128(2));
+        assert!(user.has_permission_in_group(other, "events:write"));
+    }
+
+    #[test]
+    fn is_admin_false_when_user_roles_is_empty() {
+        let user = user_with(vec![]);
+        assert!(!user.is_admin());
     }
 }
 

@@ -28,6 +28,8 @@ const HOST_MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0009_job_run.up.sql"),
     include_str!("../migrations/0010_object.up.sql"),
     include_str!("../migrations/0011_user_locale.up.sql"),
+    include_str!("../migrations/0012_forget_resource.up.sql"),
+    include_str!("../migrations/0013_user_roles.up.sql"),
 ];
 
 async fn apply_migrations(pool: &PgPool) {

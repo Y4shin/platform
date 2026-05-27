@@ -36,8 +36,9 @@ pub use repo::{RepoPool, ScopedDb};
 pub use telemetry::MetricSink;
 
 pub use auth::{
-    AuditEmitter, Auth, CurrentUser, GroupId, GroupMember, GroupRef, Groups, MaybeUser, Membership,
-    Role, RoleId, User, UserDisplay, UserId, Users,
+    ADMIN_WILDCARD, AuditEmitter, Auth, CurrentUser, GroupId, GroupMember, GroupRef, Groups,
+    MaybeUser, Membership, Role, RoleId, User, UserDisplay, UserId, UserRoleGrant, UserRoleId,
+    Users,
 };
 pub use config::PluginConfig;
 pub use db::PluginDb;

@@ -308,6 +308,7 @@ mod tests {
                     .map(|p| (*p).to_string())
                     .collect::<HashSet<_>>(),
             }],
+            user_roles: vec![],
         }
     }
 

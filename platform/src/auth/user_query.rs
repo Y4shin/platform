@@ -1,9 +1,10 @@
-//! Loading the authenticated `User` (with memberships + permissions) from a
-//! session id, via a single join over the identity tables.
+//! Loading the authenticated `User` (with memberships, permissions, and
+//! user-roles) from a session id, via a small set of joins over the identity
+//! tables.
 
 use std::collections::{HashMap, HashSet};
 
-use junius_sdk::{GroupId, Membership, Role, RoleId, User, UserId};
+use junius_sdk::{GroupId, Membership, Role, RoleId, User, UserId, UserRoleGrant, UserRoleId};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -33,6 +34,7 @@ pub async fn load_user_by_session(
         display_name: row.get("display_name"),
         locale: row.get("locale"),
         memberships: load_memberships(pool, user_id).await?,
+        user_roles: load_user_roles(pool, user_id).await?,
     }))
 }
 
@@ -75,5 +77,43 @@ async fn load_memberships(pool: &PgPool, user_id: Uuid) -> Result<Vec<Membership
     Ok(order
         .into_iter()
         .filter_map(|g| by_group.remove(&g))
+        .collect())
+}
+
+/// Load M18 user-role grants for `user_id`. The `LEFT JOIN` lets a role with
+/// no permissions still appear (degenerate but observable) without breaking the
+/// caller's grouping logic.
+async fn load_user_roles(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserRoleGrant>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT ura.role_id, ur.name AS role_name, urp.permission \
+         FROM platform.user_role_assignment ura \
+         JOIN platform.user_role ur ON ur.id = ura.role_id \
+         LEFT JOIN platform.user_role_permission urp ON urp.role_id = ur.id \
+         WHERE ura.user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut by_role: HashMap<Uuid, UserRoleGrant> = HashMap::new();
+    let mut order: Vec<Uuid> = Vec::new();
+    for row in rows {
+        let role_id: Uuid = row.get("role_id");
+        let grant = by_role.entry(role_id).or_insert_with(|| {
+            order.push(role_id);
+            UserRoleGrant {
+                role_id: UserRoleId(role_id),
+                role_name: row.get("role_name"),
+                permissions: HashSet::new(),
+            }
+        });
+        if let Some(permission) = row.get::<Option<String>, _>("permission") {
+            grant.permissions.insert(permission);
+        }
+    }
+
+    Ok(order
+        .into_iter()
+        .filter_map(|r| by_role.remove(&r))
         .collect())
 }

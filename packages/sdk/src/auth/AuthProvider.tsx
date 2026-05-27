@@ -135,12 +135,18 @@ interface WireMembership {
   role: WireRole;
   permissions: string[];
 }
+interface WireUserRoleGrant {
+  roleId: string;
+  roleName: string;
+  permissions: string[];
+}
 interface WireUser {
   id: string;
   email: string;
   displayName: string;
   locale: string | null;
   memberships: WireMembership[];
+  userRoles?: WireUserRoleGrant[];
 }
 
 /** Fetch the current user, or `null` on 401 / any non-200. */
@@ -163,5 +169,10 @@ async function fetchMe(): Promise<User | null> {
         permissions: new Set(m.permissions ?? []),
       }),
     ),
+    userRoles: (raw.userRoles ?? []).map((r) => ({
+      roleId: r.roleId,
+      roleName: r.roleName,
+      permissions: new Set(r.permissions ?? []),
+    })),
   };
 }

@@ -35,6 +35,7 @@ const OVERRIDE_USER: User = {
   displayName: 'Bob',
   locale: null,
   memberships: [],
+  userRoles: [],
 };
 
 let assign: ReturnType<typeof vi.fn>;
