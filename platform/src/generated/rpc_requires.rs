@@ -5,6 +5,106 @@
 /// method's `option (platform.requires)`. The host RPC guard enforces these.
 pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
     (
+        "admin.v1.GroupAdminService",
+        "AddGroupMember",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "CreateGroup",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "CreateGroupRole",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "DeleteGroup",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "DeleteGroupRole",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "ListGroupMembers",
+        &["admin:groups_read"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "ListGroupRoles",
+        &["admin:groups_read"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "ListGroups",
+        &["admin:groups_read"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "RemoveGroupMember",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "SetGroupRolePermissions",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.GroupAdminService",
+        "UpdateGroup",
+        &["admin:groups_write"],
+    ),
+    (
+        "admin.v1.PermissionCatalogService",
+        "ListPermissions",
+        &["admin:groups_read"],
+    ),
+    (
+        "admin.v1.UserAdminService",
+        "FindUserByEmail",
+        &["admin:groups_read"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "AssignUserRole",
+        &["admin:user_roles_write"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "CreateUserRole",
+        &["admin:user_roles_write"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "DeleteUserRole",
+        &["admin:user_roles_write"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "ListUserRoleAssignments",
+        &["admin:user_roles_read"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "ListUserRoles",
+        &["admin:user_roles_read"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "RevokeUserRole",
+        &["admin:user_roles_write"],
+    ),
+    (
+        "admin.v1.UserRoleAdminService",
+        "SetUserRolePermissions",
+        &["admin:user_roles_write"],
+    ),
+    (
         "events.v1.CalendarService",
         "CreateGroupKey",
         &["events:read", "events:write"],
@@ -64,6 +164,10 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// `service_fqn` -> owning plugin, so the host attaches the right
 /// `PluginResourceCtx` per request on the shared `/rpc` router.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("admin.v1.GroupAdminService", "admin"),
+    ("admin.v1.PermissionCatalogService", "admin"),
+    ("admin.v1.UserAdminService", "admin"),
+    ("admin.v1.UserRoleAdminService", "admin"),
     ("events.v1.CalendarService", "events"),
     ("events.v1.EventService", "events"),
     ("events.v1.InviteService", "events"),

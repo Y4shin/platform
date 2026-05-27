@@ -113,6 +113,62 @@ fn compose_http(plugins: &[Box<dyn Plugin>], services: Option<HttpServices<'_>>)
     http
 }
 
+/// Trusted-capability allowlist (M18). The `platform.admin` capability grants
+/// cross-schema mutation rights on `platform.group*`/`platform.user_role*` via
+/// the `PlatformAdminApi` accessor. Only the blessed first-party plugin is
+/// allowed to declare it; anyone else fails the host boot with a clear
+/// diagnostic so a malicious / mistaken declaration can't slip through `junius
+/// check`'s manifest gate.
+const TRUSTED_CAPABILITIES: &[(&str, &str)] = &[("platform.admin", "admin")];
+
+fn enforce_trusted_capabilities(plugins: &[Box<dyn Plugin>]) -> anyhow::Result<()> {
+    for plugin in plugins {
+        let meta = plugin.metadata();
+        for cap in meta.capabilities {
+            if let Some((_, allowed_plugin)) =
+                TRUSTED_CAPABILITIES.iter().find(|(name, _)| name == cap)
+                && *allowed_plugin != meta.name
+            {
+                anyhow::bail!(
+                    "plugin {:?} declares trusted capability {:?}, but it is reserved for {:?}",
+                    meta.name,
+                    cap,
+                    allowed_plugin,
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Aggregate every plugin's declared `[permissions]` into one catalogue the
+/// admin plugin's `PermissionCatalogService` returns. The catalogue lives in
+/// `HostInfra::admin_catalogue` and is plumbed to each plugin's
+/// `PlatformAdminApi` (though only the admin plugin's `platform.admin`
+/// capability lets it call `permission_catalogue()`).
+fn build_permission_catalogue(
+    plugins: &[Box<dyn Plugin>],
+) -> Vec<junius_sdk::PluginPermissionsSummary> {
+    plugins
+        .iter()
+        .map(|plugin| {
+            let meta = plugin.metadata();
+            junius_sdk::PluginPermissionsSummary {
+                plugin: meta.name.to_string(),
+                display_name: meta.display_name.to_string(),
+                permissions: meta
+                    .permissions
+                    .iter()
+                    .map(|p| junius_sdk::PluginPermissionEntry {
+                        name: p.name.to_string(),
+                        description: p.description.to_string(),
+                    })
+                    .collect(),
+            }
+        })
+        .collect()
+}
+
 /// Fold every plugin's Connect services into one `connectrpc` router and convert
 /// it to an axum router (mounted under `/rpc` by the caller).
 fn build_rpc(plugins: &[Box<dyn Plugin>]) -> Router {
@@ -184,7 +240,13 @@ pub async fn run(
 
     // Host-global infra clients (job backend, object stores, email transport,
     // OTel metric sink) — built once, shared across plugins via `build_ctx`.
-    let infra = HostInfra::build(resolved, metric_sink).await?;
+    // M18: also enforce the trusted-capability allowlist + build the
+    // permission catalogue the admin plugin exposes to its UI.
+    enforce_trusted_capabilities(&plugins)?;
+    let admin_catalogue = build_permission_catalogue(&plugins);
+    let infra = HostInfra::build(resolved, metric_sink)
+        .await?
+        .with_admin_catalogue(std::sync::Arc::new(admin_catalogue));
 
     // i18n catalog: one Localizer built once from every plugin's register_i18n,
     // then cloned into each plugin's request context. Static `&[…]` data, so the

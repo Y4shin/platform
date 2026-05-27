@@ -36,6 +36,7 @@ pub fn build_ctx(
         email: infra.email_handle(meta.name, meta.capabilities),
         jobs: infra.jobs_handle(platform_pool, meta.name, meta.capabilities),
         storage: infra.storage_handle(platform_pool, meta.name, meta.capabilities),
+        platform_admin: infra.admin_handle(platform_pool, meta.name, meta.capabilities),
         localizer: localizer.clone(),
         secrets: runtime.secrets.clone(),
         capabilities: meta.capabilities,

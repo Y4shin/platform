@@ -1,0 +1,16 @@
+[plugin]
+name            = "admin"
+display_name    = "Admin"
+description     = "Manage groups, group-roles, user-roles, and OIDC mappings."
+manifest_schema = 1
+
+[permissions]
+"admin:groups_read"      = "List groups, group roles, members."
+"admin:groups_write"     = "Create / edit / delete groups, group-roles, role permissions, memberships."
+"admin:user_roles_read"  = "List user-roles and their assignments."
+"admin:user_roles_write" = "Create / edit / delete user-roles, set their permissions, assign / revoke them."
+"admin:oidc_read"        = "List OIDC group → group/role mappings."
+"admin:oidc_write"       = "Create / edit / delete OIDC group → group/role mappings."
+
+[requires]
+capabilities = ["platform.admin"]

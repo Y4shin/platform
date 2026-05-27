@@ -15,6 +15,7 @@ use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 
+use crate::admin::PlatformAdminApi;
 use crate::auth::{AuditEmitter, Auth, Groups, User, Users};
 use crate::authz::Authz;
 use crate::config::PluginConfig;
@@ -65,6 +66,12 @@ pub struct PluginResources {
     pub jobs: Jobs,
     /// Object storage (gated on `storage.read`/`storage.write`).
     pub storage: PluginStorage,
+    /// Cross-schema admin API (M18 — gated on `platform.admin`). The handle
+    /// is on every plugin's resources for shape, but every method refuses
+    /// with `CapabilityNotDeclared` if the plugin didn't declare the
+    /// trusted capability. The host's allowlist additionally ensures only
+    /// the blessed admin plugin can declare it.
+    pub platform_admin: PlatformAdminApi,
     /// Catalog-backed translator (always-on; static data, no capability gate).
     /// Built once at host boot from every plugin's `register_i18n` and cloned
     /// per request.
@@ -72,7 +79,7 @@ pub struct PluginResources {
     /// Resolved secrets; read via the codegen'd `Secrets` accessor.
     pub(crate) secrets: SecretStore,
     /// The plugin's declared `[requires].capabilities` (for runtime gating of
-    /// `email`/`jobs`/`storage` handles).
+    /// `email`/`jobs`/`storage`/`platform_admin` handles).
     pub(crate) capabilities: &'static [&'static str],
 }
 
@@ -81,18 +88,20 @@ impl PluginResources {
     /// the (optional) current caller.
     #[must_use]
     pub fn from_ctx(ctx: &PluginResourceCtx, user: Option<User>) -> Self {
+        let user_id = user.as_ref().map(|u| u.id);
         Self {
             config: ctx.config.clone(),
             telemetry: ctx.telemetry.clone(),
             db: ctx.db.clone(),
-            auth: ctx.auth.clone().with_user(user.clone()),
+            auth: ctx.auth.clone().with_user(user),
             users: ctx.users.clone(),
             groups: ctx.groups.clone(),
             audit: ctx.audit.clone(),
-            authz: ctx.authz.clone().with_user(user.map(|u| u.id)),
+            authz: ctx.authz.clone().with_user(user_id),
             email: ctx.email.clone(),
             jobs: ctx.jobs.clone(),
             storage: ctx.storage.clone(),
+            platform_admin: ctx.platform_admin.clone().with_user(user_id),
             localizer: ctx.localizer.clone(),
             secrets: ctx.secrets.clone(),
             capabilities: ctx.capabilities,
@@ -141,6 +150,7 @@ pub struct PluginResourceCtx {
     pub email: Email,
     pub jobs: Jobs,
     pub storage: PluginStorage,
+    pub platform_admin: PlatformAdminApi,
     pub localizer: Localizer,
     pub secrets: SecretStore,
     pub capabilities: &'static [&'static str],

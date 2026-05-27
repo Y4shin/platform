@@ -3,6 +3,7 @@ modules:
   - path: proto
   # >>> junius managed start
   - path: plugins/events/proto
+  - path: plugins/admin/proto
   # <<< junius managed end
 lint:
   use:

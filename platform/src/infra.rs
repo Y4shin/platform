@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use junius_manifest::ResolvedConfig;
 use junius_sdk::{
-    Email, JobBackend, Jobs, MetricSink, ObjectStore, PluginStorage, Transport, UrlSigner,
+    AuditEmitter, Email, JobBackend, Jobs, MetricSink, ObjectStore, PlatformAdminApi,
+    PluginPermissionsSummary, PluginStorage, Transport, UrlSigner,
 };
 use sqlx::PgPool;
 
@@ -33,6 +34,10 @@ pub struct HostInfra {
     pub jobs: JobsInfra,
     /// Object stores (one per physical bucket) + the logical→physical mapping.
     pub storage: StorageInfra,
+    /// Aggregated permission catalogue used by the M18 admin plugin: one
+    /// entry per loaded plugin, each carrying its `[permissions]` block.
+    /// Built once at host start from every plugin's `PluginMetadata`.
+    pub admin_catalogue: Arc<Vec<PluginPermissionsSummary>>,
 }
 
 /// The deployment's object storage: one [`ObjectStore`] per physical bucket, the
@@ -113,7 +118,37 @@ impl HostInfra {
             email,
             jobs,
             storage,
+            admin_catalogue: Arc::new(Vec::new()),
         })
+    }
+
+    /// Attach the aggregated permission catalogue. Called once at server
+    /// startup after the plugin registry is materialised; before this is set,
+    /// `admin_handle` returns an API with an empty catalogue (still functional
+    /// — only `permission_catalogue()` is affected).
+    #[must_use]
+    pub fn with_admin_catalogue(mut self, catalogue: Arc<Vec<PluginPermissionsSummary>>) -> Self {
+        self.admin_catalogue = catalogue;
+        self
+    }
+
+    /// Build the per-plugin [`PlatformAdminApi`] handle, gated on
+    /// `platform.admin`. Every method on the returned API still checks the
+    /// capability at entry; this just hands the plugin its handle.
+    #[must_use]
+    pub fn admin_handle(
+        &self,
+        platform_pool: &PgPool,
+        plugin_name: &'static str,
+        capabilities: &'static [&'static str],
+    ) -> PlatformAdminApi {
+        PlatformAdminApi::new(
+            platform_pool.clone(),
+            AuditEmitter::new(platform_pool.clone()),
+            plugin_name,
+            capabilities,
+            self.admin_catalogue.clone(),
+        )
     }
 
     /// Build the per-plugin [`Email`] handle, gated on `capabilities`.

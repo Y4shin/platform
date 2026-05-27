@@ -6,5 +6,8 @@ use junius_sdk::Plugin;
 /// Constructed plugin registry, in deployment-declared order.
 #[must_use]
 pub fn plugins() -> Vec<Box<dyn Plugin>> {
-    vec![Box::new(events_plugin::EventsPlugin::new())]
+    vec![
+        Box::new(events_plugin::EventsPlugin::new()),
+        Box::new(admin_plugin::AdminPlugin::new()),
+    ]
 }

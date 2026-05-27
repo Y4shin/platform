@@ -10,11 +10,12 @@
 pub enum Domain {
     Platform = 0,
     Events = 1,
+    Admin = 2,
 }
 
 impl Domain {
-    pub const COUNT: usize = 2;
-    pub const ALL: [Domain; Self::COUNT] = [Self::Platform, Self::Events];
+    pub const COUNT: usize = 3;
+    pub const ALL: [Domain; Self::COUNT] = [Self::Platform, Self::Events, Self::Admin];
 
     /// Catalog domain name as it appears in `.po` headers and in the
     /// build helper's `Options.domain` field.
@@ -23,6 +24,7 @@ impl Domain {
         match self {
             Self::Platform => "platform",
             Self::Events => "events",
+            Self::Admin => "admin",
         }
     }
 
@@ -36,6 +38,8 @@ impl Domain {
             Some(Self::Platform)
         } else if matches_bytes(b, b"events") {
             Some(Self::Events)
+        } else if matches_bytes(b, b"admin") {
+            Some(Self::Admin)
         } else {
             None
         }

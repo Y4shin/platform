@@ -5,6 +5,7 @@
 //! `plugin_metadata!()` macro re-export. DB, storage, jobs, email, and auth
 //! handles land in later milestones (M06–M10) as fields on `PluginResources`.
 
+pub mod admin;
 pub mod auth;
 pub mod authz;
 pub mod config;
@@ -29,6 +30,10 @@ pub use junius_sdk_macros::{
     PluginCtx, i18n_catalog, impl_repository, permissions, plugin_metadata, repository, rpc_service,
 };
 
+pub use admin::{
+    AdminGroup, AdminGroupRole, AdminMembership, AdminUserRole, AdminUserRoleAssignment,
+    PlatformAdminApi, PluginPermissionEntry, PluginPermissionsSummary,
+};
 pub use authz::{Authz, Principal, ShareRecord};
 pub use context::{ApiError, BuildState, PluginContext, system_context};
 pub use permissions::{And, Has, Permission, PermissionList};
