@@ -13,7 +13,8 @@
     "@playwright/test": "^1.49.0"
   },
   "dependencies": {
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "testcontainers": "^10.16.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

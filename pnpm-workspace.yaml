@@ -5,7 +5,13 @@ packages:
 
 allowBuilds:
   '@bufbuild/buf': true
+  # Pulled in transitively by `testcontainers` (Dockerode → ssh2 → cpu-features).
+  # Native build scripts are optional optimizations; the pure-JS fallbacks
+  # cover the local-Docker E2E use case, so they're explicitly skipped.
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 
 # pnpm 11+ requires explicit approval before running install scripts of
 # packages. esbuild's postinstall just selects the platform-specific binary

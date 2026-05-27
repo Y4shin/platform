@@ -1,0 +1,44 @@
+# Template used by Playwright globalSetup to materialise an ephemeral juniusd
+# config pointing at the testcontainers stack. `${TOKEN}` placeholders are
+# replaced verbatim by global-setup.ts.
+#
+# Authentik is intentionally NOT in the E2E stack — sessions are seeded by the
+# `loginAs` fixture, so the host's session middleware works without a real OIDC
+# round-trip. The host warns "OIDC discovery failed; /api/auth/login disabled"
+# on boot, which is expected here.
+[config]
+bind_addr              = "127.0.0.1:18888"
+database_url           = "${DATABASE_URL}"
+oidc_issuer            = "http://127.0.0.1:9/disabled"
+oidc_client_id         = "platform"
+oidc_client_secret     = "e2e-noop"
+session_encryption_key = "e2e-session-key-0123456789abcdef"
+role_password_secret   = "e2e-role-pw-secret"
+oidc_redirect_url      = "http://127.0.0.1:${HOST_PORT}/api/auth/callback"
+job_workers            = 1
+
+[config.jobs]
+amqp_url = "${AMQP_URL}"
+
+[config.audit]
+retention_days = 365
+
+[config.email]
+transport              = "mailpit"
+from_default           = "no-reply@e2e.local"
+allowed_sender_domains = ["e2e.local", "local"]
+
+[config.email.mailpit]
+host = "${SMTP_HOST}"
+port = ${SMTP_PORT}
+
+[config.storage]
+token_secret = "e2e-storage-token"
+
+[config.storage.buckets.main]
+endpoint       = "${S3_ENDPOINT}"
+region         = "us-east-1"
+bucket         = "platform-e2e"
+access_key     = "${S3_ACCESS_KEY}"
+secret_key     = "${S3_SECRET_KEY}"
+use_path_style = true

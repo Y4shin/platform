@@ -75,15 +75,28 @@ tasks:
       - pnpm run typecheck
 
   test:e2e:
-    desc: Playwright browser E2E (needs the dev stack + a login; set JUNIUS_E2E=1).
+    desc: Playwright browser E2E. Spins an ephemeral testcontainers stack (Postgres + RabbitMQ + MinIO + mailpit) and the embedded juniusd; needs Docker.
     cmds:
       - |
-        if [ -n "$JUNIUS_E2E" ]; then
-          pnpm exec playwright test --config e2e/playwright.config.ts
-        else
-          echo "task test:e2e — skipped: set JUNIUS_E2E=1 with the dev stack running"
-          echo "  (docker compose -f dev/docker-compose.yml up -d; task dev; log in)."
+        if ! docker info >/dev/null 2>&1; then
+          echo "task test:e2e — skipped: Docker is not reachable."
+          echo "  Start Docker (or skip this gate locally; CI always runs it)."
           echo "  Deterministic enabled/disabled coverage runs in task test:js."
+          exit 0
+        fi
+        set -euo pipefail
+        pnpm exec lingui compile
+        pnpm --filter @junius/shell build
+        cargo build --release -p platform --features embed-frontend
+        pnpm exec playwright test --config e2e/playwright.config.ts
+
+  test:e2e:clean:
+    desc: Force-remove any leftover testcontainers from interrupted E2E runs.
+    cmds:
+      - |
+        ids=$(docker ps -aq --filter label=junius-e2e-run 2>/dev/null || true)
+        if [ -n "$ids" ]; then
+          docker rm -f $ids
         fi
 
   # --- format / lint --------------------------------------------------------
