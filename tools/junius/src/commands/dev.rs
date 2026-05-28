@@ -1,29 +1,36 @@
 //! `junius dev` — the one-command developer loop.
 //!
-//! At M04 this spawns Vite (`pnpm --filter @junius/shell dev`) and the host
-//! binary (`cargo run -p platform`) concurrently and forwards their output to
-//! the current terminal. Ctrl-C tears both children down via the foreground
-//! process group; the parent only waits for them to drain.
+//! Two FE topologies, selected by `--frontend` (or auto-detected from
+//! `[build] frontend` in `platform.toml`):
 //!
-//! Vite serves the SPA at <http://127.0.0.1:5173> and proxies `/h`, `/rpc`,
-//! `/api` to the host at <http://127.0.0.1:18080>.
+//!   - **embedded** (today's default): Vite (`pnpm --filter @junius/shell
+//!     dev`) at `:5173` + juniusd at `:18080`. Vite proxies `/h`, `/rpc`,
+//!     `/api` to juniusd.
+//!   - **ssr** (M23): the SSR Node server (`pnpm --filter @junius/shell-ssr
+//!     dev`) at `:3000` + juniusd at `:18080`. The Node server reaches
+//!     juniusd over the loopback address it gets via `JUNIUS_BE_INTERNAL_URL`;
+//!     dev's `oidc_redirect_url` should point at `http://localhost:3000`.
 //!
-//! File-watching, proto regen, and manifest-driven re-sync land in M05/M06.
+//! Children run in the foreground process group; Ctrl-C tears both down.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
+use junius_manifest::{FrontendDelivery, PlatformManifest};
 use tokio::process::{Child, Command};
 use tokio::runtime::Runtime;
 use tokio::signal;
 
-use crate::cli::DevArgs;
+use crate::cli::{DevArgs, DevFrontend};
 use crate::exit;
 
 const DEFAULT_CONFIG: &str = "platform.toml";
 
 const VITE_PNPM_FILTER: &str = "@junius/shell";
+const SSR_PNPM_FILTER: &str = "@junius/shell-ssr";
+const SSR_DEV_PORT: u16 = 3000;
+const JUNIUSD_DEV_URL: &str = "http://127.0.0.1:18080";
 
 pub fn run(args: &DevArgs) -> i32 {
     let runtime = match Runtime::new() {
@@ -60,20 +67,24 @@ async fn run_async(args: &DevArgs) -> i32 {
         .clone()
         .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG));
 
-    eprintln!("junius dev: starting Vite + juniusd");
-    eprintln!("  Vite:    http://127.0.0.1:5173");
-    eprintln!("  juniusd: http://127.0.0.1:18080");
+    let mode = resolve_frontend_mode(args.frontend, &config_path);
 
-    let mut vite = match spawn_vite() {
+    let (fe_label, fe_url) = match mode {
+        DevFrontend::Embedded => ("Vite", "http://127.0.0.1:5173"),
+        DevFrontend::Ssr => ("SSR Node", "http://127.0.0.1:3000"),
+    };
+    eprintln!("junius dev: starting {fe_label} + juniusd");
+    eprintln!("  {fe_label}: {fe_url}");
+    eprintln!("  juniusd:  {JUNIUSD_DEV_URL}");
+
+    let mut frontend = match spawn_frontend(mode) {
         Ok(c) => c,
         Err(code) => return code,
     };
     let mut cargo = match spawn_cargo(&config_path) {
         Ok(c) => c,
         Err(code) => {
-            // Best-effort kill of the already-spawned child. tokio sends
-            // SIGKILL via `kill_on_drop`; that's fine here — we're aborting.
-            drop(vite);
+            drop(frontend);
             return code;
         }
     };
@@ -82,36 +93,70 @@ async fn run_async(args: &DevArgs) -> i32 {
     // tty sends SIGINT to every member, so all three of us receive it. We
     // only need to wait for the children to drain.
     tokio::select! {
-        status = vite.wait() => {
-            eprintln!("junius dev: Vite exited ({status:?})");
+        status = frontend.wait() => {
+            eprintln!("junius dev: {fe_label} exited ({status:?})");
             wait_or_kill(&mut cargo).await;
             exit_status_to_code(&status)
         }
         status = cargo.wait() => {
             eprintln!("junius dev: juniusd exited ({status:?})");
-            wait_or_kill(&mut vite).await;
+            wait_or_kill(&mut frontend).await;
             exit_status_to_code(&status)
         }
         _ = signal::ctrl_c() => {
             eprintln!("\njunius dev: shutting down");
-            wait_or_kill(&mut vite).await;
+            wait_or_kill(&mut frontend).await;
             wait_or_kill(&mut cargo).await;
             exit::OK
         }
     }
 }
 
-fn spawn_vite() -> Result<Child, i32> {
-    Command::new("pnpm")
-        .args(["--filter", VITE_PNPM_FILTER, "dev"])
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|e| {
-            eprintln!("junius: failed to spawn pnpm: {e}");
-            exit::PARSE_ERROR
-        })
+/// Pick the dev FE topology: explicit `--frontend` wins; otherwise consult
+/// `[build] frontend` in the deployment's `platform.toml` (`"none"` →
+/// `ssr`, anything else → `embedded`). Errors loading the manifest fall
+/// back to `embedded` (matches the today-default).
+fn resolve_frontend_mode(arg: Option<DevFrontend>, config_path: &Path) -> DevFrontend {
+    if let Some(mode) = arg {
+        return mode;
+    }
+    match std::fs::read_to_string(config_path).ok().and_then(|s| {
+        PlatformManifest::parse(&s)
+            .ok()
+            .map(|m| m.build.frontend)
+    }) {
+        Some(FrontendDelivery::None) => DevFrontend::Ssr,
+        _ => DevFrontend::Embedded,
+    }
+}
+
+fn spawn_frontend(mode: DevFrontend) -> Result<Child, i32> {
+    match mode {
+        DevFrontend::Embedded => Command::new("pnpm")
+            .args(["--filter", VITE_PNPM_FILTER, "dev"])
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|e| {
+                eprintln!("junius: failed to spawn pnpm (Vite): {e}");
+                exit::PARSE_ERROR
+            }),
+        DevFrontend::Ssr => Command::new("pnpm")
+            .args(["--filter", SSR_PNPM_FILTER, "dev"])
+            // The SSR Node server needs the BE's address to proxy `/api` /
+            // `/h` / `/rpc` to and to attach absolute URLs to SSR fetches.
+            .env("JUNIUS_BE_INTERNAL_URL", JUNIUSD_DEV_URL)
+            .env("PORT", SSR_DEV_PORT.to_string())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|e| {
+                eprintln!("junius: failed to spawn pnpm (SSR Node): {e}");
+                exit::PARSE_ERROR
+            }),
+    }
 }
 
 fn spawn_cargo(config_path: &Path) -> Result<Child, i32> {

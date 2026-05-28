@@ -180,6 +180,17 @@ pub struct DevArgs {
     /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
     #[arg(long)]
     pub config: Option<PathBuf>,
+    /// FE delivery in dev: `embedded` (Vite SPA at :5173 — today's default)
+    /// or `ssr` (M23 SSR Node server at :3000 + juniusd at :18080). When
+    /// omitted, auto-detect from `[build] frontend` in `platform.toml`.
+    #[arg(long, value_enum)]
+    pub frontend: Option<DevFrontend>,
+}
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum DevFrontend {
+    Embedded,
+    Ssr,
 }
 
 #[derive(Subcommand, Debug)]

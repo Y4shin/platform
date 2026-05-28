@@ -30,6 +30,13 @@
 > response-header allowlist (set-cookie + content-* + cache-* +
 > vary + location).
 >
+> Stage 4 (split-mode dev) landed: `junius dev --frontend ssr` boots
+> the SSR Node server on `:3000` in place of Vite-SPA on `:5173`, and
+> auto-detects from `[build] frontend = "none"` in the deployment's
+> `platform.toml`. The CLI sets `JUNIUS_BE_INTERNAL_URL` +
+> `PORT=3000` on the SSR child so its proxy targets juniusd at
+> `:18080`.
+>
 > No plugin-API change. The `Plugin` trait, `junius-sdk`, `plugin.toml`,
 > the per-plugin `frontend/` shape — all unchanged. The only thing that
 > moves is the *delivery* of the FE bundle (still embedded by default;
