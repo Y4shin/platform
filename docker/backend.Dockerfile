@@ -13,11 +13,14 @@ ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot
 FROM rust:${RUST_VERSION} AS builder
 ENV CARGO_TERM_COLOR=always \
     DEBIAN_FRONTEND=noninteractive
-# `build-essential` ships gcc + binutils (ld); `rust:<ver>-bookworm` doesn't
-# include them by default and cargo's native-dep crates need both to link.
+# `rust:<ver>-bookworm` ships gcc but NOT binutils — cargo's native-dep
+# crates fail to link with `cannot find 'ld'` without it. Install binutils
+# + gcc + libc6-dev explicitly (the `build-essential` metapackage's
+# Depends are partially pre-satisfied in the base image, which is why
+# pulling just `build-essential` isn't enough).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        build-essential pkg-config libssl-dev \
+        binutils gcc g++ make libc6-dev pkg-config libssl-dev \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .

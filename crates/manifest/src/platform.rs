@@ -150,7 +150,10 @@ mod tests {
 
     #[test]
     fn platform_mode_from_str_round_trip() {
-        assert_eq!(PlatformMode::from_str("source").unwrap(), PlatformMode::Source);
+        assert_eq!(
+            PlatformMode::from_str("source").unwrap(),
+            PlatformMode::Source
+        );
         assert_eq!(
             PlatformMode::from_str("precompiled").unwrap(),
             PlatformMode::Precompiled

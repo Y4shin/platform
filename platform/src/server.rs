@@ -536,7 +536,6 @@ fn spawn_worker(
     }))
 }
 
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]

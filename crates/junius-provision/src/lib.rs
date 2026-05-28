@@ -22,9 +22,7 @@
 //!   declaration disappeared from the file). `--allow-delete` is parsed
 //!   at the CLI but a no-op in this iteration.
 
-use junius_manifest::{
-    OidcMappingDecl, ProvisioningConfig, UserRoleAssignmentDecl, UserRoleDecl,
-};
+use junius_manifest::{OidcMappingDecl, ProvisioningConfig, UserRoleAssignmentDecl, UserRoleDecl};
 use sqlx::PgPool;
 use uuid::Uuid;
 

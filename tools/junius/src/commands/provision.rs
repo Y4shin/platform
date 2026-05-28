@@ -61,7 +61,10 @@ async fn run_apply(config_path: Option<PathBuf>, force: bool, _allow_delete: boo
             hash,
             ..
         }) => {
-            println!("junius provision: already up-to-date (hash {})", &hash[..16]);
+            println!(
+                "junius provision: already up-to-date (hash {})",
+                &hash[..16]
+            );
             exit::OK
         }
         Ok(ApplyOutcome {

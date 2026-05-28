@@ -169,7 +169,10 @@ fn apply_codegen(
     // before writing) so the on-disk file matches what `sync` renders — keeping
     // `cargo fmt --check` clean AND `sync --dry-run` drift-free.
     let files: [(&str, String); 6] = [
-        (GENERATED_PLUGINS_RS, rustfmt_str(render_plugins_rs(plugins))),
+        (
+            GENERATED_PLUGINS_RS,
+            rustfmt_str(render_plugins_rs(plugins)),
+        ),
         (
             GENERATED_RPC_REQUIRES_RS,
             rustfmt_str(render_rpc_requires_rs(plugins, source_root)),
@@ -177,7 +180,10 @@ fn apply_codegen(
         (GENERATED_ROUTES_TS, render_routes_ts(plugins)),
         (GENERATED_REGISTRY_TS, render_component_registry_ts(plugins)),
         (GENERATED_I18N_TS, render_i18n_catalogs_ts(plugins)),
-        (GENERATED_DOMAINS_RS, rustfmt_str(render_domains_rs(plugins))),
+        (
+            GENERATED_DOMAINS_RS,
+            rustfmt_str(render_domains_rs(plugins)),
+        ),
     ];
     for (rel, content) in &files {
         match apply_file(&source_root.join(rel), content, dry_run) {
@@ -1630,7 +1636,10 @@ mod tests {
         assert!(names.contains(&"events".to_string()), "got {names:?}");
         let mut sorted = names.clone();
         sorted.sort();
-        assert_eq!(names, sorted, "enumerate_all_plugins should return sorted names");
+        assert_eq!(
+            names, sorted,
+            "enumerate_all_plugins should return sorted names"
+        );
     }
 
     #[test]

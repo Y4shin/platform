@@ -121,11 +121,10 @@ fn resolve_frontend_mode(arg: Option<DevFrontend>, config_path: &Path) -> DevFro
     if let Some(mode) = arg {
         return mode;
     }
-    match std::fs::read_to_string(config_path).ok().and_then(|s| {
-        PlatformManifest::parse(&s)
-            .ok()
-            .map(|m| m.build.frontend)
-    }) {
+    match std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|s| PlatformManifest::parse(&s).ok().map(|m| m.build.frontend))
+    {
         Some(FrontendDelivery::None) => DevFrontend::Ssr,
         _ => DevFrontend::Embedded,
     }

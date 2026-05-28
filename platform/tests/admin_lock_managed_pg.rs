@@ -86,7 +86,10 @@ fn admin_api(pool: &PgPool, lock_managed: bool) -> PlatformAdminApi {
     )
 }
 
-async fn pg_pool() -> Option<(testcontainers_modules::testcontainers::ContainerAsync<Postgres>, PgPool)> {
+async fn pg_pool() -> Option<(
+    testcontainers_modules::testcontainers::ContainerAsync<Postgres>,
+    PgPool,
+)> {
     let node = match Postgres::default().with_tag("17-alpine").start().await {
         Ok(n) => n,
         Err(e) => {
