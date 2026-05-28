@@ -20,6 +20,16 @@
 > split + cookie forwarding, split-mode dev (`junius dev --frontend
 > ssr`), deployment example, CI job.
 >
+> Stage 3 (cookie forwarding + API proxy) landed: an
+> `AsyncLocalStorage` carries the inbound `Cookie` +
+> `Accept-Language` headers across the per-request async chain; the
+> SSR Connect transport's interceptor reads from the store and
+> attaches them to every BE call. The Node server's proxy forwards
+> `/api`, `/h`, `/rpc` to `JUNIUS_BE_INTERNAL_URL` with an explicit
+> request-header allowlist (cookie + content + accept-language) and a
+> response-header allowlist (set-cookie + content-* + cache-* +
+> vary + location).
+>
 > No plugin-API change. The `Plugin` trait, `junius-sdk`, `plugin.toml`,
 > the per-plugin `frontend/` shape — all unchanged. The only thing that
 > moves is the *delivery* of the FE bundle (still embedded by default;
