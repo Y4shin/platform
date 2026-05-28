@@ -242,13 +242,47 @@ pub async fn run(
         )
         .await?;
 
+    // M18 Stage D: declarative provisioning, hash-guarded. With
+    // `auto_apply_on_boot = true` (default), a restart with an unchanged
+    // `[provisioning]` block is one SELECT against `platform.provisioning_state`
+    // and zero writes; a changed block reconciles in place. The CLI's
+    // `junius provision apply` runs the same code path against the same hash
+    // row, so a deployment that bootstraps via the CLI and then restarts
+    // converges without a second apply.
+    if let Some(provisioning) = &config.provisioning {
+        if provisioning.auto_apply_on_boot {
+            match junius_provision::apply(&platform_pool, provisioning, false).await {
+                Ok(outcome) if outcome.unchanged => {
+                    tracing::info!(
+                        hash = &outcome.hash[..16],
+                        "provisioning unchanged; skipped"
+                    );
+                }
+                Ok(outcome) => {
+                    tracing::info!(
+                        hash = &outcome.hash[..16],
+                        groups = outcome.groups,
+                        user_roles = outcome.user_roles,
+                        user_role_assignments = outcome.user_role_assignments,
+                        oidc_mappings = outcome.oidc_mappings,
+                        "provisioning applied",
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "provisioning auto-apply failed");
+                    return Err(anyhow::anyhow!("provisioning auto-apply failed: {e}"));
+                }
+            }
+        }
+    }
+
     // Host-global infra clients (job backend, object stores, email transport,
     // OTel metric sink) — built once, shared across plugins via `build_ctx`.
     // M18: also enforce the trusted-capability allowlist + build the
     // permission catalogue the admin plugin exposes to its UI.
     enforce_trusted_capabilities(&plugins)?;
     let admin_catalogue = build_permission_catalogue(&plugins);
-    let infra = HostInfra::build(resolved, metric_sink)
+    let infra = HostInfra::build(resolved, config.provisioning.as_ref(), metric_sink)
         .await?
         .with_admin_catalogue(std::sync::Arc::new(admin_catalogue));
 

@@ -17,6 +17,14 @@ pub enum PluginError {
     #[error("permission denied: {0}")]
     PermissionDenied(String),
 
+    /// A mutation targeted a row owned by the deployment's `[provisioning]`
+    /// block while `lock_managed = true`. The admin UI surfaces this as a
+    /// "locked by provisioning" diagnostic; the only way to mutate the row is
+    /// to remove its declaration from the TOML and re-run
+    /// `junius provision apply`.
+    #[error("row is managed by provisioning config: {0}")]
+    ManagedByConfig(String),
+
     /// A database operation failed (host-provided handles: `Auth`, `Users`,
     /// `AuditEmitter`).
     #[error("database error: {0}")]

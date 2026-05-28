@@ -21,8 +21,9 @@ default = []
 embed-frontend = ["dep:rust-embed", "dep:mime_guess"]
 
 [dependencies]
-junius-sdk      = { workspace = true }
-junius-manifest = { workspace = true }
+junius-sdk       = { workspace = true }
+junius-manifest  = { workspace = true }
+junius-provision = { workspace = true }
 
 axum               = { workspace = true }
 connectrpc         = { workspace = true }

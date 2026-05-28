@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use junius_manifest::ResolvedConfig;
+use junius_manifest::{ProvisioningConfig, ResolvedConfig};
 use junius_sdk::{
     AuditEmitter, Email, JobBackend, Jobs, MetricSink, ObjectStore, PlatformAdminApi,
     PluginPermissionsSummary, PluginStorage, Transport, UrlSigner,
@@ -38,6 +38,11 @@ pub struct HostInfra {
     /// entry per loaded plugin, each carrying its `[permissions]` block.
     /// Built once at host start from every plugin's `PluginMetadata`.
     pub admin_catalogue: Arc<Vec<PluginPermissionsSummary>>,
+    /// M18 Stage D — when `true`, the `PlatformAdminApi` refuses mutations
+    /// targeting rows with `managed_by='config'`. Defaults to `true` (the
+    /// safe choice); a deployment can flip it off via
+    /// `[provisioning] lock_managed = false`.
+    pub admin_lock_managed: bool,
 }
 
 /// The deployment's object storage: one [`ObjectStore`] per physical bucket, the
@@ -78,6 +83,7 @@ impl HostInfra {
     /// members.
     pub async fn build(
         resolved: &ResolvedConfig,
+        provisioning: Option<&ProvisioningConfig>,
         metric_sink: Option<Arc<dyn MetricSink>>,
     ) -> anyhow::Result<Self> {
         let email = match &resolved.email {
@@ -113,12 +119,14 @@ impl HostInfra {
             }
             None => StorageInfra::default(),
         };
+        let admin_lock_managed = provisioning.is_none_or(|p| p.lock_managed);
         Ok(Self {
             metric_sink,
             email,
             jobs,
             storage,
             admin_catalogue: Arc::new(Vec::new()),
+            admin_lock_managed,
         })
     }
 
@@ -148,6 +156,7 @@ impl HostInfra {
             plugin_name,
             capabilities,
             self.admin_catalogue.clone(),
+            self.admin_lock_managed,
         )
     }
 

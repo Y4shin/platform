@@ -12,10 +12,12 @@
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr as _;
 
-use junius_manifest::{PlatformManifest, ResolvedConfig, SecretRef, secrets};
+use junius_manifest::{
+    PlatformManifest, ProvisioningConfig, ResolvedConfig, SecretRef, secrets,
+};
 use junius_sdk::{PluginConfig, SecretStore};
 
 /// Per-plugin runtime resources resolved from `[plugins.<name>]`.
@@ -33,6 +35,9 @@ pub struct HostConfig {
     pub resolved: Option<ResolvedConfig>,
     /// Per-plugin config + secrets, keyed by plugin name.
     pub plugins: BTreeMap<String, PluginRuntime>,
+    /// M18 Stage D: the resolved `[provisioning]` block (with `file = "…"`
+    /// pointer already loaded). `None` when the deployment declares none.
+    pub provisioning: Option<ProvisioningConfig>,
 }
 
 impl Default for HostConfig {
@@ -42,13 +47,16 @@ impl Default for HostConfig {
             bind_addr: SocketAddr::from(([127, 0, 0, 1], 18080)),
             resolved: None,
             plugins: BTreeMap::new(),
+            provisioning: None,
         }
     }
 }
 
 impl HostConfig {
     /// Parse a deployment `platform.toml`: resolve its `[config]` block and each
-    /// enabled plugin's `[plugins.<name>]` config/secrets.
+    /// enabled plugin's `[plugins.<name>]` config/secrets. Also resolves the
+    /// `[provisioning]` block's optional `file = "…"` pointer so the host can
+    /// run the M18 Stage D auto-apply pass at boot without re-reading the TOML.
     pub fn load_from_toml(path: &Path) -> anyhow::Result<Self> {
         let src = std::fs::read_to_string(path)?;
         let manifest = PlatformManifest::parse(&src)?;
@@ -58,10 +66,19 @@ impl HostConfig {
             None => SocketAddr::from(([127, 0, 0, 1], 18080)),
         };
         let plugins = resolve_plugin_runtimes(&manifest)?;
+        let deployment_dir: PathBuf = path
+            .parent()
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+        let provisioning = manifest
+            .provisioning
+            .clone()
+            .map(|p| p.resolve_file(&deployment_dir))
+            .transpose()?;
         Ok(Self {
             bind_addr,
             resolved: Some(resolved),
             plugins,
+            provisioning,
         })
     }
 

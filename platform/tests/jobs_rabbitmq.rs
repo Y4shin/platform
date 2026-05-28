@@ -122,6 +122,7 @@ async fn jobs_round_trip_and_dead_letter() {
             "testjobs",
             &[],
             std::sync::Arc::new(Vec::new()),
+            false,
         ),
         localizer: junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build(),
         secrets: SecretStore::default(),

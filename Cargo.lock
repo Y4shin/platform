@@ -2653,6 +2653,7 @@ dependencies = [
  "insta",
  "junius-i18n-build",
  "junius-manifest",
+ "junius-provision",
  "junius-rpc-meta",
  "miette",
  "petgraph",
@@ -2694,6 +2695,17 @@ dependencies = [
  "sha2",
  "thiserror 2.0.18",
  "toml",
+]
+
+[[package]]
+name = "junius-provision"
+version = "0.0.0"
+dependencies = [
+ "junius-manifest",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3595,6 +3607,7 @@ dependencies = [
  "hmac",
  "http 1.4.0",
  "junius-manifest",
+ "junius-provision",
  "junius-sdk",
  "lapin",
  "lettre",

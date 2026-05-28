@@ -8,6 +8,7 @@ members = [
     "crates/junius-i18n-build",
     "crates/junius-rpc-meta",
     "crates/manifest",
+    "crates/junius-provision",
     # >>> junius managed start
     "plugins/events",
     "plugins/admin",
@@ -117,6 +118,7 @@ testcontainers-modules = { version = "0.11", features = ["postgres", "rabbitmq",
 # Workspace crates
 junius-i18n-build  = { path = "crates/junius-i18n-build" }
 junius-manifest    = { path = "crates/manifest" }
+junius-provision   = { path = "crates/junius-provision" }
 junius-rpc-meta    = { path = "crates/junius-rpc-meta" }
 junius-sdk         = { path = "crates/junius-sdk" }
 junius-sdk-macros  = { path = "crates/junius-sdk-macros" }

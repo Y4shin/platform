@@ -22,6 +22,7 @@ develop = []
 [dependencies]
 junius-manifest   = { workspace = true }
 junius-i18n-build = { workspace = true }
+junius-provision  = { workspace = true }
 junius-rpc-meta   = { workspace = true }
 
 clap               = { workspace = true }

@@ -4,14 +4,16 @@
 > milestone — user-roles + admin override, admin plugin with CRUD over
 > groups / group-roles / user-roles / OIDC mappings, OIDC group
 > reconciliation with REST refresh endpoint, declarative TOML
-> provisioning with hash-guarded apply). Two integration paths are
-> deferred to follow-up: `lock_managed` runtime enforcement at the
-> `PlatformAdminApi` seam (the flag is parsed + persisted, but the
-> SDK's mutators don't yet reject writes against `managed_by='config'`
-> rows); and `auto_apply_on_boot = true` host-side startup integration
-> (parsed but `server::run` doesn't yet invoke `provision apply` after
-> `migrate up`). Both are small, isolated changes against well-defined
-> seams; punting them lets each commit stay reviewable.
+> provisioning with hash-guarded apply). Both formerly-deferred
+> integration paths are now wired: `lock_managed` is enforced at the
+> `PlatformAdminApi` seam (`group_membership` mutators check the
+> existing row's `managed_by` and refuse with the new
+> `PluginError::ManagedByConfig` when the row is `'config'`), and
+> `auto_apply_on_boot = true` runs at host start. The reconcile logic
+> moved out of `tools/junius/src/commands/provision.rs` into a shared
+> [`junius-provision`](../../crates/junius-provision) crate that both
+> the CLI and the host call, so `server::run` and
+> `junius provision apply` share one hash-guard path.
 >
 > Picks up the carve-out M16 explicitly deferred: *"a group/role
 > management UI (assigning permissions without raw SQL) — a much larger

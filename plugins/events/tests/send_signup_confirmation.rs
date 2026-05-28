@@ -61,6 +61,7 @@ async fn send_signup_confirmation_emails_via_capability() {
             "events",
             CAPS,
             std::sync::Arc::new(Vec::new()),
+            false,
         ),
         localizer: {
             let mut b = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En);
@@ -124,6 +125,7 @@ async fn send_signup_confirmation_uses_recipient_locale_for_subject_and_body() {
             "events",
             CAPS,
             std::sync::Arc::new(Vec::new()),
+            false,
         ),
         localizer: {
             let mut b = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En);
@@ -192,6 +194,7 @@ async fn send_signup_confirmation_uses_locale_fallback_for_anonymous_guest() {
             "events",
             CAPS,
             std::sync::Arc::new(Vec::new()),
+            false,
         ),
         localizer: {
             let mut b = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En);

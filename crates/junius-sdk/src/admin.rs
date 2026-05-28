@@ -110,6 +110,10 @@ pub struct PlatformAdminApi {
     /// Set by [`Self::with_user`] per request; used as `actor_user_id` on
     /// every audit event.
     actor: Option<UserId>,
+    /// M18 Stage D — when `true`, mutators that target a row with
+    /// `managed_by='config'` refuse with [`PluginError::ManagedByConfig`].
+    /// Mirrors `[provisioning] lock_managed` in the deployment TOML.
+    lock_managed: bool,
 }
 
 impl PlatformAdminApi {
@@ -124,6 +128,7 @@ impl PlatformAdminApi {
         plugin_name: &'static str,
         capabilities: &'static [&'static str],
         catalogue: Arc<Vec<PluginPermissionsSummary>>,
+        lock_managed: bool,
     ) -> Self {
         Self {
             pool,
@@ -132,6 +137,7 @@ impl PlatformAdminApi {
             capabilities,
             catalogue,
             actor: None,
+            lock_managed,
         }
     }
 
@@ -146,6 +152,38 @@ impl PlatformAdminApi {
 
     fn check(&self) -> Result<(), PluginError> {
         require_capability(self.capabilities, "platform.admin")
+    }
+
+    /// When `lock_managed` is on, refuse to mutate a `group_membership` row
+    /// owned by the deployment's `[provisioning]` block. The only `managed_by`
+    /// discriminator in the schema today lives on `group_membership`, so the
+    /// lock applies there; rows tagged `'oidc'` are also under reconciler
+    /// ownership but the OIDC reaper would re-create or re-delete them on the
+    /// next login, so the admin API doesn't block 'oidc' mutations — that
+    /// would be the `lock_managed` flag's `oidc` overreach. Only `'config'`.
+    async fn ensure_membership_unlocked(
+        &self,
+        group: GroupId,
+        user: UserId,
+    ) -> Result<(), PluginError> {
+        if !self.lock_managed {
+            return Ok(());
+        }
+        let managed_by: Option<String> = sqlx::query_scalar(
+            "SELECT managed_by FROM platform.group_membership \
+             WHERE group_id = $1 AND user_id = $2",
+        )
+        .bind(group.0)
+        .bind(user.0)
+        .fetch_optional(&self.pool)
+        .await?;
+        if matches!(managed_by.as_deref(), Some("config")) {
+            return Err(PluginError::ManagedByConfig(format!(
+                "group_membership(group={}, user={}) is managed by [provisioning]",
+                group.0, user.0
+            )));
+        }
+        Ok(())
     }
 
     async fn audit_event(
@@ -404,7 +442,9 @@ impl PlatformAdminApi {
 
     /// Add or move a user into `group` with `role`. Always `managed_by =
     /// 'manual'` from this seam — OIDC and config own their own writes
-    /// (Stages 3/4) and never go through the admin API.
+    /// (Stages 3/4) and never go through the admin API. When `lock_managed`
+    /// is enabled and the existing row is `managed_by='config'`, the call
+    /// refuses with [`PluginError::ManagedByConfig`].
     pub async fn add_group_member(
         &self,
         group: GroupId,
@@ -412,6 +452,7 @@ impl PlatformAdminApi {
         role: RoleId,
     ) -> Result<(), PluginError> {
         self.check()?;
+        self.ensure_membership_unlocked(group, user).await?;
         sqlx::query(
             "INSERT INTO platform.group_membership (user_id, group_id, role_id, managed_by) \
              VALUES ($1, $2, $3, 'manual') \
@@ -444,6 +485,7 @@ impl PlatformAdminApi {
         user: UserId,
     ) -> Result<(), PluginError> {
         self.check()?;
+        self.ensure_membership_unlocked(group, user).await?;
         sqlx::query("DELETE FROM platform.group_membership WHERE group_id = $1 AND user_id = $2")
             .bind(group.0)
             .bind(user.0)
