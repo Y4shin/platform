@@ -92,7 +92,12 @@ pub fn run(args: &SyncArgs, format: OutputFormat) -> i32 {
         eprintln!("junius: sync --plugin scope is not yet implemented (planned for M09)");
         return exit::NOT_IMPLEMENTED;
     }
-
+    if args.bundle_all {
+        // M24: ignore `[plugins].enabled` (and `--config`) entirely. The
+        // image build wants every monorepo plugin linked in regardless of
+        // any deployment toml that may or may not exist at build time.
+        return run_in_bundle_all(Path::new("."), args.dry_run, format);
+    }
     let config_path = args
         .config
         .clone()
@@ -125,6 +130,37 @@ pub(crate) fn run_in(
         Err(code) => return code,
     };
 
+    apply_codegen(
+        source_root,
+        &config_path.display().to_string(),
+        &plugins,
+        dry_run,
+        format,
+    )
+}
+
+/// M24 bundle-all variant of `run_in`: skip the deployment-toml read and
+/// link every plugin under `<source_root>/plugins/` instead. Used by the
+/// precompiled-image Docker builds.
+fn run_in_bundle_all(source_root: &Path, dry_run: bool, format: OutputFormat) -> i32 {
+    let plugins = match resolve_all_plugins(source_root) {
+        Ok(p) => p,
+        Err(code) => return code,
+    };
+    apply_codegen(source_root, "(bundle-all)", &plugins, dry_run, format)
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "linear pipeline (generate → apply → subprocess); each step is short"
+)]
+fn apply_codegen(
+    source_root: &Path,
+    config_label: &str,
+    plugins: &[ResolvedPlugin],
+    dry_run: bool,
+    format: OutputFormat,
+) -> i32 {
     let mut changes = Vec::new();
 
     // (relative-path constant, rendered content) — written under `source_root`,
@@ -133,24 +169,15 @@ pub(crate) fn run_in(
     // before writing) so the on-disk file matches what `sync` renders — keeping
     // `cargo fmt --check` clean AND `sync --dry-run` drift-free.
     let files: [(&str, String); 6] = [
-        (
-            GENERATED_PLUGINS_RS,
-            rustfmt_str(render_plugins_rs(&plugins)),
-        ),
+        (GENERATED_PLUGINS_RS, rustfmt_str(render_plugins_rs(plugins))),
         (
             GENERATED_RPC_REQUIRES_RS,
-            rustfmt_str(render_rpc_requires_rs(&plugins, source_root)),
+            rustfmt_str(render_rpc_requires_rs(plugins, source_root)),
         ),
-        (GENERATED_ROUTES_TS, render_routes_ts(&plugins)),
-        (
-            GENERATED_REGISTRY_TS,
-            render_component_registry_ts(&plugins),
-        ),
-        (GENERATED_I18N_TS, render_i18n_catalogs_ts(&plugins)),
-        (
-            GENERATED_DOMAINS_RS,
-            rustfmt_str(render_domains_rs(&plugins)),
-        ),
+        (GENERATED_ROUTES_TS, render_routes_ts(plugins)),
+        (GENERATED_REGISTRY_TS, render_component_registry_ts(plugins)),
+        (GENERATED_I18N_TS, render_i18n_catalogs_ts(plugins)),
+        (GENERATED_DOMAINS_RS, rustfmt_str(render_domains_rs(plugins))),
     ];
     for (rel, content) in &files {
         match apply_file(&source_root.join(rel), content, dry_run) {
@@ -163,8 +190,8 @@ pub(crate) fn run_in(
     }
 
     let markers: [(&str, Vec<String>); 2] = [
-        (PLATFORM_CARGO_TOML, platform_cargo_lines(&plugins)),
-        (WORKSPACE_CARGO_TOML, workspace_cargo_lines(&plugins)),
+        (PLATFORM_CARGO_TOML, platform_cargo_lines(plugins)),
+        (WORKSPACE_CARGO_TOML, workspace_cargo_lines(plugins)),
     ];
     for (rel, body) in &markers {
         match apply_marker_update(&source_root.join(rel), body, dry_run) {
@@ -183,7 +210,7 @@ pub(crate) fn run_in(
     // frontend wiring (e.g. some test fixtures) skips them silently.
     let buf_yaml_path = source_root.join(BUF_YAML);
     if buf_yaml_path.exists() {
-        let body = buf_yaml_module_lines(&plugins, source_root);
+        let body = buf_yaml_module_lines(plugins, source_root);
         match apply_marker_update(&buf_yaml_path, &body, dry_run) {
             Ok(kind) => changes.push(FileChange {
                 path: BUF_YAML.into(),
@@ -194,7 +221,7 @@ pub(crate) fn run_in(
     }
     let pkg_json_path = source_root.join(HOST_FRONTEND_PACKAGE_JSON);
     if pkg_json_path.exists() {
-        match apply_host_frontend_deps(&pkg_json_path, &plugins, dry_run) {
+        match apply_host_frontend_deps(&pkg_json_path, plugins, dry_run) {
             Ok(kind) => changes.push(FileChange {
                 path: HOST_FRONTEND_PACKAGE_JSON.into(),
                 kind,
@@ -203,10 +230,10 @@ pub(crate) fn run_in(
         }
     }
 
-    if let Err(code) = apply_rpc_barrels(&plugins, source_root, dry_run, &mut changes) {
+    if let Err(code) = apply_rpc_barrels(plugins, source_root, dry_run, &mut changes) {
         return code;
     }
-    if let Err(code) = apply_consumer_registries(&plugins, source_root, dry_run, &mut changes) {
+    if let Err(code) = apply_consumer_registries(plugins, source_root, dry_run, &mut changes) {
         return code;
     }
 
@@ -241,7 +268,7 @@ pub(crate) fn run_in(
     }
 
     let result = SyncResult {
-        config: config_path.display().to_string(),
+        config: config_label.to_string(),
         plugins: plugins.iter().map(|p| p.name.clone()).collect(),
         dry_run,
         changes,
@@ -293,46 +320,93 @@ fn resolve_plugins(
 ) -> Result<Vec<ResolvedPlugin>, i32> {
     let mut out = Vec::with_capacity(manifest.plugins.enabled.len());
     for name in &manifest.plugins.enabled {
-        let plugin_toml = source_root.join("plugins").join(name).join("plugin.toml");
-        let src = std::fs::read_to_string(&plugin_toml).map_err(|e| {
-            eprintln!("junius: cannot read {}: {e}", plugin_toml.display());
-            exit::PARSE_ERROR
-        })?;
-        let plugin = PluginManifest::parse(&src).map_err(|e| {
-            eprintln!("junius: parse error in {}: {e}", plugin_toml.display());
-            exit::PARSE_ERROR
-        })?;
-        let report = plugin.validate();
-        if !report.is_ok() {
-            for issue in report.errors() {
-                eprintln!(
-                    "junius: [error] {} at {}: {} ({})",
-                    issue.code,
-                    issue.path,
-                    issue.message,
-                    plugin_toml.display(),
-                );
-            }
-            return Err(exit::VALIDATION);
+        out.push(resolve_plugin_by_name(name, source_root)?);
+    }
+    Ok(out)
+}
+
+/// Parse `<source_root>/plugins/<name>/plugin.toml`, validate it, and build
+/// the [`ResolvedPlugin`] the codegen pipeline consumes. Shared between the
+/// manifest-driven flow ([`resolve_plugins`]) and the M24 bundle-all flow
+/// ([`resolve_all_plugins`]).
+fn resolve_plugin_by_name(name: &str, source_root: &Path) -> Result<ResolvedPlugin, i32> {
+    let plugin_toml = source_root.join("plugins").join(name).join("plugin.toml");
+    let src = std::fs::read_to_string(&plugin_toml).map_err(|e| {
+        eprintln!("junius: cannot read {}: {e}", plugin_toml.display());
+        exit::PARSE_ERROR
+    })?;
+    let plugin = PluginManifest::parse(&src).map_err(|e| {
+        eprintln!("junius: parse error in {}: {e}", plugin_toml.display());
+        exit::PARSE_ERROR
+    })?;
+    let report = plugin.validate();
+    if !report.is_ok() {
+        for issue in report.errors() {
+            eprintln!(
+                "junius: [error] {} at {}: {} ({})",
+                issue.code,
+                issue.path,
+                issue.message,
+                plugin_toml.display(),
+            );
         }
+        return Err(exit::VALIDATION);
+    }
+    let name = plugin.plugin.name.clone();
+    let crate_name = format!("{name}-plugin");
+    let module_name = crate_name.replace('-', "_");
+    let struct_name = format!("{}Plugin", to_pascal_case(&name));
+    let frontend_dir = source_root.join("plugins").join(&name).join("frontend");
+    let has_frontend = frontend_dir.is_dir();
+    let has_frontend_i18n = frontend_dir.join("i18n").join("en.po").is_file();
+    Ok(ResolvedPlugin {
+        name,
+        crate_name,
+        module_name,
+        struct_name,
+        manifest: plugin,
+        has_frontend,
+        has_frontend_i18n,
+    })
+}
 
-        let name = plugin.plugin.name.clone();
-        let crate_name = format!("{name}-plugin");
-        let module_name = crate_name.replace('-', "_");
-        let struct_name = format!("{}Plugin", to_pascal_case(&name));
-        let frontend_dir = source_root.join("plugins").join(&name).join("frontend");
-        let has_frontend = frontend_dir.is_dir();
-        let has_frontend_i18n = frontend_dir.join("i18n").join("en.po").is_file();
+/// M24: enumerate every plugin under `<source_root>/plugins/` that ships a
+/// `plugin.toml`, sorted by directory name for deterministic codegen. The
+/// bundle-all variant of `junius sync` consumes this in place of the
+/// deployment's `[plugins].enabled` list.
+fn enumerate_all_plugins(source_root: &Path) -> Result<Vec<String>, i32> {
+    let plugins_dir = source_root.join("plugins");
+    let entries = std::fs::read_dir(&plugins_dir).map_err(|e| {
+        eprintln!("junius: cannot read {}: {e}", plugins_dir.display());
+        exit::PARSE_ERROR
+    })?;
+    let mut names = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            eprintln!("junius: reading plugins dir: {e}");
+            exit::PARSE_ERROR
+        })?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if !path.join("plugin.toml").is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        names.push(name.to_string());
+    }
+    names.sort();
+    Ok(names)
+}
 
-        out.push(ResolvedPlugin {
-            name,
-            crate_name,
-            module_name,
-            struct_name,
-            manifest: plugin,
-            has_frontend,
-            has_frontend_i18n,
-        });
+fn resolve_all_plugins(source_root: &Path) -> Result<Vec<ResolvedPlugin>, i32> {
+    let names = enumerate_all_plugins(source_root)?;
+    let mut out = Vec::with_capacity(names.len());
+    for name in &names {
+        out.push(resolve_plugin_by_name(name, source_root)?);
     }
     Ok(out)
 }
@@ -1539,5 +1613,42 @@ mod tests {
         let src = r#"{"key": "value with } inside"}"#;
         let close = match_brace(src, 0).unwrap();
         assert_eq!(close, src.len() - 1);
+    }
+
+    #[test]
+    fn enumerate_all_plugins_walks_plugins_dir_sorted() {
+        // The repo root has `plugins/{admin,events,...}/plugin.toml`. Walk
+        // it from the workspace root (CARGO_MANIFEST_DIR is `tools/junius`).
+        let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .unwrap();
+        let names = enumerate_all_plugins(workspace_root).unwrap();
+        // At least the two plugins the monorepo currently ships must show
+        // up, sorted lexicographically.
+        assert!(names.contains(&"admin".to_string()), "got {names:?}");
+        assert!(names.contains(&"events".to_string()), "got {names:?}");
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted, "enumerate_all_plugins should return sorted names");
+    }
+
+    #[test]
+    fn enumerate_all_plugins_ignores_non_plugin_dirs() {
+        // A `plugins/` directory containing one valid plugin + one
+        // unrelated subdir (no plugin.toml) should return only the
+        // valid one.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let p_dir = root.join("plugins").join("widget");
+        std::fs::create_dir_all(&p_dir).unwrap();
+        std::fs::write(
+            p_dir.join("plugin.toml"),
+            "[plugin]\nname = \"widget\"\ndisplay_name = \"Widget\"\nmanifest_schema = 1\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("plugins").join("not-a-plugin")).unwrap();
+        let names = enumerate_all_plugins(root).unwrap();
+        assert_eq!(names, vec!["widget"]);
     }
 }

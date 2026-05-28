@@ -141,8 +141,16 @@ pub struct SyncArgs {
     pub dry_run: bool,
 
     /// Path to the deployment's `platform.toml`. Defaults to `./platform.toml`.
+    /// Ignored when `--bundle-all` is set.
     #[arg(long)]
     pub config: Option<PathBuf>,
+
+    /// M24: bundle every plugin under `plugins/<name>/plugin.toml` in the
+    /// source tree, ignoring `[plugins].enabled` (and `--config` entirely).
+    /// Used by the precompiled-image Docker builds so the resulting image
+    /// links every monorepo plugin.
+    #[arg(long, conflicts_with = "plugin")]
+    pub bundle_all: bool,
 }
 
 #[derive(clap::Args, Debug)]

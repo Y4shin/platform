@@ -48,6 +48,7 @@ async fn run_async(args: &DevArgs) -> i32 {
         plugin: None,
         dry_run: false,
         config: args.config.clone(),
+        bundle_all: false,
     };
     let sync_code = super::sync::run(&sync_args, crate::cli::OutputFormat::Plain);
     if sync_code != exit::OK {
