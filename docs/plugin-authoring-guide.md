@@ -687,6 +687,33 @@ as a worked example.
 
 ---
 
+## 17. SSR considerations (M23)
+
+Plugin frontends are double-bundled in M23 split mode: once for the SSR
+Node host (`platform/frontend-ssr/`) and once for browser hydration.
+Most React 19 code is SSR-safe out of the box, but a few rules of
+thumb keep a plugin compatible with both topologies:
+
+- **No top-level `window` / `document` access.** Wrap them in
+  `useEffect`, behind a `typeof window !== 'undefined'` guard, or
+  inside an event handler. Top-level access throws during SSR.
+- **No browser-only APIs in route loaders.** Loaders run on both
+  sides; `localStorage`, `IntersectionObserver`, `window.matchMedia`
+  belong inside components, behind effect hooks.
+- **Idempotent renders.** Server and client must produce the same
+  HTML for the same inputs, or hydration mismatches show up as a
+  visible flicker (and a console warning). Use `useId` for stable
+  IDs; avoid `Math.random()` in render.
+- **Cookies + auth work transparently.** The SSR layer forwards the
+  inbound `Cookie` header through an `AsyncLocalStorage` to a Connect
+  interceptor; `useQuery(someService.method, …)` runs as the
+  requesting user without any plugin-side wiring.
+- **Embedded mode is still the default.** Plugins don't need to
+  *target* SSR — they just need to avoid the gotchas above so the
+  SSR path works for deployments that opt into split mode.
+
+---
+
 ## Inspecting a plugin
 
 ```bash

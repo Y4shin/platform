@@ -37,6 +37,14 @@
 > `PORT=3000` on the SSR child so its proxy targets juniusd at
 > `:18080`.
 >
+> Stage 5 (deployment example + docs) landed:
+> `examples/example-deployment-split/` ships the two-container
+> topology (`platform.toml` + `docker-compose.yml` + README contrasting
+> with the embedded example). `docs/design/04-frontend.md` gained
+> §4.5 "Frontend delivery modes"; `docs/design/14-decision-log.md`
+> got an M18-follow-up + M23 entry. Stage 6 (CI job `e2e-split`)
+> remains — needs Docker to run; the doc spec is below.
+>
 > No plugin-API change. The `Plugin` trait, `junius-sdk`, `plugin.toml`,
 > the per-plugin `frontend/` shape — all unchanged. The only thing that
 > moves is the *delivery* of the FE bundle (still embedded by default;

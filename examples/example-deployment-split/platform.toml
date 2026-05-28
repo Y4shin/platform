@@ -1,0 +1,57 @@
+# M23 split-mode example deployment. Pair with `docker-compose.yml` in this
+# directory to bring up the two-container topology:
+#
+#   - `juniusd` — headless API-only binary (built from `[build] frontend =
+#     "none"`). Returns a structured 404 on every browser route.
+#   - `frontend-ssr` — Node SSR host. Serves the SPA, SSRs initial HTML, and
+#     proxies `/api`, `/h`, `/rpc` to `juniusd` with cookies forwarded.
+#
+# The browser only ever sees the `frontend-ssr` origin; the SSR side reaches
+# the BE over the docker-compose network at `JUNIUS_BE_INTERNAL_URL`.
+
+[source]
+path = "../.."
+
+[plugins]
+enabled = ["events", "admin"]
+
+# Headless backend: don't embed the SPA. The SSR container serves it.
+[build]
+frontend = "none"
+
+# Secrets use `env:` indirection so they aren't committed. Export the env
+# vars (or use `.env` with docker-compose) before bringing the stack up.
+[config]
+database_url           = "postgres://platform_migrator:dev-only@postgres:5432/platform"
+oidc_issuer            = "http://authentik-server:9000/application/o/junius/"
+oidc_client_id         = "platform"
+oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
+session_encryption_key = "env:SESSION_KEY"
+role_password_secret   = "env:ROLE_PW_SECRET"
+# Browser-facing OIDC callback. Pointed at the SSR FE origin (:3000); the
+# FE container's proxy forwards `/api/auth/*` to juniusd. Must match a
+# redirect_uri registered with the IdP.
+oidc_redirect_url      = "http://localhost:3000/api/auth/callback"
+job_workers            = 4
+
+[config.jobs]
+amqp_url = "amqp://guest:guest@rabbitmq:5672/%2f"
+
+[config.otel]
+enabled  = false
+
+[config.audit]
+retention_days = 365
+
+[config.storage]
+token_secret = "env:STORAGE_TOKEN_SECRET"
+
+[config.storage.buckets.main]
+endpoint       = "http://minio:9000"
+region         = "us-east-1"
+bucket         = "platform-dev"
+access_key     = "env:MINIO_USER"
+secret_key     = "env:MINIO_PASS"
+use_path_style = true
+
+[config.storage.mapping]
