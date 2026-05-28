@@ -1,5 +1,6 @@
 packages:
   - "platform/frontend"
+  - "platform/frontend-ssr"
   - "packages/*"
   - "plugins/*/frontend"
 

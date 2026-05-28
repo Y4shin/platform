@@ -1,31 +1,22 @@
 {
-  "name": "@junius/shell",
+  "name": "@junius/shell-ssr",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "exports": {
-    "./app-shell": "./src/AppShell.tsx",
-    "./routes": "./src/generated/routes.ts",
-    "./styles.css": "./src/styles.css"
-  },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "tsx src/server.ts",
+    "build:client": "vite build --outDir dist/client",
+    "build:server": "vite build --ssr src/entry-server.tsx --outDir dist/server",
+    "build": "pnpm build:client && pnpm build:server",
+    "start": "NODE_ENV=production node --enable-source-maps --import tsx src/server.ts"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.5.0",
     "@connectrpc/connect": "^2.0.0",
     "@connectrpc/connect-query": "^2.0.0",
     "@connectrpc/connect-web": "^2.0.0",
-    "@junius/design": "workspace:*",
-    "@junius/generated": "workspace:*",
-    "@junius/plugin-admin": "workspace:*",
-    "@junius/plugin-events": "workspace:*",
     "@junius/sdk": "workspace:*",
-    "@lingui/core": "^5.9.5",
-    "@lingui/react": "^5.9.5",
+    "@junius/shell": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-router": "^1.95.0",
     "react": "^19.0.0",
@@ -34,10 +25,13 @@
   "devDependencies": {
     "@lingui/vite-plugin": "^5.9.5",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
     "vite": "^6.0.0"
   }
 }
