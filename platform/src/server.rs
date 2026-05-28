@@ -117,6 +117,65 @@ fn compose_http(plugins: &[Box<dyn Plugin>], services: Option<HttpServices<'_>>)
     http
 }
 
+/// M24: in `Precompiled` mode, refuse to boot if `[plugins].enabled` doesn't
+/// exactly match the plugin set linked into the binary. In `Source` mode this
+/// is a no-op (the deployment built its own binary with `junius build` —
+/// `[plugins].enabled` already drives the linked set by definition).
+///
+/// The error names every missing/extra plugin and points at the two escape
+/// hatches (add to `enabled`, or rebuild from source) so the operator can
+/// recover without grepping for what changed.
+fn validate_bundle_compatibility(
+    mode: junius_manifest::PlatformMode,
+    enabled: &[String],
+    plugins: &[Box<dyn Plugin>],
+) -> anyhow::Result<()> {
+    if !matches!(mode, junius_manifest::PlatformMode::Precompiled) {
+        return Ok(());
+    }
+    let bundled: Vec<&str> = plugins.iter().map(|p| p.metadata().name).collect();
+    match bundle_mismatch_message(&bundled, enabled) {
+        None => Ok(()),
+        Some(msg) => Err(anyhow::anyhow!(msg)),
+    }
+}
+
+/// Pure helper: returns `None` when `bundled` and `enabled` carry the same
+/// set of names, or `Some(msg)` describing the symmetric diff. Extracted
+/// from [`validate_bundle_compatibility`] so the diff logic is testable
+/// without standing up `Plugin` fixtures.
+fn bundle_mismatch_message(bundled: &[&str], enabled: &[String]) -> Option<String> {
+    use std::collections::BTreeSet;
+    use std::fmt::Write as _;
+    let bundled_set: BTreeSet<&str> = bundled.iter().copied().collect();
+    let enabled_set: BTreeSet<&str> = enabled.iter().map(String::as_str).collect();
+    let missing: Vec<&str> = bundled_set.difference(&enabled_set).copied().collect();
+    let extra: Vec<&str> = enabled_set.difference(&bundled_set).copied().collect();
+    if missing.is_empty() && extra.is_empty() {
+        return None;
+    }
+    let mut msg = String::from(
+        "precompiled image: [plugins].enabled does not match the bundled plugin set\n",
+    );
+    if !extra.is_empty() {
+        let _ = writeln!(
+            msg,
+            "  enabled but not bundled: {} \
+             (remove from [plugins].enabled, or rebuild from source with these plugins available)",
+            extra.join(", ")
+        );
+    }
+    if !missing.is_empty() {
+        let _ = writeln!(
+            msg,
+            "  bundled but not enabled: {} \
+             (add to [plugins].enabled — precompiled images require an exact match)",
+            missing.join(", ")
+        );
+    }
+    Some(msg)
+}
+
 /// Trusted-capability allowlist (M18). The `platform.admin` capability grants
 /// cross-schema mutation rights on `platform.group*`/`platform.user_role*` via
 /// the `PlatformAdminApi` accessor. Only the blessed first-party plugin is
@@ -248,6 +307,12 @@ pub async fn run(
     let resolved = config.resolved.as_ref().ok_or_else(|| {
         anyhow::anyhow!("no [config] loaded; juniusd needs --config or JUNIUS_CONFIG")
     })?;
+
+    // M24: in precompiled mode (image entrypoint sets JUNIUS_MODE=precompiled,
+    // or the toml's `[build] mode = "precompiled"`), the deployment's
+    // `[plugins].enabled` list must exactly match the bundled plugin set.
+    // Mismatches fail fast with a clear error before we touch the DB.
+    validate_bundle_compatibility(config.build_mode, &config.enabled_plugins, &plugins)?;
 
     let db = DbBootstrap::connect(&resolved.database_url).await?;
     let platform_pool = db.platform_pool().clone();
@@ -458,4 +523,39 @@ fn spawn_worker(
             tracing::error!(error = %e, "job worker exited with error");
         }
     }))
+}
+
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    use super::bundle_mismatch_message;
+
+    #[test]
+    fn no_mismatch_when_sets_match() {
+        let bundled = ["admin", "events"];
+        let enabled = vec!["admin".to_owned(), "events".to_owned()];
+        assert!(bundle_mismatch_message(&bundled, &enabled).is_none());
+    }
+
+    #[test]
+    fn order_does_not_matter() {
+        let bundled = ["events", "admin"];
+        let enabled = vec!["admin".to_owned(), "events".to_owned()];
+        assert!(bundle_mismatch_message(&bundled, &enabled).is_none());
+    }
+
+    #[test]
+    fn reports_extras_and_missing_with_recovery_hints() {
+        let bundled = ["admin", "events"];
+        let enabled = vec!["events".to_owned(), "ghost".to_owned()];
+        let msg = bundle_mismatch_message(&bundled, &enabled).expect("mismatch");
+        assert!(msg.contains("enabled but not bundled: ghost"), "got: {msg}");
+        assert!(msg.contains("bundled but not enabled: admin"), "got: {msg}");
+        assert!(msg.contains("rebuild from source"), "got: {msg}");
+        assert!(
+            msg.contains("precompiled images require an exact match"),
+            "got: {msg}"
+        );
+    }
 }

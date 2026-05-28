@@ -3,8 +3,10 @@
 //! registry, and hands off to `platform::server::run`.
 
 use std::path::PathBuf;
+use std::str::FromStr as _;
 
 use anyhow::Context as _;
+use junius_manifest::PlatformMode;
 use platform::config::HostConfig;
 use platform::telemetry::init_telemetry;
 
@@ -25,8 +27,14 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let config = HostConfig::load_from_toml(&path)
+    let mut config = HostConfig::load_from_toml(&path)
         .with_context(|| format!("loading host config from {}", path.display()))?;
+    // M24: `JUNIUS_MODE` env var overrides `[build] mode` from the toml.
+    // The image entrypoint sets it so a precompiled image is authoritative
+    // about its own mode regardless of what the operator's toml says.
+    if let Some(mode) = mode_from_env()? {
+        config.build_mode = mode;
+    }
     let otel = config
         .resolved
         .as_ref()
@@ -36,6 +44,21 @@ async fn main() -> anyhow::Result<()> {
 
     let plugins = platform::generated::plugins::plugins();
     platform::server::run(config, plugins, metric_sink).await
+}
+
+/// Read `JUNIUS_MODE`. Returns `Ok(None)` when unset, `Ok(Some(mode))`
+/// when valid, or `Err` on a malformed value (no silent fallback).
+fn mode_from_env() -> anyhow::Result<Option<PlatformMode>> {
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "JUNIUS_MODE is the M24 image-mode override env var"
+    )]
+    let Ok(raw) = std::env::var("JUNIUS_MODE") else {
+        return Ok(None);
+    };
+    PlatformMode::from_str(&raw)
+        .map(Some)
+        .map_err(|e| anyhow::anyhow!("JUNIUS_MODE: {e}"))
 }
 
 /// Resolve the deployment config path: `--config <path>`, else `$JUNIUS_CONFIG`,

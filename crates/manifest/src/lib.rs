@@ -22,7 +22,9 @@ pub use infra_config::{
     SmtpConfig, StorageConfig,
 };
 pub use lock::{DeploymentLock, LockSource};
-pub use platform::{BuildConfig, FrontendDelivery, PlatformManifest, PluginsConfig, SourceConfig};
+pub use platform::{
+    BuildConfig, FrontendDelivery, PlatformManifest, PlatformMode, PluginsConfig, SourceConfig,
+};
 pub use plugin::{
     BucketDecl, ConfigField, ConfigType, ExposedComponent, ExposedTable, PluginDep, PluginExposes,
     PluginIdentity, PluginManifest, PluginMount, PluginRequires, PluginStorageDecl, SecretDecl,

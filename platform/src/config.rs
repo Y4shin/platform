@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr as _;
 
 use junius_manifest::{
-    PlatformManifest, ProvisioningConfig, ResolvedConfig, SecretRef, secrets,
+    PlatformManifest, PlatformMode, ProvisioningConfig, ResolvedConfig, SecretRef, secrets,
 };
 use junius_sdk::{PluginConfig, SecretStore};
 
@@ -38,6 +38,14 @@ pub struct HostConfig {
     /// M18 Stage D: the resolved `[provisioning]` block (with `file = "…"`
     /// pointer already loaded). `None` when the deployment declares none.
     pub provisioning: Option<ProvisioningConfig>,
+    /// M24: the deployment's `[plugins].enabled` list, verbatim from the
+    /// toml. Stored separately from `plugins` (which only carries per-plugin
+    /// override tables) so the boot check can diff the enabled set against
+    /// the bundled set.
+    pub enabled_plugins: Vec<String>,
+    /// M24: `[build] mode`. The `JUNIUS_MODE` env var overrides this in
+    /// `main.rs` before `server::run` consults it.
+    pub build_mode: PlatformMode,
 }
 
 impl Default for HostConfig {
@@ -48,6 +56,8 @@ impl Default for HostConfig {
             resolved: None,
             plugins: BTreeMap::new(),
             provisioning: None,
+            enabled_plugins: Vec::new(),
+            build_mode: PlatformMode::Source,
         }
     }
 }
@@ -79,6 +89,8 @@ impl HostConfig {
             resolved: Some(resolved),
             plugins,
             provisioning,
+            enabled_plugins: manifest.plugins.enabled.clone(),
+            build_mode: manifest.build.mode,
         })
     }
 
