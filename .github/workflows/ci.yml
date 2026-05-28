@@ -171,3 +171,43 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # M23: split-mode E2E. Headless juniusd (no `--features embed-frontend`)
+  # + a Node SSR FE server in front of it. Same testcontainers stack as
+  # the embedded `e2e` job; runs in parallel and must also pass for a merge.
+  e2e-split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pw-${{ runner.os }}-
+      - run: nix develop --command pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: nix develop --command pnpm exec playwright install --with-deps chromium
+      - name: E2E split-mode (task ci:e2e:split)
+        run: nix develop --command task ci:e2e:split
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-split
+          path: |
+            playwright-report/
+            test-results/
+            e2e/.playwright-state-split/
+          retention-days: 7

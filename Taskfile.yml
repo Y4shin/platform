@@ -90,6 +90,18 @@ tasks:
         cargo build --release -p platform --features embed-frontend
         pnpm exec tsx e2e/run-suite.ts
 
+  test:e2e:split:
+    desc: M23 split-mode E2E. Headless juniusd + SSR Node server; needs Docker.
+    cmds:
+      - |
+        if ! docker info >/dev/null 2>&1; then
+          echo "task test:e2e:split — skipped: Docker is not reachable."
+          exit 0
+        fi
+        set -euo pipefail
+        pnpm exec lingui compile
+        pnpm exec tsx e2e/split/run-suite.ts
+
   test:e2e:clean:
     desc: Force-remove any leftover testcontainers from interrupted E2E runs.
     cmds:
@@ -177,6 +189,12 @@ tasks:
       - pnpm --filter @junius/shell build
       - cargo build --release -p platform --features embed-frontend
       - pnpm exec tsx e2e/run-suite.ts
+
+  ci:e2e:split:
+    desc: M23 seventh job — split-mode E2E. Headless juniusd + SSR Node server through `e2e/split/run-suite.ts`. No skip-on-no-Docker (CI always has it).
+    cmds:
+      - pnpm exec lingui compile
+      - pnpm exec tsx e2e/split/run-suite.ts
 
   ci:i18n:
     desc: M14 fifth job — full i18n gate (BE + FE catalogs, drift, pseudo).

@@ -1,6 +1,6 @@
 # 25. M23 — Optional SSR mode (split FE/BE deployment)
 
-> **Status:** ⏳ in progress. **★ Top priority** — together with [M24](26-M24-precompiled-containers.md),
+> **Status:** ✅ implemented (pending live CI verification). **★ Top priority** — together with [M24](26-M24-precompiled-containers.md),
 > this milestone jumps the queue ahead of M18–M22. M24 depends on this
 > (the `frontend` and `backend` images it ships are the split topology
 > introduced here).
@@ -42,8 +42,17 @@
 > topology (`platform.toml` + `docker-compose.yml` + README contrasting
 > with the embedded example). `docs/design/04-frontend.md` gained
 > §4.5 "Frontend delivery modes"; `docs/design/14-decision-log.md`
-> got an M18-follow-up + M23 entry. Stage 6 (CI job `e2e-split`)
-> remains — needs Docker to run; the doc spec is below.
+> got an M18-follow-up + M23 entry.
+>
+> Stage 6 (CI job `e2e-split`) landed: `e2e/split/run-suite.ts`
+> orchestrator boots the testcontainers stack, builds headless
+> juniusd + the SSR FE bundle, starts both processes, and runs a
+> curated Playwright smoke at `e2e/split/specs/smoke.spec.ts`
+> (SSR HTML contains the rendered shell; `/api` proxy round-trips;
+> `/h/*` proxy reaches juniusd). The CI workflow gains a seventh
+> parallel job `e2e-split`; `task ci:e2e:split` runs the same
+> locally when Docker is available. Live verification: pending
+> first CI run.
 >
 > No plugin-API change. The `Plugin` trait, `junius-sdk`, `plugin.toml`,
 > the per-plugin `frontend/` shape — all unchanged. The only thing that
