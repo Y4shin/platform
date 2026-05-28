@@ -30,6 +30,21 @@ async fn root_returns_headless_404() {
 }
 
 #[tokio::test]
+async fn healthz_returns_ok_in_headless_mode() {
+    // M24: `/healthz` is auth-free and returns 200 on every juniusd boot,
+    // matching the HEALTHCHECK directive in the precompiled images.
+    let app = server::build_app(&[]);
+    let response = app
+        .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let body = to_bytes(response.into_body(), 1024).await.unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["status"], "ok");
+}
+
+#[tokio::test]
 async fn unknown_route_404s() {
     let app = server::build_app(&[]);
 

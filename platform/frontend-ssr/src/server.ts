@@ -235,6 +235,13 @@ async function main(): Promise<void> {
 
   const server = createHttpServer((req, res) => {
     const url = req.url ?? '/';
+    // M24: container-orchestrator healthcheck. Returns 200 without touching
+    // the BE so an SSR<>BE network partition doesn't mark the FE unhealthy.
+    if (url === '/healthz') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{"status":"ok"}');
+      return;
+    }
     if (shouldProxy(url)) {
       proxy(req, res, ctx.beInternalUrl);
       return;

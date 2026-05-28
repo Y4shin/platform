@@ -1,0 +1,21 @@
+# Build artifacts that bloat the build context.
+target/
+**/node_modules/
+**/dist/
+.git/
+.github/
+
+# Documentation + examples — not consumed by the image build itself.
+docs/
+examples/
+
+# Editor + OS dross.
+.vscode/
+.idea/
+.DS_Store
+
+# Test scaffolding.
+e2e/.playwright-state/
+e2e/.playwright-state-split/
+playwright-report/
+test-results/

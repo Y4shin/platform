@@ -266,13 +266,22 @@ fn build_ctx_map(
     map
 }
 
+/// M24 — operational healthcheck endpoint, served on both topologies.
+/// Returns 200 + `{"status":"ok"}` so container orchestrators and the M24
+/// image `HEALTHCHECK` directive can probe without needing auth.
+async fn healthz() -> impl axum::response::IntoResponse {
+    axum::Json(serde_json::json!({"status": "ok"}))
+}
+
 #[cfg(not(feature = "embed-frontend"))]
 fn base_app() -> Router {
     // M23 — headless mode: every browser route returns a structured 404 so a
     // misrouted request (someone hitting the API tier directly when they
     // should be hitting the FE container) is obvious. API/RPC/auth routes
     // are merged on top of this and continue to match first.
-    Router::new().fallback(axum::routing::any(headless_not_found))
+    Router::new()
+        .route("/healthz", get(healthz))
+        .fallback(axum::routing::any(headless_not_found))
 }
 
 #[cfg(not(feature = "embed-frontend"))]
@@ -290,7 +299,9 @@ async fn headless_not_found(uri: axum::http::Uri) -> impl axum::response::IntoRe
 
 #[cfg(feature = "embed-frontend")]
 fn base_app() -> Router {
-    crate::static_assets::router()
+    Router::new()
+        .route("/healthz", get(healthz))
+        .merge(crate::static_assets::router())
 }
 
 /// Boot the platform end-to-end: connect the DB, build per-plugin pools and auth
