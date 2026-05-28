@@ -6,14 +6,18 @@ use junius_manifest::{PlatformManifest, PluginManifest};
 use serde::Serialize;
 
 use crate::cli::{OutputFormat, PluginCmd};
+use crate::exit;
 use crate::output::{self, Renderable};
-use crate::{cache, exit, source};
+#[cfg(feature = "source-build")]
+use crate::{cache, source};
 
 pub fn run(cmd: &PluginCmd, format: OutputFormat) -> i32 {
     match cmd {
         PluginCmd::List { config } => list(config.as_deref(), format),
         PluginCmd::Info { name } => info(name, format),
+        #[cfg(feature = "source-build")]
         PluginCmd::Enable { name, config } => enable(name, config.as_deref(), format),
+        #[cfg(feature = "source-build")]
         PluginCmd::Disable { name, config } => disable(name, config.as_deref(), format),
     }
 }
@@ -184,6 +188,7 @@ fn info(name: &str, format: OutputFormat) -> i32 {
 
 /// Resolve the source for a deployment + load every enabled plugin's manifest.
 /// Returns `(config_path, source_root, manifest, plugin_manifests)`.
+#[cfg(feature = "source-build")]
 fn load_deployment(
     config: Option<&Path>,
 ) -> Result<
@@ -225,12 +230,14 @@ fn load_deployment(
     Ok((config_path, resolved.root, manifest, plugins))
 }
 
+#[cfg(feature = "source-build")]
 fn read_plugin(source_root: &Path, name: &str) -> Option<PluginManifest> {
     let path = source_root.join("plugins").join(name).join("plugin.toml");
     let src = std::fs::read_to_string(path).ok()?;
     PluginManifest::parse(&src).ok()
 }
 
+#[cfg(feature = "source-build")]
 fn enable(name: &str, config: Option<&Path>, format: OutputFormat) -> i32 {
     let (config_path, source_root, manifest, _plugins) = match load_deployment(config) {
         Ok(v) => v,
@@ -276,6 +283,7 @@ fn enable(name: &str, config: Option<&Path>, format: OutputFormat) -> i32 {
     super::sync::run_in(&source_root, &config_path, false, format)
 }
 
+#[cfg(feature = "source-build")]
 fn disable(name: &str, config: Option<&Path>, format: OutputFormat) -> i32 {
     let (config_path, source_root, manifest, plugins) = match load_deployment(config) {
         Ok(v) => v,
@@ -314,6 +322,7 @@ fn disable(name: &str, config: Option<&Path>, format: OutputFormat) -> i32 {
 
 /// Mutate `[plugins].enabled` in `config_path` in place, preserving comments +
 /// formatting via `toml_edit`.
+#[cfg(feature = "source-build")]
 fn edit_enabled(config_path: &Path, mutate: impl FnOnce(&mut toml_edit::Array)) -> Result<(), i32> {
     let src = std::fs::read_to_string(config_path).map_err(|e| {
         eprintln!("junius: cannot read {}: {e}", config_path.display());
@@ -341,6 +350,7 @@ fn edit_enabled(config_path: &Path, mutate: impl FnOnce(&mut toml_edit::Array)) 
     })
 }
 
+#[cfg(feature = "source-build")]
 fn absolutize(p: PathBuf) -> PathBuf {
     if p.is_absolute() {
         p

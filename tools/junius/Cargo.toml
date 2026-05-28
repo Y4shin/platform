@@ -11,13 +11,16 @@ name = "junius"
 path = "src/main.rs"
 
 [features]
-# `develop` gates the source-tree-only subcommands (`new`, `sync`, `dev`) so an
-# end-user deployment build ships a CLI with only `check`/`build`/`migrate`/
-# `plugin`/`cache`. It trims the *command surface*, not the dependency tree —
-# the dev commands share tokio/regex with end-user commands (migrate needs the
-# tokio runtime; build calls sync's generation), so no dep actually drops out.
-default = ["develop"]
+# `develop` gates the source-tree-only subcommands (`new`, `sync`, `dev`, `rpc`)
+# so an end-user deployment build ships a CLI without the source-tree authoring
+# surface. `source-build` (M24) further gates `build`, `cache`, and
+# `plugin {enable,disable}` so the in-container `junius` inside the precompiled
+# images has only the runtime-relevant commands (`check`, `migrate`,
+# `plugin {list,info}`, `i18n`, `provision`). The default leaves both on so
+# in-source and source-built deployments are unaffected.
+default = ["develop", "source-build"]
 develop = []
+source-build = []
 
 [dependencies]
 junius-manifest   = { workspace = true }

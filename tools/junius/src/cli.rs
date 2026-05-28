@@ -43,7 +43,8 @@ pub enum Command {
     /// deployment config. (Source-tree-only — gated behind the `develop` feature.)
     #[cfg(feature = "develop")]
     Sync(SyncArgs),
-    /// Build a deployment binary.
+    /// Build a deployment binary. (Source-build only — gated behind `source-build`.)
+    #[cfg(feature = "source-build")]
     Build(BuildArgs),
     /// One-command developer loop. (Source-tree-only — gated behind `develop`.)
     #[cfg(feature = "develop")]
@@ -59,6 +60,8 @@ pub enum Command {
         subcommand: PluginCmd,
     },
     /// Manage the junius source cache (`~/.cache/junius`).
+    /// (Source-build only — gated behind `source-build`.)
+    #[cfg(feature = "source-build")]
     Cache {
         #[command(subcommand)]
         subcommand: CacheCmd,
@@ -153,6 +156,7 @@ pub struct SyncArgs {
     pub bundle_all: bool,
 }
 
+#[cfg(feature = "source-build")]
 #[derive(clap::Args, Debug)]
 #[allow(
     clippy::struct_excessive_bools,
@@ -258,6 +262,8 @@ pub enum PluginCmd {
     Info { name: String },
     /// Add a plugin to a deployment's `[plugins].enabled` (verifying its
     /// required dependencies are enabled) and re-sync.
+    /// (Source-build only — gated behind `source-build`.)
+    #[cfg(feature = "source-build")]
     Enable {
         name: String,
         /// Path to platform.toml. Defaults to ./platform.toml.
@@ -266,6 +272,8 @@ pub enum PluginCmd {
     },
     /// Remove a plugin from `[plugins].enabled` (refusing if another enabled
     /// plugin requires it) and re-sync.
+    /// (Source-build only — gated behind `source-build`.)
+    #[cfg(feature = "source-build")]
     Disable {
         name: String,
         /// Path to platform.toml. Defaults to ./platform.toml.
@@ -298,6 +306,7 @@ pub enum I18nCmd {
     },
 }
 
+#[cfg(feature = "source-build")]
 #[derive(Subcommand, Debug)]
 pub enum CacheCmd {
     /// Evict cached git sources older than a duration (e.g. `30d`; `0d` = all).

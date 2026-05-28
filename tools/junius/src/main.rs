@@ -1,12 +1,20 @@
 //! `junius` — Junius management CLI. See `src/cli.rs` for the user-facing surface.
 
+#[cfg(feature = "source-build")]
 mod cache;
 mod cli;
 mod commands;
 mod exit;
+#[cfg(feature = "source-build")]
 mod hash;
+// `markers` is only used by `sync`/`build`/`plugin enable/disable` — gate
+// on the same union so the trimmed in-container CLI doesn't carry it.
+#[cfg(any(feature = "develop", feature = "source-build"))]
 mod markers;
 mod output;
+// `source` stays compiled even without `source-build`: `commands::cross_check`
+// calls `source::git` for the `SQL.EXPOSED.NO_BREAKING` rule on migration
+// diffs, which `junius check` (always available) needs.
 mod source;
 
 use std::path::PathBuf;
@@ -30,11 +38,13 @@ fn main() -> ExitCode {
         cli::Command::Check(a) => commands::check::run(&a, args.format),
         #[cfg(feature = "develop")]
         cli::Command::Sync(a) => commands::sync::run(&a, args.format),
+        #[cfg(feature = "source-build")]
         cli::Command::Build(a) => commands::build::run(&a),
         #[cfg(feature = "develop")]
         cli::Command::Dev(a) => commands::dev::run(&a),
         cli::Command::Migrate { subcommand } => commands::migrate::run(&subcommand),
         cli::Command::Plugin { subcommand } => commands::plugin_cmd::run(&subcommand, args.format),
+        #[cfg(feature = "source-build")]
         cli::Command::Cache { subcommand } => commands::cache_cmd::run(&subcommand, args.format),
         #[cfg(feature = "develop")]
         cli::Command::New { subcommand } => commands::new::run(&subcommand),
