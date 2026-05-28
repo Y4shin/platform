@@ -1,4 +1,10 @@
 [toolchain]
 channel = "1.88.0"
 components = ["rustfmt", "clippy"]
+# `x86_64-unknown-linux-musl` is added for the M24 precompiled-image build:
+# `docker/{backend,full}.Dockerfile` produce statically-linked juniusd +
+# junius binaries via `nix build .#…`, so the runtime images can be
+# `FROM scratch`. The host target stays whatever rustup picks — dev shells
+# aren't forced to cross-compile.
+targets = ["x86_64-unknown-linux-musl"]
 profile = "minimal"

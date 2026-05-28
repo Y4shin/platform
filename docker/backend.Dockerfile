@@ -1,46 +1,45 @@
 # syntax=docker/dockerfile:1.7
 #
-# M24 `backend` image: headless juniusd built WITHOUT `embed-frontend`,
-# every monorepo plugin linked in. Pairs with the M24 `frontend` image (or
-# any third-party static-asset host that proxies `/api`/`/h`/`/rpc` back).
-# Browser routes return a structured 404 (`FRONTEND_NOT_EMBEDDED`); the
-# FE container handles them.
+# M24 `backend` image: headless juniusd built without `embed-frontend`,
+# every monorepo plugin linked in. Pairs with the M24 `frontend` image
+# (or any third-party static-asset host). Browser routes return a
+# structured 404 (`FRONTEND_NOT_EMBEDDED`); the FE container handles them.
+#
+# Build strategy (M24, post-musl-pivot): the Rust binaries are built
+# via `nix build .#…-static` against the flake derivations in
+# `flake.nix`. The result is fully static, musl-linked, position-
+# independent executables that run on a `FROM scratch` runtime base.
+# No glibc, no shell, no toolchain in the runtime image.
 
-ARG RUST_VERSION=1.88-bookworm
-ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot
+# nixos/nix ships with experimental features off by default; the
+# wrapper flag enables flakes for the `nix build` call below.
+FROM nixos/nix:2.24.10 AS builder
+ENV NIX_CONFIG="experimental-features = nix-command flakes"
 
-# ---------- Stage 1: rust-only builder (no node, no buf) -------------------
-FROM rust:${RUST_VERSION} AS builder
-ENV CARGO_TERM_COLOR=always \
-    DEBIAN_FRONTEND=noninteractive
-# `rust:<ver>-bookworm` ships gcc but NOT binutils — cargo's native-dep
-# crates fail to link with `cannot find 'ld'` without it. Install binutils
-# + gcc + libc6-dev explicitly (the `build-essential` metapackage's
-# Depends are partially pre-satisfied in the base image, which is why
-# pulling just `build-essential` isn't enough).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-        binutils gcc g++ make libc6-dev pkg-config libssl-dev \
- && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
-# Backend-only image: skip the FE build. `--bundle-all` still produces the
-# generated TS files (routes.ts etc.); they're harmless dead code in the
-# Rust binary because `embed-frontend` is off.
-RUN cargo run --release -p junius -- sync --bundle-all \
- && cargo build --release -p platform \
- && cargo build --release -p junius --no-default-features
 
-# ---------- Stage 2: distroless runtime ------------------------------------
-FROM ${RUNTIME_IMAGE} AS runtime
-COPY --from=builder /src/target/release/juniusd /usr/local/bin/juniusd
-COPY --from=builder /src/target/release/junius  /usr/local/bin/junius
+# Build the two binaries into /src/result-* via the flake outputs.
+# `.#juniusd-headless-static` = juniusd without the embedded SPA.
+# `.#junius-static` = the trimmed in-container CLI (--no-default-features).
+RUN nix build .#juniusd-headless-static -o /out/juniusd-link \
+ && nix build .#junius-static          -o /out/junius-link  \
+ && cp -L /out/juniusd-link/bin/juniusd /out/juniusd \
+ && cp -L /out/junius-link/bin/junius   /out/junius
+
+# Scratch runtime: only the two binaries + ENV. No shell, no libc — the
+# binaries are static. Operators mount their `platform.toml` at
+# `/etc/junius/`; migrations run via `docker run … junius migrate up`.
+FROM scratch AS runtime
+COPY --from=builder /out/juniusd /usr/local/bin/juniusd
+COPY --from=builder /out/junius  /usr/local/bin/junius
 ENV JUNIUS_MODE=precompiled \
     JUNIUS_CONFIG=/etc/junius/platform.toml
 VOLUME ["/etc/junius"]
 EXPOSE 18080
-# Healthcheck via orchestrator (compose / k8s) against `/healthz` —
-# distroless has no shell.
+# HEALTHCHECK omitted — `scratch` has no shell or `curl`/`wget`. The
+# orchestrator's healthcheck (compose / k8s readinessProbe) probes
+# the auth-free `/healthz` endpoint juniusd exposes.
 ENTRYPOINT ["/usr/local/bin/juniusd"]
 
 LABEL org.opencontainers.image.title="junius-backend" \

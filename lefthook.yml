@@ -1,0 +1,48 @@
+# Git hooks managed by lefthook. Installed into `.git/hooks/` by the
+# `lefthook install` step in `flake.nix`'s devshell shellHook.
+#
+# Reference: https://lefthook.dev/configuration/
+
+pre-push:
+  jobs:
+    # Verifies the fixed-output derivation hashes declared in flake.nix
+    # against what the fetcher actually produces. Runs as two `nix build`
+    # invocations because neither alone is sufficient:
+    #
+    #   1. Plain build — if the declared hash has no matching entry in
+    #      the local store yet (fresh clone, post-GC), this triggers a
+    #      fetch + hash compare. `--rebuild` would instead error with
+    #      "outputs are not valid" since it requires a prior build to
+    #      compare against, masking the real diagnostic.
+    #
+    #   2. --rebuild — if the declared hash *does* satisfy a prior store
+    #      entry, plain build is a no-op (FOD outputs are addressed by
+    #      hash, not by inputs), so a stale hash paired with a changed
+    #      lockfile would slip through. `--rebuild` forces a re-fetch
+    #      and surfaces the mismatch.
+    #
+    # Together they cover both cold and warm caches.
+    #
+    # Scoped via `glob` so it only fires when one of the inputs that can
+    # invalidate the hash is part of the push — a cold rebuild here is
+    # network-bound and takes ~30s on a fast link.
+    #
+    # Currently covers:
+    #   .#pnpmDeps  — pnpm-lock.yaml-driven JS dep cache.
+    - name: flake-fod-hashes
+      tags:
+        - flake
+        - nix
+      glob:
+        - "flake.nix"
+        - "pnpm-lock.yaml"
+      run: |
+        nix build --no-link .#pnpmDeps \
+          && nix build --rebuild --no-link .#pnpmDeps
+      fail_text: |
+        Fixed-output derivation hash mismatch in flake.nix.
+
+        pnpm-lock.yaml or another input to `.#pnpmDeps` changed without a
+        matching `hash = "...";` update. Copy the `got:` value from the
+        nix error above into the `pnpmDeps` block in flake.nix, commit,
+        and push again.

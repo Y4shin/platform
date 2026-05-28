@@ -7,9 +7,16 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # M24: crane is the nix-native Rust derivation builder. The
+    # `docker/{backend,full}.Dockerfile` precompiled-image builds invoke
+    # `nix build .#…` against the outputs defined below to produce
+    # statically-linked musl binaries on a `FROM scratch` runtime image.
+    crane = {
+      url = "github:ipetkov/crane";
+    };
   };
 
-  outputs = { self, nixpkgs, rust-overlay }:
+  outputs = { self, nixpkgs, rust-overlay, crane }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -17,12 +24,16 @@
         inherit system;
         overlays = [ rust-overlay.overlays.default ];
       };
+
+      # Rust toolchain — single source of truth in `rust-toolchain.toml`.
+      # `targets = ["x86_64-unknown-linux-musl"]` there gives us the
+      # musl cross-target without needing to override here.
+      rustToolchainFor = pkgs: pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
     in {
       devShells = forAllSystems (system:
         let
           pkgs = pkgsFor system;
-          # Pin the Rust toolchain via rust-toolchain.toml — single source of truth.
-          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+          rustToolchain = rustToolchainFor pkgs;
         in {
           default = pkgs.mkShell {
             packages = [
@@ -47,6 +58,11 @@
               pkgs.openssl
               pkgs.pkg-config
 
+              # Git hooks managed by `lefthook.yml` at the repo root.
+              # `lefthook install` in the shellHook below wires them into
+              # `.git/hooks/` so they fire on commit/push.
+              pkgs.lefthook
+
               # LLVM lld linker — selected on Linux via .cargo/config.toml. Far
               # lower peak memory + faster than the default GNU bfd linker when
               # linking the many large debug test binaries (~95% debug info), so
@@ -64,6 +80,13 @@
             ];
 
             shellHook = ''
+              # Wire `lefthook.yml` hooks into `.git/hooks/`. Idempotent
+              # and quick — skipped outside a working tree (e.g. CI
+              # building from a `git archive` tarball).
+              if [ -d .git ]; then
+                lefthook install >/dev/null
+              fi
+
               echo "── Junius dev shell ──"
               echo "  rustc : $(rustc --version)"
               echo "  node  : $(node --version)"
@@ -74,5 +97,210 @@
             '';
           };
         });
+
+      # M24 precompiled-image packages. Both Rust binaries are built for
+      # `x86_64-unknown-linux-musl` with `+crt-static`, so the result is
+      # fully self-contained and runs on a `FROM scratch` base. Invoked
+      # from the docker builders via `nix build .#juniusd-headless-static`
+      # / `.#juniusd-static` / `.#junius-static`.
+      #
+      # Outputs are gated to `x86_64-linux` because v1 ships amd64 only
+      # (per the M24 doc — arm64 lands in M25). Building from a different
+      # host system errors clearly; that's intentional.
+      packages = forAllSystems (system:
+        if system == "x86_64-linux" then
+          let
+            pkgs = pkgsFor system;
+            # Musl cross-compile toolchain. Necessary because some deps
+            # (`aws-lc-sys`, `zstd-sys`) compile C source via the `cc`
+            # crate at build time; without a proper musl-targeting C
+            # compiler their .o files reference glibc symbols
+            # (`__isoc23_sscanf`, `__memcpy_chk`, …) that musl doesn't
+            # provide, and the static link fails.
+            pkgsMusl = pkgs.pkgsCross.musl64;
+            muslCC = pkgsMusl.stdenv.cc;
+            targetPrefix = muslCC.targetPrefix;
+
+            rustToolchain = rustToolchainFor pkgs;
+            craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+
+            # Source: the whole workspace, minus dirs cargo doesn't read.
+            # Keeping proto/, migrations/, .sqlx/, build.rs scripts, *.po
+            # — all of which cargo consumes at build time — falls out of
+            # the permissive default.
+            #
+            # `dist/` is intentionally NOT excluded: the `full` image's
+            # docker build runs `pnpm shell build` to produce
+            # `platform/frontend/dist/` before invoking `nix build
+            # .#juniusd-static`, and `rust-embed`'s build script reads
+            # that dir to bake the SPA into the binary. For the headless
+            # variant the dir is empty / absent and the filter difference
+            # is a no-op.
+            src = pkgs.lib.cleanSourceWith {
+              src = ./.;
+              filter = path: type:
+                let base = baseNameOf (toString path); in
+                base != "target"
+                && base != "node_modules"
+                && base != ".git"
+                && base != ".github";
+            };
+
+            target = "x86_64-unknown-linux-musl";
+
+            # Shared crane args. `+crt-static` is the musl default but we
+            # set it explicitly so the audit trail is unambiguous. The
+            # `CC_…` / `AR_…` / `CARGO_TARGET_…_LINKER` env vars route
+            # both C-dep builds (`cc` crate) and the final link through
+            # the musl cross-toolchain.
+            commonArgs = {
+              inherit src;
+              strictDeps = true;
+              CARGO_BUILD_TARGET = target;
+              CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+              CC_x86_64_unknown_linux_musl = "${muslCC}/bin/${targetPrefix}cc";
+              CXX_x86_64_unknown_linux_musl = "${muslCC}/bin/${targetPrefix}c++";
+              AR_x86_64_unknown_linux_musl = "${muslCC.bintools.bintools}/bin/${targetPrefix}ar";
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "${muslCC}/bin/${targetPrefix}cc";
+              nativeBuildInputs = [
+                pkgs.protobuf
+                pkgs.pkg-config
+                muslCC
+              ];
+              # No `buildInputs` — we want zero dynamic libs at runtime.
+              # rustls handles TLS; everything else is pure Rust.
+            };
+
+            # Workspace deps compiled once and reused across binaries.
+            cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+            mkBin = { pname, cargoExtraArgs }:
+              craneLib.buildPackage (commonArgs // {
+                inherit cargoArtifacts pname cargoExtraArgs;
+                version = "0.0.0";
+                # CI runs tests separately; image-build is not the place.
+                doCheck = false;
+              });
+
+            # Hermetic pnpm dep cache. Hash is auto-pinned to the
+            # current `pnpm-lock.yaml`; nix rebuilds it whenever the
+            # lockfile changes. First-time hash discovery: set
+            # `hash = lib.fakeHash`, run a build, copy the suggested
+            # hash from the nix error.
+            pnpmDeps = pkgs.pnpm.fetchDeps {
+              pname = "junius";
+              src = ./.;
+              # `fetcherVersion = 3` is the current nixpkgs-recommended
+              # one (the 2 → 3 deprecation lands in 26.11).
+              fetcherVersion = 3;
+              hash = "sha256-gbALDqmSIHDcjkQYjYwbTlg5u3yEsyh9mEa58g8i2gA=";
+            };
+
+            # Built SPA assets, baked into the `full` juniusd binary via
+            # `rust-embed`. Pure nix derivation: deps come from the
+            # hermetic `pnpmDeps` cache, build runs in the nix sandbox.
+            frontend-bundle = pkgs.stdenvNoCC.mkDerivation {
+              pname = "junius-frontend";
+              version = "0.0.0";
+              src = ./.;
+              nativeBuildInputs = [
+                pkgs.nodejs_24
+                pkgs.pnpm
+                pkgs.pnpm.configHook
+              ];
+              inherit pnpmDeps;
+              buildPhase = ''
+                runHook preBuild
+                pnpm --filter @junius/shell build
+                runHook postBuild
+              '';
+              installPhase = ''
+                runHook preInstall
+                mkdir -p $out
+                cp -r platform/frontend/dist $out/dist
+                runHook postInstall
+              '';
+            };
+
+            # SSR bundle for the M23 `frontend` image. Same hermetic
+            # deps; produces `dist/client/` + `dist/server/` plus the
+            # full pnpm-workspace tree (source + node_modules) the
+            # runtime needs to resolve cross-package imports via tsx.
+            frontend-ssr-bundle = pkgs.stdenvNoCC.mkDerivation {
+              pname = "junius-frontend-ssr";
+              version = "0.0.0";
+              src = ./.;
+              nativeBuildInputs = [
+                pkgs.nodejs_24
+                pkgs.pnpm
+                pkgs.pnpm.configHook
+              ];
+              inherit pnpmDeps;
+              buildPhase = ''
+                runHook preBuild
+                pnpm --filter @junius/shell-ssr build
+                runHook postBuild
+              '';
+              # The Node runtime runs `node --import tsx src/server.ts`,
+              # which imports `@junius/shell/*` etc. via the pnpm
+              # workspace's `.pnpm/node_modules/@junius/*` symlinks.
+              # Those links point at the package source directories
+              # (packages/, plugins/*/frontend, platform/frontend{,
+              # -ssr}), so the runtime needs the whole workspace
+              # tree on disk — not just `platform/frontend-ssr/`.
+              # `noBrokenSymlinks` enforces this; we ship the lot.
+              installPhase = ''
+                runHook preInstall
+                mkdir -p $out
+                cp -r package.json pnpm-workspace.yaml pnpm-lock.yaml $out/
+                cp -r packages plugins platform node_modules $out/
+                runHook postInstall
+              '';
+              # `dontFixup = true` skips the stdenv's strip/patchelf
+              # pass: there are no ELF binaries to fix up here, and
+              # the pass otherwise descends into the huge node_modules
+              # tree.
+              dontFixup = true;
+            };
+
+            # `full` image: juniusd with the SPA embedded via
+            # `rust-embed`. Staged with the nix-built FE bundle dropped
+            # into `platform/frontend/dist/` so cargo's build script
+            # picks it up.
+            juniusd-static = (mkBin {
+              pname = "juniusd";
+              cargoExtraArgs = "--locked -p platform --features embed-frontend";
+            }).overrideAttrs (old: {
+              # Inject the FE bundle into the cargo source tree before
+              # cargo's build script runs.
+              postUnpack = ''
+                cp -r ${frontend-bundle}/dist source/platform/frontend/dist
+                chmod -R u+w source/platform/frontend/dist
+              '';
+            });
+
+            # `backend` image: juniusd without the embedded SPA.
+            juniusd-headless-static = mkBin {
+              pname = "juniusd";
+              cargoExtraArgs = "--locked -p platform";
+            };
+
+            # Trimmed in-container CLI: drops source-build commands
+            # (Build/Cache/Plugin {Enable,Disable}) and dev-tree-only
+            # commands (Sync/Dev/New/Rpc) so the image carries only
+            # check/migrate/plugin {list,info}/i18n/provision.
+            junius-static = mkBin {
+              pname = "junius";
+              cargoExtraArgs = "--locked -p junius --no-default-features";
+            };
+          in {
+            inherit
+              juniusd-static juniusd-headless-static junius-static
+              frontend-bundle frontend-ssr-bundle pnpmDeps;
+            # Default `nix build` → headless juniusd. Picked because it's
+            # the fastest probe (no FE bundle prep required).
+            default = juniusd-headless-static;
+          }
+        else { });
     };
 }

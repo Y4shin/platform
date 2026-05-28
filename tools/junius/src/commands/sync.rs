@@ -136,18 +136,21 @@ pub(crate) fn run_in(
         &plugins,
         dry_run,
         format,
+        false,
     )
 }
 
 /// M24 bundle-all variant of `run_in`: skip the deployment-toml read and
 /// link every plugin under `<source_root>/plugins/` instead. Used by the
-/// precompiled-image Docker builds.
+/// precompiled-image Docker builds — `skip_subprocesses=true` because the
+/// `buf generate` / `pnpm install` follow-ups serve downstream typechecks
+/// in the source tree; the image build invokes those itself when needed.
 fn run_in_bundle_all(source_root: &Path, dry_run: bool, format: OutputFormat) -> i32 {
     let plugins = match resolve_all_plugins(source_root) {
         Ok(p) => p,
         Err(code) => return code,
     };
-    apply_codegen(source_root, "(bundle-all)", &plugins, dry_run, format)
+    apply_codegen(source_root, "(bundle-all)", &plugins, dry_run, format, true)
 }
 
 #[allow(
@@ -160,6 +163,7 @@ fn apply_codegen(
     plugins: &[ResolvedPlugin],
     dry_run: bool,
     format: OutputFormat,
+    skip_subprocesses: bool,
 ) -> i32 {
     let mut changes = Vec::new();
 
@@ -248,8 +252,11 @@ fn apply_codegen(
     // M16 item A: run the codegen / dep-install subprocesses that downstream
     // typechecks depend on, but only when the corresponding managed file
     // actually changed (not every sync run). Skipped in dry-run mode so a
-    // CI drift check stays read-only.
-    if !dry_run {
+    // CI drift check stays read-only. M24: also skipped under `--bundle-all`
+    // — the precompiled-image Docker builds invoke `pnpm install` + `pnpm
+    // shell build` themselves; the BE-only image doesn't ship pnpm/buf at
+    // all and doesn't need TS proto codegen anyway.
+    if !dry_run && !skip_subprocesses {
         let buf_yaml_changed = changes
             .iter()
             .any(|c| c.path == BUF_YAML && c.kind != "unchanged");
