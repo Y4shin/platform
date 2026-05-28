@@ -7,16 +7,17 @@ Junius management CLI
 Usage: junius [OPTIONS] <COMMAND>
 
 Commands:
-  check    Validate manifests against the schema and semantic rules
-  sync     Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config. (Source-tree-only — gated behind the `develop` feature.)
-  build    Build a deployment binary
-  dev      One-command developer loop. (Source-tree-only — gated behind `develop`.)
-  migrate  Apply database migrations and emit per-plugin Postgres role grants
-  plugin   Plugin inspection and lifecycle
-  cache    Manage the junius source cache (`~/.cache/junius`)
-  new      Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
-  i18n     Inspect and validate per-plugin i18n catalogs (M14)
-  rpc      `#[rpc_service]` codemods (M15). Source-tree-only
+  check      Validate manifests against the schema and semantic rules
+  sync       Rewrite derived files (`platform/src/generated/plugins.rs` and the `junius managed` regions of `Cargo.toml`s) so they match the deployment config. (Source-tree-only — gated behind the `develop` feature.)
+  build      Build a deployment binary. (Source-build only — gated behind `source-build`.)
+  dev        One-command developer loop. (Source-tree-only — gated behind `develop`.)
+  migrate    Apply database migrations and emit per-plugin Postgres role grants
+  plugin     Plugin inspection and lifecycle
+  cache      Manage the junius source cache (`~/.cache/junius`). (Source-build only — gated behind `source-build`.)
+  new        Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
+  i18n       Inspect and validate per-plugin i18n catalogs (M14)
+  provision  Apply the deployment's declarative provisioning (M18 Stage D)
+  rpc        `#[rpc_service]` codemods (M15). Source-tree-only
 
 Options:
       --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]

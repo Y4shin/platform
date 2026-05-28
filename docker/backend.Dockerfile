@@ -11,7 +11,14 @@ ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot
 
 # ---------- Stage 1: rust-only builder (no node, no buf) -------------------
 FROM rust:${RUST_VERSION} AS builder
-ENV CARGO_TERM_COLOR=always
+ENV CARGO_TERM_COLOR=always \
+    DEBIAN_FRONTEND=noninteractive
+# `build-essential` ships gcc + binutils (ld); `rust:<ver>-bookworm` doesn't
+# include them by default and cargo's native-dep crates need both to link.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential pkg-config libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY . .
 # Backend-only image: skip the FE build. `--bundle-all` still produces the

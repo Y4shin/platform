@@ -11,6 +11,7 @@ Options:
       --plugin <PLUGIN>  Scope to a single plugin. (Not yet implemented — planned for M09.)
       --dry-run          Report pending changes without writing. Exits 1 if anything would change, 0 if everything is already in sync. Useful as a CI drift check
   -v, --verbose...       Increase verbosity (repeat for more)
-      --config <CONFIG>  Path to the deployment's `platform.toml`. Defaults to `./platform.toml`
+      --config <CONFIG>  Path to the deployment's `platform.toml`. Defaults to `./platform.toml`. Ignored when `--bundle-all` is set
       --cwd <CWD>        Run as if junius were started in <CWD>
+      --bundle-all       M24: bundle every plugin under `plugins/<name>/plugin.toml` in the source tree, ignoring `[plugins].enabled` (and `--config` entirely). Used by the precompiled-image Docker builds so the resulting image links every monorepo plugin
   -h, --help             Print help
