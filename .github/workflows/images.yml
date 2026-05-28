@@ -1,0 +1,114 @@
+# M24 — build + publish the three precompiled container images on every
+# push to `main`. Pull requests build the images as a smoke check but
+# don't push; `workflow_dispatch` lets a maintainer trigger a manual
+# rebuild without a merge.
+#
+# Deferred to a follow-up commit (out of M24 scope per the plan):
+#   - cosign keyless signing (needs `id-token: write` + OIDC trust setup);
+#   - linux/arm64 multi-arch (amd64 only for now).
+#
+# Cache backend: `type=gha,scope=<variant>` so cold-start CI builds reuse
+# the previous run's layers per image variant.
+
+name: images
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [full, backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        env:
+          OWNER: ${{ github.repository_owner }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -eu
+          owner_lc=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          sha_short="${GITHUB_SHA::7}"
+          image="ghcr.io/$owner_lc/junius-$VARIANT"
+          {
+            echo "image=$image"
+            echo "sha_tag=$image:$sha_short"
+            echo "latest_tag=$image:latest"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build (PR — smoke only, no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.variant }}.Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: false
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,scope=${{ matrix.variant }},mode=max
+          tags: ${{ steps.tags.outputs.sha_tag }}
+
+      - name: Build + push (main, manual)
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.variant }}.Dockerfile
+          platforms: linux/amd64
+          push: true
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,scope=${{ matrix.variant }},mode=max
+          tags: |
+            ${{ steps.tags.outputs.sha_tag }}
+            ${{ steps.tags.outputs.latest_tag }}
+
+  smoke:
+    # Pulls the just-pushed `full` image and verifies it can parse a stock
+    # `platform.toml` (`juniusd --check-config`). Catches a silently-broken
+    # image before it sits at `:latest`. Skipped on PRs (no push happened).
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute full image tag
+        id: tags
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -eu
+          owner_lc=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          sha_short="${GITHUB_SHA::7}"
+          echo "full_image=ghcr.io/$owner_lc/junius-full:$sha_short" >> "$GITHUB_OUTPUT"
+      - name: Pull + check-config the `full` image
+        env:
+          IMAGE: ${{ steps.tags.outputs.full_image }}
+        run: |
+          set -eu
+          docker pull "$IMAGE"
+          docker run --rm \
+            -v "$PWD/examples/example-deployment-precompiled/full/platform.toml:/etc/junius/platform.toml:ro" \
+            "$IMAGE" --check-config

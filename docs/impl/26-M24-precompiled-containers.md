@@ -1,14 +1,41 @@
 # 26. M24 — Optional precompiled container mode
 
-> **Status:** 🚧 planned. **★ Top priority** — alongside
-> [M23](25-M23-optional-ssr.md), this milestone jumps the queue ahead
-> of M18–M22. **Depends on M23** for the `frontend` (SSR Node) and
-> `backend` (headless `juniusd`) build modes; the `full` image is
-> independent and could ship first if M23 slips.
+> **Status:** ✅ implemented (pending first live CI run). **★ Top
+> priority** — alongside [M23](25-M23-optional-ssr.md), this
+> milestone jumped the queue ahead of M18–M22. Depends on M23 for the
+> `frontend` (SSR Node) and `backend` (headless `juniusd`) build
+> modes.
 >
 > No plugin-API change. The `Plugin` trait, manifests, SDK — all
-> unchanged. The change is an **additional deployment path**: pull a
+> unchanged. M24 adds an **additional deployment path**: pull a
 > prebuilt image instead of running `junius build`.
+>
+> What landed: `junius sync --bundle-all` (Stage 1); `[build] mode =
+> "source" | "precompiled"` on the existing `[build]` block +
+> `JUNIUS_MODE` env override + a boot-time bundle/config check that
+> refuses to start on a mismatch (Stage 2); a decision-log audit
+> confirming every `junius sync` artifact is plugin-set-only and
+> bundle-all needs no refactor (Stage 3); a new `source-build` cargo
+> feature gating `Build`/`Cache`/`Plugin {Enable,Disable}` so the
+> in-container CLI carries only the runtime-relevant commands
+> (Stage 4); three Dockerfiles in `docker/{full,backend,frontend}.Dockerfile`
+> + a `/healthz` route on both BE and FE (Stage 5); a GHA workflow
+> publishing to `ghcr.io/<owner>/junius-<variant>:{latest,<short-sha>}`
+> on every push to `main`, plus two example deployments
+> (`examples/example-deployment-precompiled/{full,split}/`) and
+> updated design docs (Stage 6).
+>
+> Two doc-recorded deviations from the original spec:
+> - **`[build] mode`** lives on the existing `[build]` block (not a
+>   new `[platform]` section) — colocates with the M23-added
+>   `[build] frontend` knob.
+> - **`/healthz`** instead of the doc's `/h/health`. The `/h/<name>/`
+>   prefix is reserved per-plugin; `/healthz` is the standard
+>   convention and needs no rule change.
+>
+> Deferred into a future M25 followups doc: cosign keyless signing,
+> linux/arm64 multi-arch, `junius doctor` (bundle/config diff CLI),
+> nightly precompiled-E2E run.
 
 One-line goal: ship three official Docker images (`full`, `frontend`,
 `backend`) built on every push to `main`, each bundling **every plugin

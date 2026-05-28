@@ -170,3 +170,34 @@ junius/dev/
 ```
 
 `junius dev` defaults to using `dev/platform.toml` if no `--config` is passed. This is a developer convenience, not a real deployment.
+
+## 5.6 Precompiled deployment path (M24)
+
+Source-build (§5.5) is the v1 default and remains supported. M24 adds a **second supported deployment path**: pull a prebuilt container image from `ghcr.io` and drop in a `platform.toml`. No Rust / Node / buf toolchain on the deployment host.
+
+Three image variants are published on every push to `main`:
+
+- `junius-full` — `juniusd` with `--features embed-frontend`, all monorepo plugins, single-container topology.
+- `junius-backend` — headless `juniusd` (no embedded SPA), all monorepo plugins. Pairs with the SSR FE container.
+- `junius-frontend` — the M23 SSR Node server with every plugin frontend bundled. Pairs with `junius-backend`.
+
+Tagged `<variant>-latest` (follows `main`) and `<variant>-<short-sha>` (immutable; pin in production).
+
+### "Bundle IS the active set"
+
+Precompiled images bundle **every monorepo plugin**. `[plugins].enabled` in the deployment's `platform.toml` must match the bundled set exactly — the boot check (`JUNIUS_MODE=precompiled`, set by the image entrypoint) refuses to start on a mismatch and names every missing/extra plugin. Two escape hatches:
+
+1. Add the missing plugins to `[plugins].enabled` (the usual response when the monorepo grows a new plugin and you've bumped your image tag).
+2. Drop back to source-build (§5.5) if you want a subset.
+
+Runtime plugin selection in the precompiled mode is intentionally deferred — it duplicates the cross-plugin RPC graph as a runtime check and complicates the boot path. The source-build escape hatch covers the case.
+
+### When to pick which
+
+| Need | Path |
+|---|---|
+| Custom or forked plugins; subset of the monorepo set | Source-build (§5.5) |
+| Stock plugin set, no build toolchain on deployment hosts, fastest path from `git pull` to running | Precompiled `full` |
+| Stock plugin set + SSR for first-paint / CDN-fronted FE / independent FE/BE scaling | Precompiled `split` (M23 topology) |
+
+The precompiled deployment example is `examples/example-deployment-precompiled/` (split into `full/` and `split/`).

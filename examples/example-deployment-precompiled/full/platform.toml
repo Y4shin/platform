@@ -1,0 +1,43 @@
+# M24 precompiled `full` example deployment. Single-container topology
+# using `ghcr.io/<owner>/junius-full:latest` — `juniusd` with the embedded
+# SPA and every monorepo plugin linked in.
+#
+# `[plugins].enabled` MUST list every plugin bundled into the image (the
+# boot check refuses to start on a mismatch). When a new plugin lands in
+# the monorepo and the image rebuilds, every deployment using `:latest`
+# also needs to update its `enabled` list — pin a `:<sha>` tag in
+# production to control upgrade timing.
+
+# Precompiled images don't consult `[source]`; the field is required by
+# the schema but unused at runtime.
+[source]
+path = "."
+
+[plugins]
+enabled = ["admin", "events"]
+
+[build]
+# Image entrypoint sets `JUNIUS_MODE=precompiled` regardless, but
+# repeating it here is informative and lets `junius check` agree.
+mode = "precompiled"
+
+# Secrets via env vars consumed at compose run-time. Export them in your
+# shell or use a `.env` file alongside `docker-compose.yml`.
+[config]
+database_url           = "postgres://platform_migrator:dev-only@postgres:5432/platform"
+oidc_issuer            = "http://authentik-server:9000/application/o/junius/"
+oidc_client_id         = "platform"
+oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
+session_encryption_key = "env:SESSION_KEY"
+role_password_secret   = "env:ROLE_PW_SECRET"
+oidc_redirect_url      = "http://localhost:18080/api/auth/callback"
+job_workers            = 4
+
+[config.jobs]
+amqp_url = "amqp://guest:guest@rabbitmq:5672/%2f"
+
+[config.otel]
+enabled = false
+
+[config.audit]
+retention_days = 365

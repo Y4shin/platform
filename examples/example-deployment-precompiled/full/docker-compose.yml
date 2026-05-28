@@ -1,0 +1,68 @@
+# M24 precompiled `full`: single-container Junius deployment. Pulls the
+# prebuilt image from ghcr.io — no Rust / Node / buf toolchain needed on
+# the deployment host.
+#
+#   docker compose up
+#
+# Required env (export or use a .env file alongside this docker-compose.yml):
+#   OIDC_CLIENT_SECRET, SESSION_KEY, ROLE_PW_SECRET.
+#
+# Migrations: run once before first boot (or on every release):
+#   docker compose run --rm juniusd junius migrate up
+
+services:
+  juniusd:
+    # Pin a `:<short-sha>` tag in production to control upgrade timing
+    # (`:latest` follows whatever shipped from the last push to `main`).
+    image: ghcr.io/${JUNIUS_OWNER:-junius/junius}/junius-full:${JUNIUS_TAG:-latest}
+    environment:
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      SESSION_KEY: ${SESSION_KEY}
+      ROLE_PW_SECRET: ${ROLE_PW_SECRET}
+    ports:
+      - "18080:18080"
+    volumes:
+      - ./platform.toml:/etc/junius/platform.toml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # `/healthz` is auth-free and returns 200 once the host is bound.
+      # Distroless lacks curl, so the probe runs on the docker host via
+      # `docker compose` — works because the port is published.
+      test: ["CMD", "wget", "-qO-", "http://localhost:18080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: platform_migrator
+      POSTGRES_PASSWORD: dev-only
+      POSTGRES_DB: platform
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform_migrator -d platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Add your IdP (Authentik) using dev/docker-compose.yml as a template; it
+  # was elided here to keep the example focused on the precompiled-image
+  # piece. Real deployments bring their own IdP.
+
+volumes:
+  postgres-data:

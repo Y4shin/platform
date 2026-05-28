@@ -1,0 +1,40 @@
+# M24 precompiled `split` example deployment. Two-container topology
+# (M23) using the prebuilt images:
+#   - `ghcr.io/<owner>/junius-backend:<tag>` (headless juniusd)
+#   - `ghcr.io/<owner>/junius-frontend:<tag>` (SSR Node server)
+#
+# `[plugins].enabled` MUST list every plugin bundled into the image (the
+# boot check refuses to start on a mismatch).
+
+[source]
+path = "."
+
+[plugins]
+enabled = ["admin", "events"]
+
+[build]
+# Headless BE: no embedded SPA. The frontend container serves the browser
+# routes.
+frontend = "none"
+mode     = "precompiled"
+
+[config]
+database_url           = "postgres://platform_migrator:dev-only@postgres:5432/platform"
+oidc_issuer            = "http://authentik-server:9000/application/o/junius/"
+oidc_client_id         = "platform"
+oidc_client_secret     = "env:OIDC_CLIENT_SECRET"
+session_encryption_key = "env:SESSION_KEY"
+role_password_secret   = "env:ROLE_PW_SECRET"
+# Browser-facing OIDC callback — points at the FE container's published
+# port (`:3000`). The FE proxies `/api/auth/*` to the BE.
+oidc_redirect_url      = "http://localhost:3000/api/auth/callback"
+job_workers            = 4
+
+[config.jobs]
+amqp_url = "amqp://guest:guest@rabbitmq:5672/%2f"
+
+[config.otel]
+enabled = false
+
+[config.audit]
+retention_days = 365

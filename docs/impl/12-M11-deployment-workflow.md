@@ -1,6 +1,13 @@
 # M11 — Deployment Workflow + `[source]` Resolution
 
 > **Status:** ✅ Done (2026-05-25).
+>
+> **See also:** [M24 — Precompiled containers](26-M24-precompiled-containers.md)
+> adds an additional deployment path: pull a prebuilt image instead of
+> running `junius build`. Pick source-build (this milestone) when the
+> deployment ships a subset of plugins or a fork; pick precompiled (M24)
+> when the stock plugin set is fine and no Rust/Node toolchain on the
+> deployment host is a hard requirement.
 
 ## Reconciliation (as built)
 
