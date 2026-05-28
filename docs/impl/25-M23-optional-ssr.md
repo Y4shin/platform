@@ -1,9 +1,19 @@
 # 25. M23 — Optional SSR mode (split FE/BE deployment)
 
-> **Status:** 🚧 planned. **★ Top priority** — together with [M24](26-M24-precompiled-containers.md),
+> **Status:** ⏳ in progress. **★ Top priority** — together with [M24](26-M24-precompiled-containers.md),
 > this milestone jumps the queue ahead of M18–M22. M24 depends on this
 > (the `frontend` and `backend` images it ships are the split topology
 > introduced here).
+>
+> Stage 1 (headless BE mode) landed: `[build] frontend = "embedded" |
+> "none"` in `platform.toml` selects between the today-default embedded
+> SPA and a headless API-only binary; `junius build` honours it
+> (drops `--features embed-frontend` + skips the `pnpm shell build`
+> step for `"none"`); the host returns a structured 404 with
+> `FRONTEND_NOT_EMBEDDED` for every browser route when the FE isn't
+> embedded. Stages 2–6 are next: SSR FE host package, API base URL
+> split + cookie forwarding, split-mode dev, deployment example,
+> CI job.
 >
 > No plugin-API change. The `Plugin` trait, `junius-sdk`, `plugin.toml`,
 > the per-plugin `frontend/` shape — all unchanged. The only thing that

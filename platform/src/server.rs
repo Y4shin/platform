@@ -209,7 +209,24 @@ fn build_ctx_map(
 
 #[cfg(not(feature = "embed-frontend"))]
 fn base_app() -> Router {
-    Router::new().route("/", axum::routing::get(|| async { "hello, platform" }))
+    // M23 — headless mode: every browser route returns a structured 404 so a
+    // misrouted request (someone hitting the API tier directly when they
+    // should be hitting the FE container) is obvious. API/RPC/auth routes
+    // are merged on top of this and continue to match first.
+    Router::new().fallback(axum::routing::any(headless_not_found))
+}
+
+#[cfg(not(feature = "embed-frontend"))]
+async fn headless_not_found(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
+    use axum::http::StatusCode;
+    let body = serde_json::json!({
+        "error": "not_found",
+        "code": "FRONTEND_NOT_EMBEDDED",
+        "message": "this juniusd was built without the embedded SPA; \
+                    browser routes are served by the M23 SSR FE container",
+        "path": uri.path(),
+    });
+    (StatusCode::NOT_FOUND, axum::Json(body))
 }
 
 #[cfg(feature = "embed-frontend")]

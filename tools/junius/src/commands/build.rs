@@ -18,7 +18,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use junius_manifest::{
-    DeploymentLock, LockSource, PlatformManifest, PluginManifest, ValidationReport,
+    DeploymentLock, FrontendDelivery, LockSource, PlatformManifest, PluginManifest,
+    ValidationReport,
 };
 
 use crate::cli::{BuildArgs, OutputFormat};
@@ -75,25 +76,24 @@ pub fn run(args: &BuildArgs) -> i32 {
     }
 
     // Step 4: frontend bundle + host binary, built in the source tree.
-    if let Some(code) = run_step(
-        &resolved.root,
-        "pnpm",
-        &["--filter", VITE_PNPM_FILTER, "build"],
-    ) {
-        return code;
+    // M23: `[build] frontend = "none"` produces a headless binary that pairs
+    // with the SSR FE container; the FE bundle isn't built and the
+    // `embed-frontend` cargo feature isn't passed.
+    let frontend = manifest.build.frontend;
+    if matches!(frontend, FrontendDelivery::Embedded) {
+        if let Some(code) = run_step(
+            &resolved.root,
+            "pnpm",
+            &["--filter", VITE_PNPM_FILTER, "build"],
+        ) {
+            return code;
+        }
     }
-    if let Some(code) = run_step(
-        &resolved.root,
-        "cargo",
-        &[
-            "build",
-            "-p",
-            "platform",
-            "--release",
-            "--features",
-            "embed-frontend",
-        ],
-    ) {
+    let mut cargo_args: Vec<&str> = vec!["build", "-p", "platform", "--release"];
+    if matches!(frontend, FrontendDelivery::Embedded) {
+        cargo_args.extend_from_slice(&["--features", "embed-frontend"]);
+    }
+    if let Some(code) = run_step(&resolved.root, "cargo", &cargo_args) {
         return code;
     }
 

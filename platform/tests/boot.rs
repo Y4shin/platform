@@ -11,7 +11,10 @@ use platform::server;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn root_returns_hello() {
+async fn root_returns_headless_404() {
+    // M23 Stage 1: with `embed-frontend` off, browser routes (including `/`)
+    // return a structured 404 so a misrouted request is obvious. The SPA
+    // is served by the M23 SSR FE container, not by juniusd.
     let app = server::build_app(&[]);
 
     let response = app
@@ -19,9 +22,11 @@ async fn root_returns_hello() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), 200);
-    let body = to_bytes(response.into_body(), 1024).await.unwrap();
-    assert_eq!(&body[..], b"hello, platform");
+    assert_eq!(response.status(), 404);
+    let body = to_bytes(response.into_body(), 4096).await.unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(parsed["code"], "FRONTEND_NOT_EMBEDDED");
+    assert_eq!(parsed["path"], "/");
 }
 
 #[tokio::test]
@@ -59,15 +64,14 @@ async fn server_run_binds_and_serves() {
             .unwrap();
     });
 
-    let body = reqwest::Client::new()
+    let response = reqwest::Client::new()
         .get(format!("http://{local}/"))
         .send()
         .await
-        .unwrap()
-        .text()
-        .await
         .unwrap();
-    assert_eq!(body, "hello, platform");
+    assert_eq!(response.status(), 404);
+    let parsed: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(parsed["code"], "FRONTEND_NOT_EMBEDDED");
 
     let _ = shutdown_tx.send(());
     tokio::time::timeout(std::time::Duration::from_secs(2), handle)

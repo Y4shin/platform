@@ -18,6 +18,33 @@ pub struct PlatformManifest {
     /// `junius provision apply` (and at host boot, hash-guarded).
     #[serde(default)]
     pub provisioning: Option<crate::provisioning::ProvisioningConfig>,
+    /// M23 — deployment build knobs: today, whether `junius build`
+    /// produces a binary with the SPA embedded (default) or a headless
+    /// API-only binary that pairs with the M23 SSR FE container.
+    #[serde(default)]
+    pub build: BuildConfig,
+}
+
+/// `[build]` block on `platform.toml` (M23).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BuildConfig {
+    /// How the deployment ships its frontend. `"embedded"` (default) bundles
+    /// the SPA into `juniusd` via `rust-embed`; `"none"` produces a
+    /// headless API-only binary that returns a structured 404 on browser
+    /// routes — pair it with the M23 SSR FE container.
+    #[serde(default)]
+    pub frontend: FrontendDelivery,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FrontendDelivery {
+    /// SPA assets embedded in the host binary (the today-default).
+    #[default]
+    Embedded,
+    /// No FE in the host binary; an external SSR/static container serves it.
+    None,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
