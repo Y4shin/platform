@@ -30,6 +30,9 @@ role_password_secret   = "env:ROLE_PW_SECRET"
 # Vite forwards /api → juniusd (:18080). Must match a redirect_uri registered in
 # dev/authentik/blueprints/junius.yaml. Omit in prod to derive it from bind_addr.
 oidc_redirect_url      = "http://localhost:5173/api/auth/callback"
+# Bearer token gating the admin OIDC-resync RPC (`junius oidc resync`, M18).
+# Optional — omit to disable the admin sweep. `file:`/`env:` secret refs apply.
+admin_api_token        = "dev-only-admin-token"
 # Job worker concurrency (M10).
 job_workers            = 4
 

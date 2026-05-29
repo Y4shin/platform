@@ -11,6 +11,7 @@ pub mod i18n;
 pub mod migrate;
 #[cfg(feature = "develop")]
 pub mod new;
+pub mod oidc_resync;
 pub mod plugin_cmd;
 pub mod provision;
 #[cfg(feature = "develop")]

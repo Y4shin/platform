@@ -83,6 +83,11 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: ProvisionCmd,
     },
+    /// OIDC group operations against a running `juniusd` (M18).
+    Oidc {
+        #[command(subcommand)]
+        subcommand: OidcCmd,
+    },
     /// `#[rpc_service]` codemods (M15). Source-tree-only.
     #[cfg(feature = "develop")]
     Rpc {
@@ -228,6 +233,31 @@ pub enum ProvisionCmd {
     Diff {
         #[arg(long)]
         config: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum OidcCmd {
+    /// Force an OIDC-group re-sync for one or all users, by calling the running
+    /// `juniusd`'s admin sweep (`user.v1.UserService.ResyncOidcGroups`). The
+    /// host does the token decryption + `userinfo` call + reconcile; this is a
+    /// thin client. Requires the deployment's `admin_api_token`.
+    Resync {
+        /// Resync a single user by email, OIDC subject, or platform user UUID.
+        /// Mutually exclusive with `--all`.
+        #[arg(long, conflicts_with = "all")]
+        user: Option<String>,
+        /// Resync every user that has a live session carrying a stored token.
+        #[arg(long)]
+        all: bool,
+        /// Path to the deployment's `platform.toml` (for `admin_api_token` and
+        /// the default base URL). Defaults to `./platform.toml`.
+        #[arg(long)]
+        config: Option<PathBuf>,
+        /// Base URL of the running juniusd. Defaults to the config's bind
+        /// address (`http://localhost:<port>`).
+        #[arg(long)]
+        url: Option<String>,
     },
 }
 

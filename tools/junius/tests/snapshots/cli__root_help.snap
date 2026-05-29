@@ -17,6 +17,7 @@ Commands:
   new        Scaffold new plugins, components, RPC services, migrations, permissions. (Source-tree-only — gated behind the `develop` feature.)
   i18n       Inspect and validate per-plugin i18n catalogs (M14)
   provision  Apply the deployment's declarative provisioning (M18 Stage D)
+  oidc       OIDC group operations against a running `juniusd` (M18)
   rpc        `#[rpc_service]` codemods (M15). Source-tree-only
 
 Options:

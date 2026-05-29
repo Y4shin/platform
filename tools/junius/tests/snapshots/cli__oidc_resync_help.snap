@@ -1,0 +1,17 @@
+---
+source: tools/junius/tests/cli.rs
+expression: stdout
+---
+Force an OIDC-group re-sync for one or all users, by calling the running `juniusd`'s admin sweep (`user.v1.UserService.ResyncOidcGroups`). The host does the token decryption + `userinfo` call + reconcile; this is a thin client. Requires the deployment's `admin_api_token`
+
+Usage: junius oidc resync [OPTIONS]
+
+Options:
+      --format <FORMAT>  Output format for command results [default: plain] [possible values: plain, json]
+      --user <USER>      Resync a single user by email, OIDC subject, or platform user UUID. Mutually exclusive with `--all`
+      --all              Resync every user that has a live session carrying a stored token
+  -v, --verbose...       Increase verbosity (repeat for more)
+      --config <CONFIG>  Path to the deployment's `platform.toml` (for `admin_api_token` and the default base URL). Defaults to `./platform.toml`
+      --cwd <CWD>        Run as if junius were started in <CWD>
+      --url <URL>        Base URL of the running juniusd. Defaults to the config's bind address (`http://localhost:<port>`)
+  -h, --help             Print help

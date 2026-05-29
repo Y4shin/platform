@@ -40,6 +40,9 @@ tokio              = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
+# M18 `junius oidc resync` is a thin Connect-JSON client to a running juniusd.
+reqwest  = { workspace = true }
+
 # Migration runner (M06)
 sqlx     = { workspace = true }
 sha2     = { workspace = true }

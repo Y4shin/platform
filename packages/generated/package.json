@@ -8,6 +8,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./host/rpc": "./src/host/rpc.ts",
     "./*/rpc": "./src/plugins/*/rpc.ts",
     "./proto/*": "./src/proto/*"
   },

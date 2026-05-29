@@ -51,6 +51,18 @@ fn plugin_help_snapshot() {
 }
 
 #[test]
+fn oidc_resync_help_snapshot() {
+    let output = cmd()
+        .args(["oidc", "resync", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    insta::assert_snapshot!("oidc_resync_help", stdout);
+}
+
+#[test]
 fn sync_help_snapshot() {
     let output = cmd()
         .args(["sync", "--help"])
