@@ -34,10 +34,39 @@
         let
           pkgs = pkgsFor system;
           rustToolchain = rustToolchainFor pkgs;
+
+          # `fgj` — Forgejo/Codeberg client CLI (issues, PRs, Actions),
+          # the `gh` equivalent for our Codeberg-hosted forks/mirrors.
+          # NOT in nixpkgs: nixpkgs ships `forgejo-cli` (the `fj` tool),
+          # which lacks Actions support — so we build romaintb/fgj from
+          # source here. Plain `go build`; version is baked into
+          # cmd/root.go, so no ldflags. Bump `version` + both hashes to
+          # upgrade (vendorHash via `lib.fakeHash` + rebuild to discover).
+          fgj = pkgs.buildGoModule rec {
+            pname = "fgj";
+            version = "0.4.0";
+            src = pkgs.fetchFromGitea {
+              domain = "codeberg.org";
+              owner = "romaintb";
+              repo = "fgj";
+              rev = "v${version}";
+              hash = "sha256-7/ITo+8QCj/hy4xlOw+kfjnJbHTWjGh+VYOZxvqghAQ=";
+            };
+            vendorHash = "sha256-ZBdSSif9YFpFyBQNpZ/XttVw/dgDS54L+0ZA+9ObSSg=";
+            # Functional tests need a live Forgejo instance; skip in build.
+            doCheck = false;
+            meta.mainProgram = "fgj";
+          };
         in {
           default = pkgs.mkShell {
             packages = [
               rustToolchain
+
+              # Forge CLIs for the feature-workflow skills (.claude/skills/): the
+              # skills detect the git remote and use `gh` for GitHub or `fgj` for
+              # Forgejo/Codeberg. `fgj` is the derivation above; `gh` ships in nixpkgs.
+              fgj
+              pkgs.gh
 
               # JS / TS toolchain — versions pinned in package.json + rust-toolchain.toml
               # match what's expected in CI.
