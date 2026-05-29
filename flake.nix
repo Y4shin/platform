@@ -77,6 +77,15 @@
               # `task` (go-task) runs the repo's many verification surfaces
               # (cargo, vitest, biome, buf, junius check) from one Taskfile.
               pkgs.go-task
+
+              # Playwright browsers from nixpkgs. The npm-downloaded browsers
+              # are prebuilt against an FHS dynamic loader and can't launch on
+              # NixOS (they die at startup — "Target closed"), so the M17 E2E
+              # suite needs the nixpkgs-built, patchelf'd browsers. The npm
+              # `@playwright/test` version is pinned in package.json to match
+              # this driver so the browser revisions line up.
+              # See https://wiki.nixos.org/wiki/Playwright.
+              pkgs.playwright-driver.browsers
             ];
 
             shellHook = ''
@@ -85,6 +94,15 @@
               # building from a `git archive` tarball).
               if [ -d .git ]; then
                 lefthook install >/dev/null
+              fi
+
+              # Point Playwright at the nixpkgs browsers — only on NixOS,
+              # where the npm-downloaded browsers can't run. On Ubuntu CI
+              # (no /etc/NIXOS) this stays unset so `playwright install`
+              # keeps downloading FHS-compatible browsers as before.
+              if [ -e /etc/NIXOS ]; then
+                export PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}"
+                export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
               fi
 
               echo "── Junius dev shell ──"

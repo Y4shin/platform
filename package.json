@@ -21,7 +21,7 @@
     "@junius/e2e": "workspace:*",
     "@lingui/cli": "^5.9.5",
     "@lingui/vite-plugin": "^5.9.5",
-    "@playwright/test": "^1.49.0",
+    "@playwright/test": "1.59.1",
     "babel-plugin-macros": "^3.1.0",
     "tsx": "^4.19.0",
     "typescript": "5.6.3"
