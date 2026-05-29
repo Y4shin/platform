@@ -27,6 +27,9 @@ junius-provision = { workspace = true }
 
 axum               = { workspace = true }
 connectrpc         = { workspace = true }
+buffa              = { workspace = true }
+buffa-types        = { workspace = true }
+http-body          = { workspace = true }
 tokio              = { workspace = true }
 tower              = { workspace = true }
 anyhow             = { workspace = true }
@@ -76,6 +79,10 @@ mime_guess = { workspace = true, optional = true }
 events-plugin = { path = "../plugins/events" }
 admin-plugin = { path = "../plugins/admin" }
 # <<< junius managed end
+
+[build-dependencies]
+connectrpc-build = { workspace = true }
+junius-rpc-meta  = { workspace = true }
 
 [dev-dependencies]
 http = { workspace = true }

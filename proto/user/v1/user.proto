@@ -1,0 +1,55 @@
+// Host-owned UserService (M18). The first Connect-RPC surface the platform
+// hosts itself rather than a plugin — it carries the off-login OIDC-group
+// refresh triggers:
+//   * RefreshOidcGroups — the authenticated caller's self-refresh (the typed
+//     twin of `POST /api/me/refresh-groups`), driven by the frontend.
+//   * ResyncOidcGroups — an ops sweep over one or all users, driven by
+//     `junius oidc resync`, gated by the deployment's `admin_api_token`.
+//
+// Auth is enforced in-handler via the SDK `HostCtx` (session user for
+// self-refresh; the admin-token marker for the sweep), so neither method
+// declares `(platform.v1.requires)`.
+syntax = "proto3";
+
+package user.v1;
+
+// Reconcile counts for one user — how many OIDC groups the userinfo claim
+// carried, and how many `managed_by='oidc'` memberships were added / reaped.
+message ReconcileResult {
+  uint32 oidc_groups_claimed = 1;
+  uint32 memberships_added   = 2;
+  uint32 memberships_reaped  = 3;
+}
+
+message RefreshOidcGroupsRequest {}
+
+message ResyncOidcGroupsRequest {
+  // Target a single user by email, OIDC subject, or platform user UUID.
+  optional string user = 1;
+  // Refresh every user that has a live session carrying a stored OIDC token.
+  bool all = 2;
+}
+
+// Per-user outcome in an admin sweep. Exactly one of `result` / `skipped` is
+// set: `result` when the user was reconciled, `skipped` with a human-readable
+// reason (e.g. "no active session") otherwise.
+message UserReconcileResult {
+  string user_id = 1;
+  string email   = 2;
+  optional ReconcileResult result  = 3;
+  optional string          skipped = 4;
+}
+
+message ResyncOidcGroupsResponse {
+  repeated UserReconcileResult results = 1;
+}
+
+service UserService {
+  // Re-pull the authenticated caller's OIDC `groups` claim and reconcile their
+  // `managed_by='oidc'` memberships against it. Session-authed.
+  rpc RefreshOidcGroups(RefreshOidcGroupsRequest) returns (ReconcileResult);
+
+  // Ops sweep: reconcile one user (`user`) or all users with a live token
+  // (`all`). Gated by the deployment's `admin_api_token`.
+  rpc ResyncOidcGroups(ResyncOidcGroupsRequest) returns (ResyncOidcGroupsResponse);
+}

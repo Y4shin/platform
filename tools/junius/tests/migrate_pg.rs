@@ -80,6 +80,7 @@ fn config(database_url: String) -> ResolvedConfig {
         role_password_secret: ROLE_SECRET.into(),
         bind_addr: None,
         oidc_redirect_url: None,
+        admin_api_token: None,
         default_locale: None,
         jobs: None,
         job_workers: 4,

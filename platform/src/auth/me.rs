@@ -13,7 +13,6 @@ use junius_sdk::{CurrentUser, Locale, MaybeUser};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::AuthState;
-use crate::auth::crypto;
 use crate::auth::oidc_groups;
 
 pub async fn handler(MaybeUser(user): MaybeUser) -> Response {
@@ -75,13 +74,10 @@ pub struct RefreshGroupsResponse {
 /// must be authenticated; no other gate. Returns the reconciler's
 /// counters as JSON.
 ///
-/// Why a raw `reqwest` call to `userinfo` (not `openidconnect`'s typed API):
-/// `CoreClient::user_info` returns `UserInfoClaims<EmptyAdditionalClaims,
-/// _>` which doesn't expose the `groups` claim without changing the
-/// `AdditionalClaims` type parameter (a much bigger refactor across the
-/// auth module). The raw call costs us nothing — the access token is
-/// already trusted, the URL was discovered by `build_client`, and JSON
-/// extraction is a one-liner.
+/// The token fetch + claim extraction is the shared
+/// [`oidc_groups::fetch_oidc_groups`] helper (also used by the host
+/// `UserService` RPC); this handler just maps its error to an HTTP status and
+/// then reconciles.
 pub async fn refresh_groups(
     State(state): State<AuthState>,
     CurrentUser(user): CurrentUser,
@@ -94,86 +90,13 @@ pub async fn refresh_groups(
             .into_response();
     };
 
-    // The caller's most recent active session carries the stored access
-    // token. Decrypt and use it to call userinfo. If the token has expired
-    // we surface 401 + a re-login hint; the alternative (silently doing
-    // nothing) leaves the operator confused.
-    let row = match sqlx::query_as::<_, (Option<Vec<u8>>,)>(
-        "SELECT oidc_tokens FROM platform.session \
-         WHERE user_id = $1 AND expires_at > now() \
-         ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(user.id.0)
-    .fetch_optional(&state.pool)
-    .await
-    {
-        Ok(Some(r)) => r,
-        Ok(None) => {
-            return (StatusCode::UNAUTHORIZED, "no active session").into_response();
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "session lookup failed");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "session lookup failed").into_response();
-        }
-    };
-    let Some(token_blob) = row.0 else {
-        return (
-            StatusCode::UNAUTHORIZED,
-            "no stored OIDC tokens on this session; please re-login",
-        )
-            .into_response();
-    };
-    let Some(access_bytes) = crypto::decrypt(&state.cipher, &token_blob) else {
-        tracing::error!("decrypting stored OIDC tokens failed");
-        return (StatusCode::INTERNAL_SERVER_ERROR, "token decryption failed").into_response();
-    };
-    let access_token = String::from_utf8_lossy(&access_bytes).into_owned();
-
-    // userinfo HTTP GET. Bearer auth, JSON response. A 401 from the IdP
-    // means the access token has expired — the caller needs to re-login.
-    let client = reqwest::Client::new();
-    let resp = match client
-        .get(&userinfo_url)
-        .bearer_auth(&access_token)
-        .send()
-        .await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!(error = %e, "userinfo request failed");
-            return (StatusCode::BAD_GATEWAY, "userinfo request failed").into_response();
-        }
-    };
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        return (
-            StatusCode::UNAUTHORIZED,
-            "OIDC access token expired; please re-login",
-        )
-            .into_response();
-    }
-    if !resp.status().is_success() {
-        return (
-            StatusCode::BAD_GATEWAY,
-            format!("userinfo returned {}", resp.status()),
-        )
-            .into_response();
-    }
-    let body: serde_json::Value = match resp.json().await {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::error!(error = %e, "userinfo response not JSON");
-            return (StatusCode::BAD_GATEWAY, "userinfo response not JSON").into_response();
-        }
-    };
-    let oidc_groups: Vec<String> = body
-        .get(oidc_groups::DEFAULT_GROUPS_CLAIM)
-        .and_then(serde_json::Value::as_array)
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
+    let oidc_groups =
+        match oidc_groups::fetch_oidc_groups(&state.pool, &state.cipher, &userinfo_url, user.id.0)
+            .await
+        {
+            Ok(groups) => groups,
+            Err(e) => return fetch_error_response(&e),
+        };
 
     let summary =
         match oidc_groups::reconcile_memberships(&state.pool, user.id.0, &oidc_groups).await {
@@ -189,4 +112,35 @@ pub async fn refresh_groups(
         memberships_reaped: summary.memberships_reaped,
     })
     .into_response()
+}
+
+/// Map a [`oidc_groups::FetchGroupsError`] to the REST self-refresh response.
+/// A 401 means "re-login" (no session / no token / expired); 5xx is ours.
+fn fetch_error_response(e: &oidc_groups::FetchGroupsError) -> Response {
+    use oidc_groups::FetchGroupsError as E;
+    match e {
+        E::NoActiveSession => (StatusCode::UNAUTHORIZED, "no active session").into_response(),
+        E::NoStoredToken => (
+            StatusCode::UNAUTHORIZED,
+            "no stored OIDC tokens on this session; please re-login",
+        )
+            .into_response(),
+        E::TokenExpired => (
+            StatusCode::UNAUTHORIZED,
+            "OIDC access token expired; please re-login",
+        )
+            .into_response(),
+        E::TokenDecrypt => {
+            tracing::error!("decrypting stored OIDC tokens failed");
+            (StatusCode::INTERNAL_SERVER_ERROR, "token decryption failed").into_response()
+        }
+        E::Upstream(m) => {
+            tracing::error!(error = %m, "userinfo request failed");
+            (StatusCode::BAD_GATEWAY, "userinfo request failed").into_response()
+        }
+        E::Db(e) => {
+            tracing::error!(error = %e, "session lookup failed");
+            (StatusCode::INTERNAL_SERVER_ERROR, "session lookup failed").into_response()
+        }
+    }
 }

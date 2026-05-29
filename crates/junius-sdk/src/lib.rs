@@ -35,7 +35,7 @@ pub use admin::{
     AdminUserRoleAssignment, PlatformAdminApi, PluginPermissionEntry, PluginPermissionsSummary,
 };
 pub use authz::{Authz, Principal, ShareRecord};
-pub use context::{ApiError, BuildState, PluginContext, system_context};
+pub use context::{AdminAuth, ApiError, BuildState, HostCtx, PluginContext, system_context};
 pub use permissions::{And, Has, Permission, PermissionList};
 pub use repo::{RepoPool, ScopedDb};
 pub use telemetry::MetricSink;

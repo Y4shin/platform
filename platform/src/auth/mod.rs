@@ -36,6 +36,9 @@ pub struct AuthState {
     /// Discovered userinfo endpoint URL — used by the M18 refresh-groups
     /// REST handler to GET fresh claims with the caller's access token.
     pub(crate) oidc_userinfo_url: Option<String>,
+    /// Optional bearer token gating the admin OIDC-resync RPC. `None` ⇒ the
+    /// admin sweep is disabled (every `ResyncOidcGroups` call is rejected).
+    pub(crate) admin_api_token: Option<String>,
     pub(crate) cookie_secure: bool,
     pub(crate) session_ttl_secs: i64,
 }
@@ -70,6 +73,7 @@ impl AuthState {
             ),
             oidc,
             oidc_userinfo_url,
+            admin_api_token: cfg.admin_api_token.clone(),
             cookie_secure,
             session_ttl_secs: SESSION_TTL_SECS,
             pool,
@@ -84,9 +88,24 @@ impl AuthState {
             cookie_key: Key::from(crypto::cookie_key_material(session_encryption_key).as_slice()),
             oidc: None,
             oidc_userinfo_url: None,
+            admin_api_token: None,
             cookie_secure: false,
             session_ttl_secs: SESSION_TTL_SECS,
             pool,
+        }
+    }
+
+    /// Test constructor variant that also sets the admin API token, so
+    /// integration tests can exercise the admin OIDC-resync RPC.
+    #[must_use]
+    pub fn for_test_with_admin_token(
+        pool: PgPool,
+        session_encryption_key: &str,
+        admin_api_token: &str,
+    ) -> Self {
+        Self {
+            admin_api_token: Some(admin_api_token.to_string()),
+            ..Self::for_test(pool, session_encryption_key)
         }
     }
 }

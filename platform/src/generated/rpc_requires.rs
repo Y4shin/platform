@@ -177,7 +177,10 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 ];
 
 /// `service_fqn` -> owning plugin, so the host attaches the right
-/// `PluginResourceCtx` per request on the shared `/rpc` router.
+/// `PluginResourceCtx` per request on the shared `/rpc` router. Host-
+/// owned services (M18) map to `"platform"`, for which no plugin ctx
+/// exists — `inject_ctx` injects nothing and the self-contained host
+/// handler reads only the caller from request extensions.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
     ("admin.v1.GroupAdminService", "admin"),
     ("admin.v1.OidcMappingAdminService", "admin"),
@@ -187,4 +190,5 @@ pub static RPC_SERVICES: &[(&str, &str)] = &[
     ("events.v1.CalendarService", "events"),
     ("events.v1.EventService", "events"),
     ("events.v1.InviteService", "events"),
+    ("user.v1.UserService", "platform"),
 ];

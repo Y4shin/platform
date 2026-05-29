@@ -16,11 +16,14 @@
 //! is explicitly forbidden by the `WHERE managed_by='oidc'` clause in the
 //! ON CONFLICT.
 
+use aes_gcm::Aes256Gcm;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::auth::crypto;
 
 /// Default claim key per the M18 spec; configurable per-deployment when the
 /// [`junius_manifest::ResolvedConfig`] grows an `oidc_groups_claim` knob.
@@ -165,4 +168,105 @@ pub struct ReconcileSummary {
     pub oidc_groups_claimed: usize,
     pub mappings_applied: usize,
     pub memberships_reaped: usize,
+}
+
+/// Failure modes of [`fetch_oidc_groups`], kept distinct so callers can map to
+/// a precise HTTP status (the REST self-refresh handler) or a per-user skip
+/// reason (the admin sweep), without re-deriving the cause from a string.
+#[derive(Debug)]
+pub enum FetchGroupsError {
+    /// The user has no live (unexpired) session row to borrow a token from.
+    NoActiveSession,
+    /// The latest live session carries no stored OIDC tokens.
+    NoStoredToken,
+    /// Decrypting the stored access token failed.
+    TokenDecrypt,
+    /// The `IdP` rejected the access token (expired) — the user must re-login.
+    TokenExpired,
+    /// The `userinfo` request failed, returned non-success, or wasn't JSON.
+    Upstream(String),
+    /// Database error during the session lookup.
+    Db(sqlx::Error),
+}
+
+impl std::fmt::Display for FetchGroupsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoActiveSession => write!(f, "no active session"),
+            Self::NoStoredToken => write!(f, "no stored OIDC tokens on this session"),
+            Self::TokenDecrypt => write!(f, "token decryption failed"),
+            Self::TokenExpired => write!(f, "OIDC access token expired"),
+            Self::Upstream(m) => write!(f, "userinfo upstream error: {m}"),
+            Self::Db(e) => write!(f, "session lookup failed: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for FetchGroupsError {}
+
+/// Pull a user's current OIDC `groups` claim by calling the `IdP` `userinfo`
+/// endpoint with the access token stored on their most recent live session.
+///
+/// Shared by every off-login trigger: the REST `/api/me/refresh-groups`
+/// handler, and the host `UserService` RPC's self-refresh + admin-sweep
+/// methods. Raw `reqwest` (not `openidconnect`'s typed `user_info`) because
+/// the typed API doesn't surface the `groups` claim without changing the
+/// `AdditionalClaims` type parameter across the whole auth module; the access
+/// token is already trusted and JSON extraction is a one-liner.
+pub async fn fetch_oidc_groups(
+    pool: &PgPool,
+    cipher: &Aes256Gcm,
+    userinfo_url: &str,
+    user_id: Uuid,
+) -> Result<Vec<String>, FetchGroupsError> {
+    let row = sqlx::query_as::<_, (Option<Vec<u8>>,)>(
+        "SELECT oidc_tokens FROM platform.session \
+         WHERE user_id = $1 AND expires_at > now() \
+         ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(FetchGroupsError::Db)?;
+
+    let Some((token_blob,)) = row else {
+        return Err(FetchGroupsError::NoActiveSession);
+    };
+    let Some(token_blob) = token_blob else {
+        return Err(FetchGroupsError::NoStoredToken);
+    };
+    let Some(access_bytes) = crypto::decrypt(cipher, &token_blob) else {
+        return Err(FetchGroupsError::TokenDecrypt);
+    };
+    let access_token = String::from_utf8_lossy(&access_bytes).into_owned();
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(userinfo_url)
+        .bearer_auth(&access_token)
+        .send()
+        .await
+        .map_err(|e| FetchGroupsError::Upstream(e.to_string()))?;
+    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(FetchGroupsError::TokenExpired);
+    }
+    if !resp.status().is_success() {
+        return Err(FetchGroupsError::Upstream(format!(
+            "userinfo returned {}",
+            resp.status()
+        )));
+    }
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| FetchGroupsError::Upstream(format!("userinfo response not JSON: {e}")))?;
+    Ok(body
+        .get(DEFAULT_GROUPS_CLAIM)
+        .and_then(serde_json::Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default())
 }

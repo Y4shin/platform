@@ -503,6 +503,24 @@ fn render_rpc_requires_rs(plugins: &[ResolvedPlugin], source_root: &Path) -> Str
             }
         }
     }
+    // Host-owned protos under `<source_root>/proto` (M18): the platform hosts
+    // `user.v1.UserService` itself. Record its services with the owner
+    // `"platform"` so `RPC_SERVICES` is complete; `inject_ctx` finds no plugin
+    // ctx for `"platform"` and injects nothing, which is correct — host
+    // services are self-contained and read only the caller from extensions.
+    {
+        let mut files = Vec::new();
+        collect_proto_files(&source_root.join("proto"), &mut files);
+        files.sort();
+        for file in files {
+            if let Ok(content) = std::fs::read_to_string(&file) {
+                for svc in scan_proto_services(&content) {
+                    services.push((svc, "platform".to_string()));
+                }
+                entries.extend(scan_proto_requires(&content));
+            }
+        }
+    }
     entries.sort();
     services.sort();
     services.dedup();
@@ -527,7 +545,10 @@ fn render_rpc_requires_rs(plugins: &[ResolvedPlugin], source_root: &Path) -> Str
     buf.push_str("];\n\n");
     buf.push_str(
         "/// `service_fqn` -> owning plugin, so the host attaches the right\n\
-         /// `PluginResourceCtx` per request on the shared `/rpc` router.\n\
+         /// `PluginResourceCtx` per request on the shared `/rpc` router. Host-\n\
+         /// owned services (M18) map to `\"platform\"`, for which no plugin ctx\n\
+         /// exists — `inject_ctx` injects nothing and the self-contained host\n\
+         /// handler reads only the caller from request extensions.\n\
          pub static RPC_SERVICES: &[(&str, &str)] = &[\n",
     );
     for (service, plugin) in &services {

@@ -102,6 +102,11 @@ pub struct ResolvedConfig {
     /// `junius dev` it points at the Vite origin (`:5173`) so the whole login
     /// round-trip — including the callback — flows through the single dev origin.
     pub oidc_redirect_url: Option<String>,
+    /// Optional bearer token (M18) gating the host's admin OIDC-resync RPC
+    /// (`user.v1.UserService.ResyncOidcGroups`), which `junius oidc resync`
+    /// drives. Absent ⇒ the admin sweep is unauthenticated-and-thus-disabled
+    /// (the method rejects every caller). `file:`/`env:` secret refs apply.
+    pub admin_api_token: Option<String>,
     /// Deployment-wide default locale code (e.g. `"en"`, `"de"`). Consumed by
     /// the host's `LocaleResolver` as the fallback when neither the user's
     /// stored preference nor `Accept-Language` yields a known locale. Defaults
@@ -173,6 +178,7 @@ pub fn resolve_config(
         role_password_secret: required(raw, "role_password_secret", lookup)?,
         bind_addr: optional(raw, "bind_addr", lookup)?,
         oidc_redirect_url: optional(raw, "oidc_redirect_url", lookup)?,
+        admin_api_token: optional(raw, "admin_api_token", lookup)?,
         default_locale: optional(raw, "default_locale", lookup)?,
         jobs: parse_jobs(&cfg, dyn_lookup)?,
         job_workers: parse_job_workers(&cfg),

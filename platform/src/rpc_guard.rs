@@ -14,7 +14,7 @@ use std::sync::Arc;
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use junius_sdk::{ApiError, PluginResourceCtx, User};
+use junius_sdk::{AdminAuth, ApiError, PluginResourceCtx, User};
 
 use crate::generated::rpc_requires::{RPC_REQUIRES, RPC_SERVICES};
 
@@ -73,9 +73,61 @@ pub async fn require_permissions(req: Request, next: Next) -> Response {
     next.run(req).await
 }
 
+/// Admin-token gate for host-owned RPC methods (M18). When a request carries
+/// `Authorization: Bearer <token>` matching the configured `admin_api_token`,
+/// insert an [`AdminAuth`] marker so a host handler's `HostCtx::is_admin_token()`
+/// returns true. An absent header, no configured token, or a mismatch inserts
+/// nothing — a no-op for plugin RPC and for ordinary session callers. The token
+/// comparison is constant-time.
+pub(crate) async fn admin_token(
+    State(expected): State<Option<Arc<str>>>,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    if let Some(expected) = expected.as_deref() {
+        if let Some(presented) = bearer_token(&req) {
+            if constant_time_eq(presented.as_bytes(), expected.as_bytes()) {
+                req.extensions_mut().insert(AdminAuth);
+            }
+        }
+    }
+    next.run(req).await
+}
+
+/// Extract a `Bearer <token>` value from the `Authorization` header.
+fn bearer_token(req: &Request) -> Option<&str> {
+    req.headers()
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+}
+
+/// Length-checked constant-time byte comparison (avoids leaking the match
+/// position via early return). The length check itself can leak the token
+/// length, which is not sensitive here.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn constant_time_eq_matches() {
+        assert!(constant_time_eq(b"secret", b"secret"));
+        assert!(!constant_time_eq(b"secret", b"secreT"));
+        assert!(!constant_time_eq(b"secret", b"secret-longer"));
+        assert!(!constant_time_eq(b"", b"x"));
+    }
 
     #[test]
     fn path_resolves_to_owning_plugin() {

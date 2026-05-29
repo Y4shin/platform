@@ -94,6 +94,54 @@ where
     }
 }
 
+/// Marker inserted into request extensions by the host's admin-token
+/// middleware when a request presents a valid admin API token. Read by
+/// [`HostCtx::is_admin_token`] to authorize the admin OIDC-resync sweep.
+#[derive(Debug, Clone, Copy)]
+pub struct AdminAuth;
+
+/// Per-request context for a **host-owned** Connect-RPC handler (M18).
+///
+/// Unlike [`PluginContext`], it does **not** require a `PluginResourceCtx` in
+/// request extensions — host services are self-contained (they carry their own
+/// pool/cipher/etc. on the service struct). It resolves only the authenticated
+/// caller and an optional admin-token marker, and verifies the witness `P`.
+/// Auth beyond the witness (e.g. "this method needs a logged-in user" or
+/// "needs the admin token") is enforced in the handler via [`HostCtx::user`] /
+/// [`HostCtx::is_admin_token`].
+pub struct HostCtx<P = ()> {
+    /// The authenticated caller, if a session cookie resolved to one.
+    pub user: Option<User>,
+    admin: bool,
+    _phantom: PhantomData<P>,
+}
+
+impl<P> HostCtx<P>
+where
+    P: PermissionList,
+{
+    /// Build the context inside a host Connect-RPC handler from its
+    /// [`RequestContext`](connectrpc::RequestContext): read the caller + the
+    /// admin-token marker from request extensions and verify the witness `P`.
+    pub fn from_rpc(ctx: &connectrpc::RequestContext) -> Result<Self, ApiError> {
+        let extensions = ctx.extensions();
+        let user = extensions.get::<User>().cloned();
+        let admin = extensions.get::<AdminAuth>().is_some();
+        check_perms(user.as_ref(), &P::names())?;
+        Ok(Self {
+            user,
+            admin,
+            _phantom: PhantomData,
+        })
+    }
+
+    /// Whether the request carried a valid admin API token.
+    #[must_use]
+    pub fn is_admin_token(&self) -> bool {
+        self.admin
+    }
+}
+
 /// Error returned by the `PluginCtx` extractor / RPC entry point: a missing
 /// caller (401), a missing permission (403), or unconfigured resources (500).
 /// Rendered as a small JSON body matching the Connect error envelope so HTTP and

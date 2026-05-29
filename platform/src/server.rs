@@ -21,7 +21,7 @@ use crate::infra::HostInfra;
 /// [`build_app_with_services`].
 pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
     let http = compose_http(plugins, None);
-    base_app().merge(http).nest("/rpc", build_rpc(plugins))
+    base_app().merge(http).nest("/rpc", build_rpc(plugins, None))
 }
 
 /// Compose the full host: per-plugin resource context, the `/api/auth/*` public
@@ -53,13 +53,22 @@ pub fn build_app_with_services(
         infra,
         localizer,
     ));
-    let rpc = build_rpc(plugins)
+    // Host-owned `user.v1.UserService` (M18) is folded into the same `/rpc`
+    // router as the plugins. Its admin sweep is gated by the admin-token
+    // middleware below, which sets the `AdminAuth` marker the handler reads.
+    let host_user = crate::rpc::user_service::UserRpc::from_auth_state(&auth_state);
+    let admin_token: Option<Arc<str>> = auth_state.admin_api_token.as_deref().map(Arc::from);
+    let rpc = build_rpc(plugins, Some(host_user))
         .layer(axum::middleware::from_fn(
             crate::rpc_guard::require_permissions,
         ))
         .layer(axum::middleware::from_fn_with_state(
             ctx_map,
             crate::rpc_guard::inject_ctx,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            admin_token,
+            crate::rpc_guard::admin_token,
         ));
 
     let protected = http
@@ -232,12 +241,18 @@ fn build_permission_catalogue(
         .collect()
 }
 
-/// Fold every plugin's Connect services into one `connectrpc` router and convert
-/// it to an axum router (mounted under `/rpc` by the caller).
-fn build_rpc(plugins: &[Box<dyn Plugin>]) -> Router {
+/// Fold every plugin's Connect services — plus the host's own
+/// `user.v1.UserService` (M18), when `host_user` is provided — into one
+/// `connectrpc` router and convert it to an axum router (mounted under `/rpc`
+/// by the caller). The resource-less [`build_app`] passes `None`.
+fn build_rpc(plugins: &[Box<dyn Plugin>], host_user: Option<crate::rpc::user_service::UserRpc>) -> Router {
+    use crate::rpc::proto::user::v1::UserServiceExt as _;
     let mut router = connectrpc::Router::new();
     for plugin in plugins {
         router = plugin.register_rpc(router);
+    }
+    if let Some(user) = host_user {
+        router = Arc::new(user).register(router);
     }
     router.into_axum_router()
 }
