@@ -69,29 +69,53 @@ message Membership {
   string display_name = 3;
   string role_id = 4;
   string role_name = 5;
-  string managed_by = 6;       // 'manual' | 'oidc' | 'config'
-  string managed_source = 7;   // empty when managed_by='manual'
+  string managed_by = 6; // 'manual' | 'oidc' | 'config'
+  string managed_source = 7; // empty when managed_by='manual'
 }
 
 message ListGroupsRequest {}
-message ListGroupsResponse { repeated Group groups = 1; }
+message ListGroupsResponse {
+  repeated Group groups = 1;
+}
 
-message CreateGroupRequest { string name = 1; string description = 2; }
-message CreateGroupResponse { Group group = 1; }
+message CreateGroupRequest {
+  string name = 1;
+  string description = 2;
+}
+message CreateGroupResponse {
+  Group group = 1;
+}
 
-message UpdateGroupRequest { string id = 1; string name = 2; string description = 3; }
+message UpdateGroupRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+}
 message UpdateGroupResponse {}
 
-message DeleteGroupRequest { string id = 1; }
+message DeleteGroupRequest {
+  string id = 1;
+}
 message DeleteGroupResponse {}
 
-message ListGroupRolesRequest { string group_id = 1; }
-message ListGroupRolesResponse { repeated GroupRole roles = 1; }
+message ListGroupRolesRequest {
+  string group_id = 1;
+}
+message ListGroupRolesResponse {
+  repeated GroupRole roles = 1;
+}
 
-message CreateGroupRoleRequest { string group_id = 1; string name = 2; }
-message CreateGroupRoleResponse { GroupRole role = 1; }
+message CreateGroupRoleRequest {
+  string group_id = 1;
+  string name = 2;
+}
+message CreateGroupRoleResponse {
+  GroupRole role = 1;
+}
 
-message DeleteGroupRoleRequest { string role_id = 1; }
+message DeleteGroupRoleRequest {
+  string role_id = 1;
+}
 message DeleteGroupRoleResponse {}
 
 message SetGroupRolePermissionsRequest {
@@ -100,8 +124,12 @@ message SetGroupRolePermissionsRequest {
 }
 message SetGroupRolePermissionsResponse {}
 
-message ListGroupMembersRequest { string group_id = 1; }
-message ListGroupMembersResponse { repeated Membership members = 1; }
+message ListGroupMembersRequest {
+  string group_id = 1;
+}
+message ListGroupMembersResponse {
+  repeated Membership members = 1;
+}
 
 message AddGroupMemberRequest {
   string group_id = 1;
@@ -110,7 +138,10 @@ message AddGroupMemberRequest {
 }
 message AddGroupMemberResponse {}
 
-message RemoveGroupMemberRequest { string group_id = 1; string user_id = 2; }
+message RemoveGroupMemberRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
 message RemoveGroupMemberResponse {}
 
 // ---- User-roles -------------------------------------------------------------
@@ -156,12 +187,21 @@ message UserRoleAssignment {
 }
 
 message ListUserRolesRequest {}
-message ListUserRolesResponse { repeated UserRole roles = 1; }
+message ListUserRolesResponse {
+  repeated UserRole roles = 1;
+}
 
-message CreateUserRoleRequest { string name = 1; string description = 2; }
-message CreateUserRoleResponse { UserRole role = 1; }
+message CreateUserRoleRequest {
+  string name = 1;
+  string description = 2;
+}
+message CreateUserRoleResponse {
+  UserRole role = 1;
+}
 
-message DeleteUserRoleRequest { string id = 1; }
+message DeleteUserRoleRequest {
+  string id = 1;
+}
 message DeleteUserRoleResponse {}
 
 message SetUserRolePermissionsRequest {
@@ -171,12 +211,20 @@ message SetUserRolePermissionsRequest {
 message SetUserRolePermissionsResponse {}
 
 message ListUserRoleAssignmentsRequest {}
-message ListUserRoleAssignmentsResponse { repeated UserRoleAssignment assignments = 1; }
+message ListUserRoleAssignmentsResponse {
+  repeated UserRoleAssignment assignments = 1;
+}
 
-message AssignUserRoleRequest { string user_id = 1; string role_id = 2; }
+message AssignUserRoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
 message AssignUserRoleResponse {}
 
-message RevokeUserRoleRequest { string user_id = 1; string role_id = 2; }
+message RevokeUserRoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
 message RevokeUserRoleResponse {}
 
 // ---- Permission catalogue + user directory ----------------------------------
@@ -199,7 +247,9 @@ message PluginPermissions {
 }
 
 message ListPermissionsRequest {}
-message ListPermissionsResponse { repeated PluginPermissions plugins = 1; }
+message ListPermissionsResponse {
+  repeated PluginPermissions plugins = 1;
+}
 
 service UserAdminService {
   // Look up a user by email — the admin UI's "add member" form takes an
@@ -210,7 +260,9 @@ service UserAdminService {
   }
 }
 
-message FindUserByEmailRequest { string email = 1; }
+message FindUserByEmailRequest {
+  string email = 1;
+}
 message FindUserByEmailResponse {
   // Empty `user_id` means "not found"; the UI surfaces that as
   // "no user with that email — have they logged in once yet?".
@@ -242,14 +294,20 @@ message OidcMapping {
 }
 
 message ListOidcMappingsRequest {}
-message ListOidcMappingsResponse { repeated OidcMapping mappings = 1; }
+message ListOidcMappingsResponse {
+  repeated OidcMapping mappings = 1;
+}
 
 message CreateOidcMappingRequest {
   string oidc_group_name = 1;
   string group_id = 2;
   string role_id = 3;
 }
-message CreateOidcMappingResponse { string id = 1; }
+message CreateOidcMappingResponse {
+  string id = 1;
+}
 
-message DeleteOidcMappingRequest { string id = 1; }
+message DeleteOidcMappingRequest {
+  string id = 1;
+}
 message DeleteOidcMappingResponse {}

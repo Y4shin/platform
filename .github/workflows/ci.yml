@@ -170,6 +170,7 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            e2e/.playwright-state/
           retention-days: 7
 
   # M23: split-mode E2E. Headless juniusd (no `--features embed-frontend`)

@@ -71,6 +71,12 @@ tasks:
   test:js:
     desc: Frontend unit tests (vitest) + TypeScript typecheck.
     cmds:
+      # Compile Lingui catalogs (`.po` → `.js`) first: per-plugin vitest
+      # specs (e.g. `plugins/events/frontend/src/i18n.test.ts`) import the
+      # compiled `pseudo.js` directly to assert catalog completeness, and
+      # the `.js` outputs are gitignored — without this step they don't
+      # exist in a fresh checkout / CI.
+      - pnpm exec lingui compile
       - pnpm test
       - pnpm run typecheck
 
