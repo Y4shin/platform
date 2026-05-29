@@ -25,6 +25,19 @@
 > (`examples/example-deployment-precompiled/{full,split}/`) and
 > updated design docs (Stage 6).
 >
+> Image-build architecture (post-pivot from the original Rust-in-Docker
+> approach): every binary is a `nix build .#…-static` derivation
+> (crane + `pkgsCross.musl64`) producing statically-linked musl
+> executables on `FROM scratch`. The SSR FE is a Vite SSR bundle with
+> `noExternal: true` (`vite.node.config.ts`) producing a single
+> self-contained `dist/node-server/server.js` on `node:22-slim` —
+> images are 52 MB (`backend`), 53 MB (`full`), 231 MB (`frontend`).
+> `tools/build-images.sh stage <variant>` runs the nix builds and
+> dereferences the result symlinks into `docker/staging/` (docker
+> COPY won't follow nix-store symlinks); the docker build is then a
+> few-line `COPY` step. CI uses the same script; local dev runs
+> `tools/build-images.sh` for stage + image in one shot.
+>
 > Two doc-recorded deviations from the original spec:
 > - **`[build] mode`** lives on the existing `[build]` block (not a
 >   new `[platform]` section) — colocates with the M23-added

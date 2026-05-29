@@ -222,10 +222,15 @@
               '';
             };
 
-            # SSR bundle for the M23 `frontend` image. Same hermetic
-            # deps; produces `dist/client/` + `dist/server/` plus the
-            # full pnpm-workspace tree (source + node_modules) the
-            # runtime needs to resolve cross-package imports via tsx.
+            # SSR bundle for the M23 `frontend` image. Vite SSR-bundles
+            # `src/server.ts` itself (via `vite.node.config.ts`,
+            # `noExternal: true`) into `dist/node-server/server.js` — a
+            # single self-contained file with React + TanStack + every
+            # plugin frontend inlined. The runtime image then needs only
+            # `node + dist/`; no `node_modules`, no source files, no
+            # workspace symlinks. Pre-pivot this derivation shipped the
+            # entire pnpm workspace (498 MB on disk → 2.7 GB image);
+            # bundling drops that by ~10×.
             frontend-ssr-bundle = pkgs.stdenvNoCC.mkDerivation {
               pname = "junius-frontend-ssr";
               version = "0.0.0";
@@ -241,25 +246,14 @@
                 pnpm --filter @junius/shell-ssr build
                 runHook postBuild
               '';
-              # The Node runtime runs `node --import tsx src/server.ts`,
-              # which imports `@junius/shell/*` etc. via the pnpm
-              # workspace's `.pnpm/node_modules/@junius/*` symlinks.
-              # Those links point at the package source directories
-              # (packages/, plugins/*/frontend, platform/frontend{,
-              # -ssr}), so the runtime needs the whole workspace
-              # tree on disk — not just `platform/frontend-ssr/`.
-              # `noBrokenSymlinks` enforces this; we ship the lot.
               installPhase = ''
                 runHook preInstall
                 mkdir -p $out
-                cp -r package.json pnpm-workspace.yaml pnpm-lock.yaml $out/
-                cp -r packages plugins platform node_modules $out/
+                cp -r platform/frontend-ssr/dist $out/dist
                 runHook postInstall
               '';
-              # `dontFixup = true` skips the stdenv's strip/patchelf
-              # pass: there are no ELF binaries to fix up here, and
-              # the pass otherwise descends into the huge node_modules
-              # tree.
+              # `dontFixup` skips the stdenv strip/patchelf pass — no ELF
+              # binaries to fix; saves a few seconds on every build.
               dontFixup = true;
             };
 

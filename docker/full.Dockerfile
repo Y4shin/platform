@@ -6,30 +6,26 @@
 # `JUNIUS_MODE=precompiled`, so the boot check refuses to start unless
 # `[plugins].enabled` exactly matches the bundled set.
 #
-# Build strategy: pure `nix build`. The flake's `juniusd-static` output
-# depends on `frontend-bundle` (a `pnpm.fetchDeps` + `pnpm shell build`
-# derivation) and stages the FE dist into the cargo source tree before
-# the rust musl-static link runs. Result: a fully static binary on
-# `scratch` — no shell, no libc, no toolchain in the runtime image.
+# Build strategy: the binary is produced by `nix build .#juniusd-static`
+# against the flake (depends on `frontend-bundle` for the SPA dist). The
+# Dockerfile only stages the result into a `FROM scratch` runtime image
+# — no nix sandbox inside docker buildkit (it routinely OOMs / fills
+# the overlay filesystem).
 #
-# Operators run migrations via:
-#   docker run --rm <image> junius migrate up --config /etc/junius/platform.toml
-# then start the long-running container.
+# Build wrapper (run before `docker build`): see `tools/build-images.sh`.
+# It calls `nix build` for each derivation, dereferences the resulting
+# nix-store symlinks into `docker/staging/` (docker COPY doesn't follow
+# symlinks pointing outside the build context), then invokes
+# `docker build` against those staged files.
 
-FROM nixos/nix:2.24.10 AS builder
-ENV NIX_CONFIG="experimental-features = nix-command flakes"
-
-WORKDIR /src
-COPY . .
-
-RUN nix build .#juniusd-static -o /out/juniusd-link \
- && nix build .#junius-static  -o /out/junius-link  \
- && cp -L /out/juniusd-link/bin/juniusd /out/juniusd \
- && cp -L /out/junius-link/bin/junius   /out/junius
+ARG JUNIUSD_PATH=docker/staging/juniusd-full
+ARG JUNIUS_PATH=docker/staging/junius
 
 FROM scratch AS runtime
-COPY --from=builder /out/juniusd /usr/local/bin/juniusd
-COPY --from=builder /out/junius  /usr/local/bin/junius
+ARG JUNIUSD_PATH
+ARG JUNIUS_PATH
+COPY --chmod=0755 ${JUNIUSD_PATH} /usr/local/bin/juniusd
+COPY --chmod=0755 ${JUNIUS_PATH}  /usr/local/bin/junius
 ENV JUNIUS_MODE=precompiled \
     JUNIUS_CONFIG=/etc/junius/platform.toml
 VOLUME ["/etc/junius"]

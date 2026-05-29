@@ -49,3 +49,8 @@ e2e/.playwright-state/
 # nix results
 /result
 /result*
+
+# docker image staging (populated by tools/build-images.sh from `nix
+# build` outputs; docker COPY doesn't follow nix store symlinks, hence
+# the dereference step).
+/docker/staging/

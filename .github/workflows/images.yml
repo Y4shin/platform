@@ -3,12 +3,18 @@
 # don't push; `workflow_dispatch` lets a maintainer trigger a manual
 # rebuild without a merge.
 #
-# Deferred to a follow-up commit (out of M24 scope per the plan):
+# Build strategy (M24 post-nix-pivot): every variant is produced by
+# `tools/build-images.sh` which runs `nix build` for each flake
+# derivation (statically-musl-linked binaries / Vite-bundled SSR
+# server), stages the outputs into `docker/staging/`, then `docker
+# build`s a thin `FROM scratch` (or `node:22-slim`) image. The runtime
+# images carry NO toolchain — just the binary/bundle. Splitting the
+# nix build off from buildkit avoids the container-sandbox OOM + disk
+# limits we hit when running nix-in-docker.
+#
+# Deferred to M25 (see docs/impl/27-M25-precompiled-followups.md):
 #   - cosign keyless signing (needs `id-token: write` + OIDC trust setup);
 #   - linux/arm64 multi-arch (amd64 only for now).
-#
-# Cache backend: `type=gha,scope=<variant>` so cold-start CI builds reuse
-# the previous run's layers per image variant.
 
 name: images
 on:
@@ -31,11 +37,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Nix toolchain — required for the `nix build` step that produces
+      # the static musl binaries + Vite SSR bundle. The Determinate
+      # installer + magic cache match what the existing CI jobs use.
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to ghcr.io
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -58,6 +70,42 @@ jobs:
             echo "latest_tag=$image:latest"
           } >> "$GITHUB_OUTPUT"
 
+      # `tools/build-images.sh stage` runs `nix build` + dereferences
+      # the result symlinks into `docker/staging/`. We then hand those
+      # staged paths to `docker/build-push-action` for the docker build
+      # (better cache + push integration than the script's own docker
+      # invocation, which is meant for local dev).
+      - name: Stage nix outputs
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: tools/build-images.sh stage "$VARIANT"
+
+      - name: Compute build-args
+        id: build-args
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -eu
+          case "$VARIANT" in
+            full)
+              echo "args<<EOF" >> "$GITHUB_OUTPUT"
+              echo "JUNIUSD_PATH=docker/staging/juniusd-full" >> "$GITHUB_OUTPUT"
+              echo "JUNIUS_PATH=docker/staging/junius" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+              ;;
+            backend)
+              echo "args<<EOF" >> "$GITHUB_OUTPUT"
+              echo "JUNIUSD_PATH=docker/staging/juniusd-headless" >> "$GITHUB_OUTPUT"
+              echo "JUNIUS_PATH=docker/staging/junius" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+              ;;
+            frontend)
+              echo "args<<EOF" >> "$GITHUB_OUTPUT"
+              echo "BUNDLE_PATH=docker/staging/frontend-dist" >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - name: Build (PR — smoke only, no push)
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
@@ -67,6 +115,7 @@ jobs:
           platforms: linux/amd64
           push: false
           load: false
+          build-args: ${{ steps.build-args.outputs.args }}
           cache-from: type=gha,scope=${{ matrix.variant }}
           cache-to: type=gha,scope=${{ matrix.variant }},mode=max
           tags: ${{ steps.tags.outputs.sha_tag }}
@@ -79,6 +128,7 @@ jobs:
           file: docker/${{ matrix.variant }}.Dockerfile
           platforms: linux/amd64
           push: true
+          build-args: ${{ steps.build-args.outputs.args }}
           cache-from: type=gha,scope=${{ matrix.variant }}
           cache-to: type=gha,scope=${{ matrix.variant }},mode=max
           tags: |
@@ -106,9 +156,15 @@ jobs:
       - name: Pull + check-config the `full` image
         env:
           IMAGE: ${{ steps.tags.outputs.full_image }}
+          OIDC_CLIENT_SECRET: smoke
+          SESSION_KEY: smoke
+          ROLE_PW_SECRET: smoke
         run: |
           set -eu
           docker pull "$IMAGE"
           docker run --rm \
             -v "$PWD/examples/example-deployment-precompiled/full/platform.toml:/etc/junius/platform.toml:ro" \
+            -e OIDC_CLIENT_SECRET \
+            -e SESSION_KEY \
+            -e ROLE_PW_SECRET \
             "$IMAGE" --check-config

@@ -5,34 +5,31 @@
 # (or any third-party static-asset host). Browser routes return a
 # structured 404 (`FRONTEND_NOT_EMBEDDED`); the FE container handles them.
 #
-# Build strategy (M24, post-musl-pivot): the Rust binaries are built
-# via `nix build .#…-static` against the flake derivations in
-# `flake.nix`. The result is fully static, musl-linked, position-
-# independent executables that run on a `FROM scratch` runtime base.
-# No glibc, no shell, no toolchain in the runtime image.
+# Build strategy (M24, post-nix-pivot): the Rust binaries are produced
+# by `nix build .#juniusd-headless-static` and `nix build .#junius-static`
+# (against the flake derivations in `flake.nix`) — fully static, musl-
+# linked, position-independent. The Dockerfile does no compilation; it
+# stages the pre-built binaries into a `FROM scratch` runtime image.
+# This split keeps the nix sandbox out of docker buildkit (where it
+# routinely OOMs the container or fills the overlay filesystem).
+#
+# Build wrapper (run before `docker build`): see `tools/build-images.sh`.
+# That script calls `nix build` for each derivation, dereferences the
+# resulting nix-store symlinks into `docker/staging/` (docker COPY
+# doesn't follow symlinks pointing outside the build context), then
+# invokes `docker build` against those staged files.
+#
+# Default ARG values target `docker/staging/`; override only if you've
+# staged elsewhere.
 
-# nixos/nix ships with experimental features off by default; the
-# wrapper flag enables flakes for the `nix build` call below.
-FROM nixos/nix:2.24.10 AS builder
-ENV NIX_CONFIG="experimental-features = nix-command flakes"
+ARG JUNIUSD_PATH=docker/staging/juniusd-headless
+ARG JUNIUS_PATH=docker/staging/junius
 
-WORKDIR /src
-COPY . .
-
-# Build the two binaries into /src/result-* via the flake outputs.
-# `.#juniusd-headless-static` = juniusd without the embedded SPA.
-# `.#junius-static` = the trimmed in-container CLI (--no-default-features).
-RUN nix build .#juniusd-headless-static -o /out/juniusd-link \
- && nix build .#junius-static          -o /out/junius-link  \
- && cp -L /out/juniusd-link/bin/juniusd /out/juniusd \
- && cp -L /out/junius-link/bin/junius   /out/junius
-
-# Scratch runtime: only the two binaries + ENV. No shell, no libc — the
-# binaries are static. Operators mount their `platform.toml` at
-# `/etc/junius/`; migrations run via `docker run … junius migrate up`.
 FROM scratch AS runtime
-COPY --from=builder /out/juniusd /usr/local/bin/juniusd
-COPY --from=builder /out/junius  /usr/local/bin/junius
+ARG JUNIUSD_PATH
+ARG JUNIUS_PATH
+COPY --chmod=0755 ${JUNIUSD_PATH} /usr/local/bin/juniusd
+COPY --chmod=0755 ${JUNIUS_PATH}  /usr/local/bin/junius
 ENV JUNIUS_MODE=precompiled \
     JUNIUS_CONFIG=/etc/junius/platform.toml
 VOLUME ["/etc/junius"]

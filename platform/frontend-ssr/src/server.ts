@@ -36,8 +36,17 @@ import { dirname, resolve } from 'node:path';
 import { requestContext } from './als.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, '..');
 const IS_PROD = process.env['NODE_ENV'] === 'production';
+// In dev mode (tsx runs `src/server.ts` directly), `__dirname` is the
+// package's `src/` and ROOT = the package root. The Vite-mode branch
+// below reads `index.html` from there; the prod-mode branch reads
+// pre-built artifacts from `<ROOT>/dist/*`. After the M24
+// `build:node-server` step bundles us into `dist/node-server/server.js`,
+// `__dirname` becomes `<pkg>/dist/node-server` instead — so `ROOT`
+// would be `<pkg>/dist` and the `dist/client/...` lookups would resolve
+// to `<pkg>/dist/dist/...` (broken). Detect mode here and step the
+// right number of levels.
+const ROOT = IS_PROD ? resolve(__dirname, '..', '..') : resolve(__dirname, '..');
 const PORT = Number(process.env['PORT'] ?? 3000);
 
 /** Headers the FE proxy is allowed to forward from inbound → BE. An explicit
@@ -95,13 +104,15 @@ async function buildServer(): Promise<ResolvedServer> {
   if (IS_PROD) {
     const { readFileSync } = await import('node:fs');
     const template = readFileSync(resolve(ROOT, 'dist/client/index.html'), 'utf-8');
-    const mod = (await import(resolve(ROOT, 'dist/server/entry-server.js'))) as typeof import(
-      './entry-server.js'
-    );
+    // Static import: lets Vite's `build:node-server` bundle the whole
+    // SSR tree (React + plugin frontends + entry-server) into the same
+    // single-file server.js. Resolved at module-load time; getRender
+    // just returns the already-imported `render` function.
+    const { render } = await import('./entry-server.js');
     return {
       vite: null,
       getTemplate: () => Promise.resolve(template),
-      getRender: () => Promise.resolve(mod.render),
+      getRender: () => Promise.resolve(render),
       beInternalUrl,
     };
   }
