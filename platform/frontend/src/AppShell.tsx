@@ -1,5 +1,4 @@
-import { Code, ConnectError } from '@connectrpc/connect';
-import { type Transport } from '@connectrpc/connect';
+import { Code, ConnectError, type Transport } from '@connectrpc/connect';
 import { TransportProvider } from '@connectrpc/connect-query';
 import {
   AuthProvider,
@@ -11,7 +10,7 @@ import {
 } from '@junius/sdk';
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type AnyRouter, RouterProvider } from '@tanstack/react-router';
-import { StrictMode, type ReactElement } from 'react';
+import { type ReactElement, StrictMode } from 'react';
 
 import { componentRegistry } from './generated/component-registry.js';
 import { PLUGIN_I18N_CATALOGS } from './generated/i18n-catalogs.js';
@@ -23,9 +22,8 @@ import { loadShellI18n } from './i18n.js';
 // entry can share one source of truth.
 export const I18N_CATALOGS: readonly CatalogLoader[] = [loadShellI18n, ...PLUGIN_I18N_CATALOGS];
 
-export { PUBLIC_ROUTE_PREFIXES };
-export { componentRegistry };
 export type { ComponentRegistryValue };
+export { componentRegistry, PUBLIC_ROUTE_PREFIXES };
 
 export interface AppShellProps {
   /** Per-mount router (memory history on the server, browser history on
