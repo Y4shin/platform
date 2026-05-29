@@ -21,7 +21,9 @@ use crate::infra::HostInfra;
 /// [`build_app_with_services`].
 pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
     let http = compose_http(plugins, None);
-    base_app().merge(http).nest("/rpc", build_rpc(plugins, None))
+    base_app()
+        .merge(http)
+        .nest("/rpc", build_rpc(plugins, None))
 }
 
 /// Compose the full host: per-plugin resource context, the `/api/auth/*` public
@@ -245,7 +247,10 @@ fn build_permission_catalogue(
 /// `user.v1.UserService` (M18), when `host_user` is provided — into one
 /// `connectrpc` router and convert it to an axum router (mounted under `/rpc`
 /// by the caller). The resource-less [`build_app`] passes `None`.
-fn build_rpc(plugins: &[Box<dyn Plugin>], host_user: Option<crate::rpc::user_service::UserRpc>) -> Router {
+fn build_rpc(
+    plugins: &[Box<dyn Plugin>],
+    host_user: Option<crate::rpc::user_service::UserRpc>,
+) -> Router {
     use crate::rpc::proto::user::v1::UserServiceExt as _;
     let mut router = connectrpc::Router::new();
     for plugin in plugins {

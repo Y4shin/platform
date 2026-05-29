@@ -1,7 +1,7 @@
 //! Integration test for the host-owned `user.v1.UserService` Connect-RPC
 //! (M18) against an ephemeral Postgres. Focuses on the two auth modes — the
 //! self-refresh method needs a session; the admin sweep needs the admin API
-//! token — without standing up a live IdP (the reconcile happy-path is covered
+//! token — without standing up a live `IdP` (the reconcile happy-path is covered
 //! by the OIDC reconcile tests + the e2e/manual verification). Skips cleanly
 //! without Docker.
 

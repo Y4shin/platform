@@ -46,6 +46,11 @@ see a validation error, check the instance status:
   for `junius dev` (Vite origin) and `http://localhost:18080/api/auth/callback`
   for the embedded SPA — openid/email/profile scopes, the default self-signed
   signing key);
+- a custom **`groups` scope mapping** (M18) that emits the caller's group names
+  as a `groups` claim, so the host's OIDC reconciler can map Authentik groups
+  onto Junius `(group, role)` pairs;
+- two dev groups, `junius-organisers` (alice) and `junius-members` (bob), to
+  exercise that mapping out of the box;
 - the `alice` / `bob` test users.
 
 It's written for the pinned `2024.12.x` schema. Notes if you bump the image:
@@ -65,6 +70,30 @@ the **username** `alice` / `bob`):
 - Admin UI → **Directory → Users** → user → *Set password*, or
 - `docker compose -f dev/docker-compose.yml exec authentik-server \`
   `ak shell -c "from authentik.core.models import User; u=User.objects.get(username='alice'); u.set_password('alice'); u.save()"`
+
+## Seed groups, roles & permissions (provisioning)
+
+The platform's initial groups/roles/permissions ship as checked-in TOML, not a
+hand-run SQL script (M18 replaced the old `dev-seed.sql`). After migrating,
+apply the dev provisioning once:
+
+```bash
+junius provision apply --config dev/platform.toml
+```
+
+This reconciles `dev/provisioning.toml` (the `Organisers` group + `organiser`
+role, the `admin` user-role assignment for alice, and the OIDC group mapping)
+and is idempotent — re-running is a no-op. `junius dev` / `juniusd` also apply
+it automatically on boot (`[provisioning] auto_apply_on_boot`).
+
+To force an OIDC-group re-sync for a user without waiting for their next login
+(e.g. after changing their Authentik groups), call the running host's admin
+sweep — set `[config] admin_api_token` in `dev/platform.toml` first:
+
+```bash
+junius oidc resync --user alice@example.com --config dev/platform.toml
+junius oidc resync --all --config dev/platform.toml
+```
 
 ## Then
 

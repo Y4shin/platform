@@ -138,6 +138,9 @@ end. Ordered easiest → riskiest; the items are independent, so the order is on
 
 - A group/role **management UI** (assigning permissions without raw SQL) — a much larger platform
   feature surfaced separately during M13 testing; not one of the four triaged items.
+  **Delivered by [M18](20-M18-group-role-provisioning.md)** as the `admin` plugin
+  (`/p/admin`: groups, group-roles, user-roles, OIDC mappings) on a typed,
+  capability-gated `PlatformAdminApi`.
 - Anything already owned by **M15** (the proto-vs-handler witness restatement). `PluginContext::public`
   (D) is complementary — it's the *ungated* path, orthogonal to M15's gated typed-context work.
 

@@ -92,9 +92,7 @@ impl UserRpc {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| ApiError::internal(format!("user sweep query failed: {e}"))),
-            (None, false) => Err(ApiError::internal(
-                "specify a target: set `user` or `all`",
-            )),
+            (None, false) => Err(ApiError::internal("specify a target: set `user` or `all`")),
         }
     }
 }

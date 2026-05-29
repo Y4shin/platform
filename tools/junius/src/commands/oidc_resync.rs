@@ -120,7 +120,11 @@ fn print_results(results: &[UserResult]) {
     }
     println!("junius oidc resync: {} user(s) processed", results.len());
     for r in results {
-        let who = if r.email.is_empty() { &r.user_id } else { &r.email };
+        let who = if r.email.is_empty() {
+            &r.user_id
+        } else {
+            &r.email
+        };
         match (&r.result, &r.skipped) {
             (Some(rc), _) => println!(
                 "  {who}: {} claimed, {} added, {} reaped",

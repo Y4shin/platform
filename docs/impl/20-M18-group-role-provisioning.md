@@ -1,19 +1,25 @@
 # 20. M18 — Group & Role Provisioning
 
-> **Status:** ⏳ in progress. Stages 1–4 implemented (the core of the
-> milestone — user-roles + admin override, admin plugin with CRUD over
-> groups / group-roles / user-roles / OIDC mappings, OIDC group
-> reconciliation with REST refresh endpoint, declarative TOML
-> provisioning with hash-guarded apply). Both formerly-deferred
-> integration paths are now wired: `lock_managed` is enforced at the
-> `PlatformAdminApi` seam (`group_membership` mutators check the
-> existing row's `managed_by` and refuse with the new
+> **Status:** ✅ implemented. Stages 1–5 complete. The core (Stages 1–4):
+> user-roles + admin override, the admin plugin with CRUD over groups /
+> group-roles / user-roles / OIDC mappings, OIDC group reconciliation,
+> declarative TOML provisioning with hash-guarded apply. `lock_managed`
+> is enforced at the `PlatformAdminApi` seam (`group_membership` mutators
+> check the existing row's `managed_by` and refuse with
 > `PluginError::ManagedByConfig` when the row is `'config'`), and
-> `auto_apply_on_boot = true` runs at host start. The reconcile logic
-> moved out of `tools/junius/src/commands/provision.rs` into a shared
-> [`junius-provision`](../../crates/junius-provision) crate that both
-> the CLI and the host call, so `server::run` and
-> `junius provision apply` share one hash-guard path.
+> `auto_apply_on_boot = true` runs at host start; the reconcile logic
+> lives in the shared [`junius-provision`](../../crates/junius-provision)
+> crate that both the CLI and the host call.
+>
+> **All four OIDC-refresh trigger points are now wired:** (1) login,
+> (2) `POST /api/me/refresh-groups`, (3) the host-owned
+> `user.v1.UserService.RefreshOidcGroups` Connect-RPC (the first
+> Connect service the platform hosts itself, on a new SDK `HostCtx`
+> seam), and (4) `junius oidc resync [--user | --all]` — a thin client
+> over the admin-token-gated `UserService.ResyncOidcGroups` sweep
+> (`[config] admin_api_token`). The shared
+> `auth::oidc_groups::fetch_oidc_groups` helper backs all of them.
+> Stage 5 (admin-flow Playwright spec + docs) is done.
 >
 > Picks up the carve-out M16 explicitly deferred: *"a group/role
 > management UI (assigning permissions without raw SQL) — a much larger
