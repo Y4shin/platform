@@ -13,9 +13,34 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: m.permissions.length
+#: platform/frontend/src/pages/MePage.tsx:190
+msgid "{0} permissions"
+msgstr ""
+
 #: platform/frontend/src/layout/Shell.tsx:25
 #~ msgid "Anonymous"
 #~ msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:252
+msgid "Browser"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:152
+msgid "Config"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:82
+msgid "Could not load your profile."
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:129
+msgid "Display name"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:130
+msgid "Email"
+msgstr ""
 
 #: platform/frontend/src/layout/LocaleSwitcher.tsx:13
 msgid "English"
@@ -25,11 +50,61 @@ msgstr ""
 msgid "German"
 msgstr ""
 
+#: platform/frontend/src/pages/MePage.tsx:172
+msgid "Group"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:162
+msgid "Group memberships"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:128
+msgid "Identity"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:142
+msgid "Language"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:255
+msgid "Last seen"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:75
+msgid "Loading…"
+msgstr ""
+
 #: platform/frontend/src/layout/LocaleSwitcher.tsx:19
 msgid "Locale"
 msgstr ""
 
+#: platform/frontend/src/pages/MePage.tsx:181
+msgid "Managed by"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:154
+msgid "Manual"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:150
+msgid "OIDC"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:132
+msgid "OIDC subject"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:178
+#: platform/frontend/src/pages/MePage.tsx:218
+msgid "Permissions"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:141
+msgid "Preferences"
+msgstr ""
+
 #: platform/frontend/src/layout/UserMenu.tsx:37
+#: platform/frontend/src/pages/MePage.tsx:90
 msgid "Profile"
 msgstr ""
 
@@ -37,10 +112,43 @@ msgstr ""
 msgid "Pseudo"
 msgstr ""
 
+#: platform/frontend/src/pages/MePage.tsx:280
+msgid "Revoke"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:175
+#: platform/frontend/src/pages/MePage.tsx:215
+msgid "Role"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:247
+msgid "Sessions"
+msgstr ""
+
 #: platform/frontend/src/layout/UserMenu.tsx:43
 msgid "Sign out"
 msgstr ""
 
+#: platform/frontend/src/pages/MePage.tsx:267
+msgid "This device"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:264
+msgid "Unknown device"
+msgstr ""
+
 #: platform/frontend/src/layout/UserMenu.tsx:26
 msgid "User menu"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:205
+msgid "User-roles"
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:165
+msgid "You are not a member of any group."
+msgstr ""
+
+#: platform/frontend/src/pages/MePage.tsx:208
+msgid "You hold no user-roles."
 msgstr ""

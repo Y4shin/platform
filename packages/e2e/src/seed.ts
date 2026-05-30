@@ -115,14 +115,60 @@ export async function grantPermissions(
   }
 }
 
-export async function insertSession(userId: string): Promise<string> {
+export interface SessionOptions {
+  /** User-Agent string recorded on the session row (shown in the /me revoke
+   * list). Defaults to NULL when omitted. */
+  userAgent?: string;
+}
+
+export async function insertSession(userId: string, options?: SessionOptions): Promise<string> {
   const row = await pool().query<{ id: string }>(
-    `INSERT INTO platform.session (user_id, expires_at)
-       VALUES ($1, now() + interval '1 day')
+    `INSERT INTO platform.session (user_id, expires_at, user_agent)
+       VALUES ($1, now() + interval '1 day', $2)
        RETURNING id`,
-    [userId],
+    [userId, options?.userAgent ?? null],
   );
   const id = row.rows[0]?.id;
   if (!id) throw new Error(`insertSession(${userId}): no row returned`);
   return id;
+}
+
+/**
+ * Create a global-scope user-role (M18) with the given permissions and assign it
+ * to the user. Used by the /me profile spec to seed a user-role assignment (e.g.
+ * `admin` holding the `*` wildcard) so the User-roles section has a row.
+ * Per-invocation isolation (UUID-suffixed role name) keeps specs independent.
+ */
+export async function assignUserRole(
+  userId: string,
+  roleName: string,
+  permissions: readonly string[],
+): Promise<void> {
+  const client = await pool().connect();
+  try {
+    await client.query('BEGIN');
+    const roleRow = await client.query<{ id: string }>(
+      `INSERT INTO platform.user_role (name) VALUES ($1) RETURNING id`,
+      [`${roleName}-${randomUUID()}`],
+    );
+    const roleId = roleRow.rows[0]?.id;
+    if (!roleId) throw new Error('assignUserRole: role insert returned no row');
+    if (permissions.length > 0) {
+      await client.query(
+        `INSERT INTO platform.user_role_permission (role_id, permission)
+           SELECT $1, p FROM unnest($2::text[]) AS p`,
+        [roleId, permissions],
+      );
+    }
+    await client.query(
+      `INSERT INTO platform.user_role_assignment (user_id, role_id) VALUES ($1, $2)`,
+      [userId, roleId],
+    );
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }

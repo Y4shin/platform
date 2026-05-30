@@ -40,7 +40,7 @@ pub async fn load_user_by_session(
 
 async fn load_memberships(pool: &PgPool, user_id: Uuid) -> Result<Vec<Membership>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT gm.group_id, g.name AS group_name, \
+        "SELECT gm.group_id, g.name AS group_name, gm.managed_by, \
                 gr.id AS role_id, gr.name AS role_name, rp.permission \
          FROM platform.group_membership gm \
          JOIN platform.group g ON g.id = gm.group_id \
@@ -67,6 +67,7 @@ async fn load_memberships(pool: &PgPool, user_id: Uuid) -> Result<Vec<Membership
                     name: row.get("role_name"),
                 },
                 permissions: HashSet::new(),
+                managed_by: row.get("managed_by"),
             }
         });
         if let Some(permission) = row.get::<Option<String>, _>("permission") {

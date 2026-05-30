@@ -355,6 +355,7 @@ mod tests {
                     .iter()
                     .map(|p| (*p).to_string())
                     .collect::<HashSet<_>>(),
+                managed_by: "manual".into(),
             }],
             user_roles: vec![],
         }

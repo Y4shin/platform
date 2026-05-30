@@ -20,6 +20,17 @@ pub async fn middleware(State(state): State<AuthState>, mut req: Request, next: 
             if let Ok(id) = Uuid::parse_str(cookie.value()) {
                 match load_user_by_session(&state.pool, id).await {
                     Ok(Some(user)) => {
+                        // Record activity so the /me sessions list shows recency.
+                        // Best-effort: a failed stamp must not break the request.
+                        if let Err(e) = sqlx::query(
+                            "UPDATE platform.session SET last_seen = now() WHERE id = $1",
+                        )
+                        .bind(id)
+                        .execute(&state.pool)
+                        .await
+                        {
+                            tracing::warn!(error = %e, "failed to stamp session last_seen");
+                        }
                         req.extensions_mut().insert(user);
                     }
                     Ok(None) => {}

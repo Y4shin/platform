@@ -600,7 +600,8 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
          \n\
          import { createRoute } from '@tanstack/react-router';\n\
          \n\
-         import { authedLayoutRoute, rootRoute } from '../router/root.js';\n",
+         import { authedLayoutRoute, rootRoute } from '../router/root.js';\n\
+         import { MePage } from '../pages/MePage.js';\n",
     );
 
     for p in &fe {
@@ -620,9 +621,12 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
         }
     }
 
-    // Authed app: the index + every plugin's `/p/<name>` routes, wrapped by the
-    // Shell via the pathless `authedLayoutRoute`.
+    // Authed app: the index, the host `/me` profile page, and every plugin's
+    // `/p/<name>` routes, wrapped by the Shell via the pathless
+    // `authedLayoutRoute`. `/me` is a host-owned route (no plugin), so it is
+    // emitted unconditionally alongside the index.
     buf.push_str("\nconst indexRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/',\n  component: () => null,\n});\n\n");
+    buf.push_str("const meRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/me',\n  component: MePage,\n});\n\n");
 
     for p in &fe {
         let pascal = p.struct_name.trim_end_matches("Plugin");
@@ -653,7 +657,7 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
     }
 
     buf.push_str(
-        "export const routeTree = rootRoute.addChildren([\n  authedLayoutRoute.addChildren([\n    indexRoute,\n",
+        "export const routeTree = rootRoute.addChildren([\n  authedLayoutRoute.addChildren([\n    indexRoute,\n    meRoute,\n",
     );
     for p in &fe {
         let camel = to_camel_case(&p.name);

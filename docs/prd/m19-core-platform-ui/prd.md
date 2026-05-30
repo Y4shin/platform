@@ -197,3 +197,16 @@ No open blockers for slicing. The library-choice confirmations above are the onl
   `@radix-ui/react-dropdown-menu` (design), `lucide-react` (host frontend). The
   `LocaleSwitcher` strings stay in the host catalog — the component still exists and
   re-homes onto `/me` in slice #3.
+- **Slice #3 (`/me` profile page)** — `GET /api/me` now returns a flattened
+  `MeResponse` (user + `oidcSub` + `sessions[]`), built by a dedicated host query so the
+  per-request `User` in extensions stays lean; `DELETE /api/sessions/{id}` revokes a
+  session (403 on the current one, 404 on non-owned/unknown to avoid leakage). Migration
+  `0016` adds `user_agent` + `last_seen` to `platform.session`; the session middleware
+  stamps `last_seen`, the OIDC callback records the login User-Agent. Decision: surfaced
+  `managed_by` by adding it to the **SDK `Membership`** (intrinsic to a membership; the
+  standard `load_memberships` path now carries it) rather than a parallel /me-only query.
+  `/me` is host-owned, so the `junius sync` route generator emits the route
+  unconditionally (the index `/` still renders `null` until slice #4's dashboard). The
+  Playwright spec follows the repo convention for `e2e/cross/**` browser specs —
+  `JUNIUS_E2E`-gated (skipped in the automated `run-suite`, like `user-menu`/`locale`);
+  the CI-enforced behavioural coverage for the auth gates is `platform/tests/sessions_pg.rs`.
