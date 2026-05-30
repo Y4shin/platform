@@ -77,5 +77,14 @@ The old milestone template maps almost 1:1 onto the PRD + slices model:
 
 ## Status
 
-Pilot (M19) **pending** — nothing migrated yet. This document defines the objective; the
-pilot run executes step 1 above and is reviewed before the rest follow.
+Pilot (M19) **executed — awaiting review.** Step 1 above is done:
+[`docs/prd/m19-core-platform-ui/prd.md`](docs/prd/m19-core-platform-ui/prd.md) transcribes the
+milestone (`kind: feature`, `milestone: M19`) and links back to the milestone doc for the full
+design; `/feature-prd-to-issues` created the PRD tracking issue
+([#1](https://github.com/Y4shin/platform/issues/1)) owning eight slice sub-issues (#2–#9 —
+M19 Stages 1–6 with Stage 6 split into jobs/plugins/health, and Stage 7 "tests + docs"
+absorbed); each slice has a committed `slices/<n>-*.md` spec; the M19 milestone doc carries a
+migration banner and the `docs/impl/README.md` row points at the PRD.
+
+**Review the shape**, then repeat for **M20** / **M21** (`feature`) and **M22** / **M25**
+(`capability`) per step 2 above.

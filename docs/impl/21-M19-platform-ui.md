@@ -1,5 +1,12 @@
 # 21. M19 — Core platform UIs
 
+> **📦 Migrated to a PRD.** Planning of this (still-unbuilt) milestone moved to the
+> feature/capability PRD workflow — see [`docs/prd/m19-core-platform-ui/prd.md`](../prd/m19-core-platform-ui/prd.md)
+> and the [MIGRATION.md](../../MIGRATION.md) pilot. This doc stays as the **full design
+> reference** (mockups, proto sketches, endpoint lists); the PRD links back here rather than
+> duplicating it. Track active work via the PRD's tracking issue
+> ([#1](https://github.com/Y4shin/platform/issues/1)), not this doc.
+
 > **Status:** 🚧 planned. Sequenced **after [M18](20-M18-group-role-provisioning.md)**:
 > the Tier-2 admin pages in this milestone extend the M18 `admin` plugin and
 > consume its `platform.admin` capability + permission catalogue. Independent
