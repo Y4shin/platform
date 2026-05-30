@@ -35,6 +35,13 @@ end-to-end behaviour. The pre-push `lefthook` hook also verifies flake FOD hashe
   issue (and unblocks its PRD dependency).
 - All issue/PR text in English.
 
+## Merging
+
+**Never squash.** Merge PRs with a **merge commit** (`gh pr merge <n> --merge`), preserving the
+individual commits on the branch. The commit history is intentionally granular — squashing
+discards the per-commit context (and the Conventional Commit scopes) we rely on. Don't rebase-
+merge or squash-merge either.
+
 ## A PR isn't done until CI is green
 
 Passing `task ci` locally is necessary but not sufficient — the remote checks are the source of
