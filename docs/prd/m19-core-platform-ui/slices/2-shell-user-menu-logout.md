@@ -33,3 +33,37 @@ a Profile link, and can sign out back to the Authentik login page.
 ## Blocked by
 
 - None — can start immediately.
+
+## Test plan
+
+**Test type:** e2e (Playwright) + frontend-unit (vitest) — the repo convention pairs every
+`e2e/cross/*.spec.ts` with a deterministic vitest counterpart (cf. `locale.spec.ts` ↔
+`I18nProvider.test.tsx`).
+**Reasoning:** the load-bearing behaviour is an integration (clear session → leave the authed
+app), which only an e2e proves honestly; the `signOut` request-shaping is the one piece with
+real risk that's too slow to iterate on in e2e, so it gets a fast unit counterpart.
+
+### e2e — `login → open menu → sign out` (the required round-trip)
+- After `loginAs`, the header shows the user's **display name + chevron** (trigger visible).
+- Opening the menu reveals the **email**, a **Profile link to `/me`**, and a **Sign out** item.
+- The **`LocaleSwitcher` no longer renders in the header**.
+- Clicking **Sign out** ends the session: assert we're **bounced out of the authed SPA** (URL
+  leaves the app / a follow-up `page.goto('/')` lands on the login flow) — **not** an assertion
+  against Authentik's own login DOM (session-seed fixtures deliberately avoid the external IdP).
+
+### frontend-unit — the `signOut` helper (deterministic counterpart)
+- `POST`s `/api/auth/logout` **with credentials** (`credentials: 'include'`).
+- Then redirects to `/api/auth/login` for a fresh session.
+- Error case: a failed logout `fetch` still redirects (no silent dead-end leaving the user
+  stuck in a half-authed state) — confirm the intended behaviour during implementation.
+
+*Not separately tested:* `<UserMenu>` render and the `@junius/design/Menu` primitive — the
+e2e's open-menu assertions cover the contents, and the primitive is a thin Radix wrapper
+(testing it would test the library).
+
+### Test files
+- `e2e/cross/user-menu.spec.ts` (gated behind `JUNIUS_E2E`, session-seed login via `loginAs`)
+- `packages/sdk/src/auth/signOut.test.ts` (vitest, jsdom — mock `fetch` + `window.location`)
+
+### Run command
+`task test:e2e` (round-trip) · `task test:js` (the `signOut` vitest)
