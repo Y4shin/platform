@@ -2,6 +2,7 @@
 kind: capability
 title: Precompiled-image follow-ups
 slug: m25-precompiled-followups
+epic: build-and-infra
 milestone: M25
 prd_issue: 26
 slices: [27, 28, 29, 30]

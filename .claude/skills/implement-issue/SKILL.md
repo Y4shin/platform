@@ -90,8 +90,9 @@ criteria and `Closes #<n>` (PR form for the detected provider):
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_create_pr`
 
-Then set the issue label `status:in-progress` → `status:needs-review` and tick the slice
-off the PRD issue's task list (`- [x] #<n> …`). Label-edit form:
+Then set the issue label `status:in-progress` → `status:needs-review`. (No task list to tick —
+the slice is wired as a native dependency of its PRD; merging the PR `Closes #<n>`, which
+auto-resolves that dependency.) Label-edit form:
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_edit_labels`
 

@@ -2,6 +2,7 @@
 kind: feature
 title: Core platform UIs
 slug: m19-core-platform-ui
+epic: platform-ux-foundations
 milestone: M19
 prd_issue: 1
 slices: [2, 3, 4, 5, 6, 7, 8, 9]

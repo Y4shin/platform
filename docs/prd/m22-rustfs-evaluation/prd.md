@@ -2,6 +2,7 @@
 kind: capability
 title: Evaluate RustFS as a MinIO alternative
 slug: m22-rustfs-evaluation
+epic: build-and-infra
 milestone: M22
 prd_issue: 21
 slices: [22, 23, 24, 25]

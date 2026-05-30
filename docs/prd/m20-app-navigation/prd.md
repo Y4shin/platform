@@ -2,6 +2,7 @@
 kind: feature
 title: Plugin apps + left-rail navigation
 slug: m20-app-navigation
+epic: platform-ux-foundations
 milestone: M20
 prd_issue: 10
 slices: [11, 12, 13, 14]

@@ -49,7 +49,8 @@ case "$key" in
     cat <<'EOF'
 git_type owner repo auth_check
 cmd_get_issue cmd_create_issue cmd_list_issues cmd_comment cmd_close_issue
-cmd_edit_labels cmd_create_pr ensure_labels cmd_attach_subissue ownership_note
+cmd_edit_labels cmd_create_pr ensure_labels
+cmd_attach_subissue cmd_detach_subissue cmd_add_dependency ownership_note
 EOF
     ;;
 
@@ -76,6 +77,7 @@ EOF
   ensure_labels)
     # Idempotent label provisioning for the detected provider.
     labels=(
+      "epic|b60205"
       "kind:feature|1d76db"     "kind:capability|0e8a16" "prd|5319e7"
       "mode:hitl|fbca04"        "mode:afk|c2e0c6"
       "status:todo|ededed"      "status:in-progress|0052cc"
@@ -92,25 +94,56 @@ EOF
     ;;
 
   cmd_attach_subissue)
+    # ONLY relationship that uses sub-issue parenting: epic -> {child PRD, child slice}.
+    # Everything else (PRD<-slice, slice<-slice, PRD<-PRD) is a dependency — see cmd_add_dependency.
     if [ "$FORGE" = gh ]; then
       cat <<EOF
-# GitHub native sub-issue (true ownership). child id != issue number — resolve it first.
+# GitHub native sub-issue. child id != issue number — resolve it first.
 child_id=\$(gh api "repos/$OWNER/$REPO/issues/<child#>" --jq .id)
-gh api --method POST "repos/$OWNER/$REPO/issues/<prd#>/sub_issues" -F sub_issue_id="\$child_id"
+gh api --method POST "repos/$OWNER/$REPO/issues/<epic#>/sub_issues" -F sub_issue_id="\$child_id"
 EOF
     else
       cat <<'EOF'
-# Forgejo has no ownership hierarchy. Model it by convention:
-#  - add "- [ ] #<child#> <title>" to the PRD issue's task list (fgj issue edit <prd#> --body ...)
-#  - put a "Part of #<prd#>" line in the child issue body
-# (Optional native dependency via raw REST; blocks-semantics, not ownership.)
+# Forgejo/Gitea: sub-issue support varies by version. If the build exposes it, set the child's
+# parent ref to the epic; otherwise emulate by convention (epic task list "- [ ] #<child>" +
+# a "Part of #<epic>" line in the child). Confirm the API against your fgj version first.
+EOF
+    fi
+    ;;
+
+  cmd_detach_subissue)
+    # Remove a child from its epic parent (used by the migration to re-home old PRD children).
+    if [ "$FORGE" = gh ]; then
+      cat <<EOF
+# GitHub: detach <child#> from <epic#>. Uses the child's internal id.
+child_id=\$(gh api "repos/$OWNER/$REPO/issues/<child#>" --jq .id)
+gh api --method DELETE "repos/$OWNER/$REPO/issues/<epic#>/sub_issue" -F sub_issue_id="\$child_id"
+EOF
+    else
+      echo "# Forgejo: clear the child's parent ref (PATCH /issues/<child#> with empty parent)."
+    fi
+    ;;
+
+  cmd_add_dependency)
+    # Make <issue#> blocked-by <blocker#> (native dependency). issue_id != number — resolve it.
+    if [ "$FORGE" = gh ]; then
+      cat <<EOF
+blocker_id=\$(gh api "repos/$OWNER/$REPO/issues/<blocker#>" --jq .id)
+gh api --method POST "repos/$OWNER/$REPO/issues/<issue#>/dependencies/blocked_by" \\
+  -H "X-GitHub-Api-Version: 2026-03-10" -F issue_id="\$blocker_id"
+EOF
+    else
+      cat <<EOF
+# Forgejo/Gitea native dependency: <issue#> depends on (is blocked by) <blocker#>.
+fgj api --method POST "repos/$OWNER/$REPO/issues/<issue#>/dependencies" \\
+  --field "index=<blocker#>"
 EOF
     fi
     ;;
 
   ownership_note)
-    pick 'GitHub: native sub-issues give the PRD issue true parent/child ownership + roll-up progress (wired via gh api).' \
-         'Forgejo: NO ownership hierarchy — best-effort via the PRD issue task list + "Part of #<prd>" references only.' ;;
+    pick 'GitHub: epics own children via native sub-issues; PRD<-slice / slice<-slice / PRD<-PRD order via native issue dependencies (gh api).' \
+         'Forgejo: native sub-issues (parent ref) for epic->child; native issue dependencies for ordering (fgj api).' ;;
 
   *)
     echo "ERROR: unknown key '$key' — run 'scripts/forge_detect.sh keys'" >&2

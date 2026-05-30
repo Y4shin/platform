@@ -42,7 +42,9 @@ If a question is answerable from the code/docs, answer it yourself and move on.
 ## Step 3 — Write the PRD
 
 Write to `docs/prd/<slug>/prd.md` (`<slug>` = 3–5 word kebab of the title). Frontmatter per
-`docs/workflow/artifacts.md` with `kind: feature` and `status: draft`. Body:
+`docs/workflow/artifacts.md` with `kind: feature` and `status: draft`. **If you were invoked
+with epic context** (e.g. handed off from `/epic-to-prds` with an `epic: <epic-slug>`), set the
+`epic:` field to that slug; otherwise omit it (standalone PRD). Body:
 
 ```markdown
 # <title>

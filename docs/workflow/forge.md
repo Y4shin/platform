@@ -12,24 +12,35 @@ targeted snippet for a key. Skills inject only the key they need, e.g.
 Run `scripts/forge_detect.sh keys` for the full list. Keys: `git_type`, `owner`, `repo`,
 `auth_check`, `cmd_get_issue`, `cmd_create_issue`, `cmd_list_issues`, `cmd_comment`,
 `cmd_close_issue`, `cmd_edit_labels`, `cmd_create_pr`, `ensure_labels`,
-`cmd_attach_subissue`, `ownership_note`.
+`cmd_attach_subissue`, `cmd_detach_subissue`, `cmd_add_dependency`, `ownership_note`.
 
-## PRD-issue ↔ slice ownership (provider-specific)
+## Tracker shape — flat, native primitives
 
-Each PRD has one `prd`-labelled **PRD tracking issue** that owns its slice issues
-(`scripts/forge_detect.sh cmd_attach_subissue` emits the wiring for the detected provider).
+The tracker uses GitHub's **native sub-issues** and **native issue dependencies**. One rule
+splits the two mechanisms:
 
-- **GitHub — native sub-issues (true ownership).** `gh` has no sub-issue subcommand
-  (cli/cli#10298), so it's wired via `gh api` (`POST …/issues/<prd#>/sub_issues` with the
-  child's **internal id**, not its issue number — passing the number 404s). Real
-  parent/child hierarchy + roll-up progress on the PRD issue.
-- **Forgejo — no ownership hierarchy (best-effort).** Forgejo/Gitea has only
-  depends-on/blocks dependencies, and `fgj` exposes neither sub-issues nor dependencies.
-  So model it by convention: a task list of `- [ ] #<child> <title>` on the PRD issue + a
-  `Part of #<prd>` line in each slice. ⚠️ This is references + a checklist, **not** enforced
-  ownership — don't mistake it for parity with GitHub.
-- **Both:** every PR body carries `Closes #<n>` so merging auto-closes its slice; the PRD
-  issue's task list is ticked as each lands.
+- **Sub-issue (parent/child)** — used for **exactly one** relationship: an **epic** is the
+  sub-issue parent of its child PRD issues *and* their slice issues, all flat siblings under
+  the epic. `scripts/forge_detect.sh cmd_attach_subissue` emits the wiring;
+  `cmd_detach_subissue` removes it (the migration uses it to re-home old PRD children).
+- **Dependency (`blocked_by`)** — used for **everything else**: a PRD issue is `blocked_by` its
+  slice issues; slice `blocked_by` slice for ordering; PRD `blocked_by` PRD for cross-PRD
+  order. `scripts/forge_detect.sh cmd_add_dependency` emits the wiring.
+
+A **standalone PRD** (no epic) uses the same rule with the parenting half empty: no sub-issue
+parent; the PRD issue is `blocked_by` its slices; slices ordered by dependencies.
+
+### Provider notes
+
+- **GitHub.** `gh` has no sub-issue/dependency subcommand (cli/cli#10298), so both go via
+  `gh api`. Sub-issues: `POST …/issues/<epic#>/sub_issues` with the child's **internal id**
+  (not its number — passing the number 404s). Dependencies: `POST
+  …/issues/<issue#>/dependencies/blocked_by` with `issue_id` = the blocker's **internal id**,
+  header `X-GitHub-Api-Version: 2026-03-10`. Both GA as of 2025.
+- **Forgejo/Gitea.** Native issue **dependencies** (depends-on/blocks) exist via the API;
+  native **sub-issues** vary by version — if unavailable, emulate epic→child by convention
+  (epic task list + `Part of #<epic>` line). Confirm against your `fgj` build.
+- **Both:** every PR body carries `Closes #<n>` so merging auto-closes its slice.
 
 ## Label scheme
 
@@ -38,8 +49,9 @@ Created idempotently via `scripts/forge_detect.sh ensure_labels` (emits the prov
 
 | Label | Meaning |
 |-------|---------|
+| `epic` | the epic issue (sub-issue parent of its child PRD + slice issues) |
 | `kind:feature` / `kind:capability` | track; carried from PRD `kind` onto every slice issue |
-| `prd` | the PRD tracking issue (parent of the slices) |
+| `prd` | the PRD issue (a regular issue, `blocked_by` its slices — no longer their sub-issue parent) |
 | `mode:hitl` / `mode:afk` | needs human interaction vs autonomously mergeable |
 | `status:todo` / `status:in-progress` / `status:needs-review` / `status:done` | slice lifecycle |
 | `milestone:M<NN>` *(optional)* | mirror of a provider milestone when one applies |

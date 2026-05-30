@@ -2,6 +2,7 @@
 kind: feature
 title: Documentation site (mdbook)
 slug: m21-documentation-site
+epic: developer-experience
 milestone: M21
 prd_issue: 15
 slices: [16, 17, 18, 19, 20]

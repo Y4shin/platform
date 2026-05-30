@@ -1,13 +1,15 @@
 ---
 name: capability-prd-to-issues
-description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (SDK/macro/host surface, each with a first consumer), create a PRD tracking issue that owns them, and write committed slice docs. Use after /create-capability-prd. Provider-aware (gh/fgj).
+description: Break a capability PRD (kind:capability) into independently-grabbable enabling slices (SDK/macro/host surface, each with a first consumer), wire the PRD issue + slices with native dependencies (and sub-issues under an epic), and write committed slice docs. Use after /create-capability-prd. Provider-aware (gh/fgj).
 ---
 
 # Capability PRD → Issues
 
 Convert a `kind: capability` PRD into independently-grabbable issues using **enabling
-slices**, owned by a PRD tracking issue. Capabilities are foundational (no UI to demo), so
-acceptance is a **consumer test**, not a demoable screen.
+slices**, wired with the flat native tracker model (see the injected reference): the PRD issue
+is `blocked_by` its slices; under an epic, the PRD and every slice attach as native sub-issues
+of that epic. Capabilities are foundational (no UI to demo), so acceptance is a **consumer
+test**, not a demoable screen.
 
 Detected forge: **!`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" git_type`** — !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" ownership_note`
 
@@ -59,26 +61,40 @@ Present the breakdown as a numbered list; per slice: **Title**, **Type (HITL/AFK
 does each slice name a real consumer? merge/split any? HITL vs AFK correct? Iterate until
 approved.
 
-## Step 4 — Publish (dependency order, blockers first)
+## Step 4 — Publish (flat native model, dependency order, blockers first)
+
+Read the injected reference for the tracker rule: **sub-issue = epic-only; dependencies =
+everything else.** Check `prd.md` frontmatter for an `epic:` field — present ⇒ this PRD belongs
+to an epic; absent ⇒ standalone.
 
 Create-issue form for the detected provider:
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_create_issue`
 
-Attach a slice as a child of the PRD issue (detected provider):
+Add a native dependency (make `<issue#>` blocked-by `<blocker#>`):
+
+!`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_add_dependency`
+
+Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_attach_subissue`
 
-1. **Create the PRD issue** (label `prd`): body = PRD summary + an empty task list. Record
-   its number as `prd_issue:` in `prd.md`.
+1. **Create the PRD issue** (labels `prd`, `kind:capability`): body = PRD summary. It is a
+   regular issue — it does **not** own the slices as sub-issues. Record its number as
+   `prd_issue:` in `prd.md`.
 2. For each slice, in dependency order:
    - Create the issue with labels `kind:capability`, `mode:hitl|afk`, `status:todo` (+
-     `milestone:M<NN>`). Body uses the template below, including `Part of #<prd>` and
-     blockers referencing real issue numbers.
-   - **Attach it as a child of the PRD issue** (snippet above).
+     `milestone:M<NN>`). Body uses the template below (`Part of #<prd>` + blockers).
+   - Add **PRD `blocked_by` this slice**.
+   - For each blocker in the slice's `## Blocked by`, add **slice `blocked_by` blocker**.
    - Write `docs/prd/<slug>/slices/<n>-<slug>.md` from the template in `docs/workflow/artifacts.md`.
-3. Set `slices: [...]` and `status: issues-created` in `prd.md`. Commit the `docs/prd/<slug>/`
-   changes.
+3. **If `epic:` is set:** attach the PRD issue **and every slice issue** as native sub-issues of
+   the epic (`epic_issue:` from `docs/prd/epics/<epic-slug>/epic.md`). Add any **PRD `blocked_by`
+   PRD** edges the epic's `prds[].blocked_by` calls for. Then in `epic.md`: set this PRD's
+   `prds[].issue` to `<prd#>`, tick its checklist item on the epic issue, and set the epic
+   `status: in-progress`.
+4. Set `slices: [...]` and `status: issues-created` in `prd.md`. Commit the `docs/prd/` changes
+   (PRD dir, and the epic dir if touched).
 
 <issue-template>
 ## Part of
@@ -98,11 +114,14 @@ the decision better than prose.
 - #<n> — <reason>   (or "None — can start immediately")
 </issue-template>
 
-After publishing, report: `#<n> · <title> · HITL|AFK · consumer: <x> · blocked-by: …`, and
-the PRD issue number.
+After publishing, report: `#<n> · <title> · HITL|AFK · consumer: <x> · blocked-by: …` per
+slice, the PRD issue number, and (if under an epic) the epic issue number with its updated
+checklist.
 
 ## Constraints
 
 - **kind:capability only** — abort on a feature PRD.
 - **English**; **no speculative scope** — every surface names a consumer or it's deferred.
+- **Tracker rule:** sub-issue parenting is epic-only; PRD↔slice and all ordering are native
+  dependencies. The PRD issue never owns slices as sub-issues.
 - Do not modify unrelated issues.
