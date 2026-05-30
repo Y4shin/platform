@@ -8,6 +8,13 @@ modules:
 lint:
   use:
     - STANDARD
+  ignore_only:
+    # `user.v1.UserService.RefreshOidcGroups` returns the shared
+    # `ReconcileResult` (the same shape the login-time group reconcile logs),
+    # deliberately not the method-specific `RefreshOidcGroupsResponse` the
+    # STANDARD rule expects. Keep the shared name; exempt just this file.
+    RPC_RESPONSE_STANDARD_NAME:
+      - proto/user/v1/user.proto
 breaking:
   use:
     - FILE

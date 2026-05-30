@@ -109,6 +109,22 @@ export function goToLogin(): void {
 }
 
 /**
+ * End the current session and return to login for a fresh one. POSTs
+ * `/api/auth/logout` (with credentials so the session cookie is sent), then
+ * redirects to `/api/auth/login`. The redirect is unconditional: a failed
+ * logout request must never strand the user in a half-authenticated SPA, so we
+ * swallow the error and still send them out to re-authenticate.
+ */
+export async function signOut(): Promise<void> {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  } catch {
+    // Ignore: redirect to login regardless (see doc comment).
+  }
+  window.location.assign('/api/auth/login');
+}
+
+/**
  * The single "should an unauthenticated state send us to login?" decision,
  * consulted by *every* redirect path (AuthProvider's initial `/api/me`, and the
  * app's `queryClient.onError` for `Unauthenticated` RPCs). It redirects unless
