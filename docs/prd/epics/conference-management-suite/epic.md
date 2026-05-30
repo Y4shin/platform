@@ -6,7 +6,7 @@ epic_issue: 34
 prds:
   - slug: composition-contracts
     kind: capability
-    issue: null
+    issue: 35
     blocked_by: []
   - slug: composition-entity-links
     kind: capability
@@ -48,7 +48,7 @@ prds:
     kind: feature
     issue: null
     blocked_by: [voting, composition-contracts, composition-entity-links, composition-event-bus]
-status: prds-planned
+status: in-progress
 ---
 
 # Conference management suite

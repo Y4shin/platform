@@ -3,9 +3,9 @@ kind: capability
 title: Cross-plugin contracts & extension slots
 slug: composition-contracts
 epic: conference-management-suite
-prd_issue:
-slices:
-status: draft
+prd_issue: 35
+slices: [36, 37, 38, 39, 40, 41, 42]
+status: issues-created
 ---
 
 # Cross-plugin contracts & extension slots
