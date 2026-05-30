@@ -1,5 +1,11 @@
 # 23. M21 — Documentation site (mdbook)
 
+> **📦 Migrated to a PRD.** Planning of this (still-unbuilt) milestone moved to the PRD
+> workflow — see [`docs/prd/m21-documentation-site/prd.md`](../prd/m21-documentation-site/prd.md)
+> and the [MIGRATION.md](../../MIGRATION.md) rollout. This doc stays as the **full design
+> reference**; track active work via the PRD's tracking issue
+> ([#15](https://github.com/Y4shin/platform/issues/15)), not this doc.
+
 > **Status:** 🚧 planned. Independent of M14–M20 — can land any time after
 > M13. The existing `docs/` tree (design, impl, plugin-authoring-guide)
 > is kept in place; M21 wraps it in a navigable, locally-servable book
