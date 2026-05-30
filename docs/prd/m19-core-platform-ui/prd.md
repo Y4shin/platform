@@ -186,3 +186,14 @@ No open blockers for slicing. The library-choice confirmations above are the onl
 
 ## Implementation notes
 <!-- appended by implement-issue as slices land; empty for now -->
+
+- **Slice #2 (shell + user menu + logout)** — PR #34. Added `@junius/design/Menu`
+  (Radix `react-dropdown-menu` wrapper, first host menu primitive), `signOut` in
+  `@junius/sdk/auth`, and `<UserMenu>` in the host `Shell`. Deviations from the spec:
+  the Profile link uses a plain `<a href="/me">` rather than a router `Link` because
+  the `/me` route lands in slice #3 (avoids depending on an unregistered route);
+  `signOut` redirects to `/api/auth/login` **unconditionally** (even when the logout
+  fetch throws) so a failed logout can't strand a half-authenticated SPA. New deps:
+  `@radix-ui/react-dropdown-menu` (design), `lucide-react` (host frontend). The
+  `LocaleSwitcher` strings stay in the host catalog — the component still exists and
+  re-homes onto `/me` in slice #3.
