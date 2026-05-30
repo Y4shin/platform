@@ -1,5 +1,11 @@
 # 27. M25 — Precompiled-image follow-ups
 
+> **📦 Migrated to a PRD.** Planning of this (still-unbuilt) milestone moved to the PRD
+> workflow — see [`docs/prd/m25-precompiled-followups/prd.md`](../prd/m25-precompiled-followups/prd.md)
+> and the [MIGRATION.md](../../MIGRATION.md) rollout. This doc stays as the **full design
+> reference**; track active work via the PRD's tracking issue
+> ([#26](https://github.com/Y4shin/platform/issues/26)), not this doc.
+
 > **Status:** 🚧 planned. Sweeper milestone for items deferred from
 > [M24](26-M24-precompiled-containers.md) Stage 7. Small, independent
 > changes; each can land separately as a focused commit if priorities

@@ -86,5 +86,19 @@ M19 Stages 1–6 with Stage 6 split into jobs/plugins/health, and Stage 7 "tests
 absorbed); each slice has a committed `slices/<n>-*.md` spec; the M19 milestone doc carries a
 migration banner and the `docs/impl/README.md` row points at the PRD.
 
-**Review the shape**, then repeat for **M20** / **M21** (`feature`) and **M22** / **M25**
-(`capability`) per step 2 above.
+The pilot was reviewed (LGTM) and the **rollout is complete** — every planned milestone is now
+a PRD:
+
+| Milestone | Kind | PRD | Tracking issue | Slice issues |
+|---|---|---|---|---|
+| M19 | feature | `docs/prd/m19-core-platform-ui/` | [#1](https://github.com/Y4shin/platform/issues/1) | #2–#9 |
+| M20 | feature | `docs/prd/m20-app-navigation/` | [#10](https://github.com/Y4shin/platform/issues/10) | #11–#14 |
+| M21 | feature | `docs/prd/m21-documentation-site/` | [#15](https://github.com/Y4shin/platform/issues/15) | #16–#20 |
+| M22 | capability | `docs/prd/m22-rustfs-evaluation/` | [#21](https://github.com/Y4shin/platform/issues/21) | #22–#25 |
+| M25 | capability | `docs/prd/m25-precompiled-followups/` | [#26](https://github.com/Y4shin/platform/issues/26) | #27–#30 |
+
+Each milestone doc carries a migration banner pointing at its PRD, and the
+[`docs/impl/README.md`](docs/impl/README.md) rows link the PRDs + tracking issues. The shipped
+milestones (M00–M18, M23, M24) stay as permanent records — they are **not** migrated. New
+planned work now starts as a PRD via `/create-(feature|capability)-prd`, not a new `docs/impl/`
+doc. The migration objective is met; this document is retained as the rationale of record.
