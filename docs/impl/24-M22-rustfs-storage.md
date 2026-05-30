@@ -1,5 +1,11 @@
 # 24. M22 — Evaluate RustFS as a MinIO alternative
 
+> **📦 Migrated to a PRD.** Planning of this (still-unbuilt) milestone moved to the PRD
+> workflow — see [`docs/prd/m22-rustfs-evaluation/prd.md`](../prd/m22-rustfs-evaluation/prd.md)
+> and the [MIGRATION.md](../../MIGRATION.md) rollout. This doc stays as the **full design
+> reference** (and the home for the eventual "Spike findings" write-up); track active work via
+> the PRD's tracking issue ([#21](https://github.com/Y4shin/platform/issues/21)), not this doc.
+
 > **Status:** 🚧 planned. Independent of M14–M21 — can land any time after
 > [M10](11-M10-infra-capabilities.md) (which established the
 > `rust-s3` / `ObjectStore` storage seam). Touches no plugin code: the
