@@ -187,7 +187,7 @@ No open blockers for slicing. The library-choice confirmations above are the onl
 ## Implementation notes
 <!-- appended by implement-issue as slices land; empty for now -->
 
-- **Slice #2 (shell + user menu + logout)** — PR #34. Added `@junius/design/Menu`
+- **Slice #2 (shell + user menu + logout)** — PR #43. Added `@junius/design/Menu`
   (Radix `react-dropdown-menu` wrapper, first host menu primitive), `signOut` in
   `@junius/sdk/auth`, and `<UserMenu>` in the host `Shell`. Deviations from the spec:
   the Profile link uses a plain `<a href="/me">` rather than a router `Link` because
