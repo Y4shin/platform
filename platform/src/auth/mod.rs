@@ -11,6 +11,7 @@ pub mod me;
 pub mod oidc;
 pub mod oidc_groups;
 pub mod session;
+pub mod sessions;
 pub mod user_query;
 
 use std::sync::Arc;

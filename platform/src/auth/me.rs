@@ -9,17 +9,100 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use junius_sdk::{CurrentUser, Locale, MaybeUser};
+use junius_sdk::{CurrentUser, Locale, MaybeUser, User};
 use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, Row};
+use tower_cookies::Cookies;
+use uuid::Uuid;
 
 use crate::auth::AuthState;
 use crate::auth::oidc_groups;
+use crate::auth::session::SESSION_COOKIE;
 
-pub async fn handler(MaybeUser(user): MaybeUser) -> Response {
-    match user {
-        Some(user) => Json(user).into_response(),
-        None => (StatusCode::UNAUTHORIZED, "not authenticated").into_response(),
+/// `GET /api/me` body: the authenticated [`User`] (flattened — identity,
+/// memberships, user-roles) plus the two fields the `/me` profile page adds on
+/// top: the bound OIDC subject and the caller's live sessions.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MeResponse {
+    #[serde(flatten)]
+    user: User,
+    oidc_sub: String,
+    sessions: Vec<SessionInfo>,
+}
+
+/// One live session in the `/me` sessions list. `current` flags the session the
+/// request itself is authenticated with, so the frontend suppresses its Revoke
+/// control (the current session signs out via the user menu instead).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionInfo {
+    id: Uuid,
+    user_agent: Option<String>,
+    last_seen: chrono::DateTime<chrono::Utc>,
+    current: bool,
+}
+
+pub async fn handler(
+    State(state): State<AuthState>,
+    cookies: Cookies,
+    MaybeUser(user): MaybeUser,
+) -> Response {
+    let Some(user) = user else {
+        return (StatusCode::UNAUTHORIZED, "not authenticated").into_response();
+    };
+    let current_session = cookies
+        .get(SESSION_COOKIE)
+        .and_then(|c| Uuid::parse_str(c.value()).ok());
+    match build_me(&state.pool, user, current_session).await {
+        Ok(me) => Json(me).into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to build /api/me response");
+            (StatusCode::INTERNAL_SERVER_ERROR, "failed").into_response()
+        }
     }
+}
+
+/// Augment the session-resolved [`User`] with its OIDC subject and its live
+/// (unexpired) sessions. The session marked `current` is the one whose id is in
+/// the request's cookie.
+async fn build_me(
+    pool: &PgPool,
+    user: User,
+    current_session: Option<Uuid>,
+) -> Result<MeResponse, sqlx::Error> {
+    let oidc_sub: String = sqlx::query_scalar("SELECT oidc_sub FROM platform.user WHERE id = $1")
+        .bind(user.id.0)
+        .fetch_one(pool)
+        .await?;
+
+    let rows = sqlx::query(
+        "SELECT id, user_agent, last_seen FROM platform.session \
+         WHERE user_id = $1 AND expires_at > now() \
+         ORDER BY last_seen DESC",
+    )
+    .bind(user.id.0)
+    .fetch_all(pool)
+    .await?;
+
+    let sessions = rows
+        .into_iter()
+        .map(|row| {
+            let id: Uuid = row.get("id");
+            SessionInfo {
+                id,
+                user_agent: row.get("user_agent"),
+                last_seen: row.get("last_seen"),
+                current: Some(id) == current_session,
+            }
+        })
+        .collect();
+
+    Ok(MeResponse {
+        user,
+        oidc_sub,
+        sessions,
+    })
 }
 
 #[derive(Debug, Deserialize)]

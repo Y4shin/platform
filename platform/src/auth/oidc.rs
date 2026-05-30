@@ -128,6 +128,7 @@ pub struct CallbackQuery {
 pub async fn callback(
     State(state): State<AuthState>,
     cookies: Cookies,
+    headers: axum::http::HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Response {
     let Some(client) = state.oidc.as_ref() else {
@@ -220,16 +221,18 @@ pub async fn callback(
         token_response.access_token().secret().as_bytes(),
     );
     let expires_at = chrono::Utc::now() + chrono::Duration::seconds(state.session_ttl_secs);
-    let session_id = match create_session(&state.pool, user_id, expires_at, &token_blob).await {
-        Ok(id) => id,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("session create failed: {e}"),
-            )
-                .into_response();
-        }
-    };
+    let user_agent = request_user_agent(&headers);
+    let session_id =
+        match create_session(&state.pool, user_id, expires_at, &token_blob, user_agent).await {
+            Ok(id) => id,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("session create failed: {e}"),
+                )
+                    .into_response();
+            }
+        };
 
     let mut cookie = Cookie::new(SESSION_COOKIE, session_id.to_string());
     cookie.set_http_only(true);
@@ -277,19 +280,30 @@ async fn upsert_user(
     Ok(row.0)
 }
 
+/// The request's `User-Agent` header as a string, recorded on the session so the
+/// `/me` profile page can label it in the revoke list. `None` if the header is
+/// absent or not valid UTF-8 — best-effort telemetry, never load-bearing.
+fn request_user_agent(headers: &axum::http::HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+}
+
 async fn create_session(
     pool: &sqlx::PgPool,
     user_id: Uuid,
     expires_at: chrono::DateTime<chrono::Utc>,
     oidc_tokens: &[u8],
+    user_agent: Option<&str>,
 ) -> Result<Uuid, sqlx::Error> {
     let row: (Uuid,) = sqlx::query_as(
-        "INSERT INTO platform.session (user_id, expires_at, oidc_tokens) \
-         VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO platform.session (user_id, expires_at, oidc_tokens, user_agent) \
+         VALUES ($1, $2, $3, $4) RETURNING id",
     )
     .bind(user_id)
     .bind(expires_at)
     .bind(oidc_tokens)
+    .bind(user_agent)
     .fetch_one(pool)
     .await?;
     Ok(row.0)

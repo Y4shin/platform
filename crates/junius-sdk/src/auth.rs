@@ -72,6 +72,16 @@ pub struct Membership {
     pub group_name: String,
     pub role: Role,
     pub permissions: HashSet<String>,
+    /// Provenance of the membership (M18): `"manual"`, `"oidc"`, or `"config"`.
+    /// Surfaced on the `/me` profile page so a user can tell which group
+    /// memberships are IdP-managed (and so reaped on the next OIDC sync) versus
+    /// assigned by hand. Defaults to `"manual"` for payloads that pre-date it.
+    #[serde(default = "default_managed_by")]
+    pub managed_by: String,
+}
+
+fn default_managed_by() -> String {
+    "manual".to_string()
 }
 
 /// A user-role assignment (M18). Global scope — not per-group. The built-in
@@ -177,6 +187,7 @@ mod user_tests {
                 .iter()
                 .map(|s| (*s).to_string())
                 .collect::<HashSet<_>>(),
+            managed_by: "manual".into(),
         }
     }
 
