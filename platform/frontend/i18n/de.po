@@ -14,8 +14,8 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: platform/frontend/src/layout/Shell.tsx:25
-msgid "Anonymous"
-msgstr "Anonym"
+#~ msgid "Anonymous"
+#~ msgstr "Anonym"
 
 #: platform/frontend/src/layout/LocaleSwitcher.tsx:13
 msgid "English"
@@ -29,6 +29,18 @@ msgstr "Deutsch"
 msgid "Locale"
 msgstr "Sprache"
 
+#: platform/frontend/src/layout/UserMenu.tsx:37
+msgid "Profile"
+msgstr "Profil"
+
 #: platform/frontend/src/layout/LocaleSwitcher.tsx:15
 msgid "Pseudo"
 msgstr "Pseudo"
+
+#: platform/frontend/src/layout/UserMenu.tsx:43
+msgid "Sign out"
+msgstr "Abmelden"
+
+#: platform/frontend/src/layout/UserMenu.tsx:26
+msgid "User menu"
+msgstr "Benutzermenü"

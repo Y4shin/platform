@@ -1,17 +1,14 @@
 import { Stack } from '@junius/design';
-import { useUser } from '@junius/sdk';
-import { Trans } from '@lingui/react/macro';
 import type { ReactNode } from 'react';
 
-import { LocaleSwitcher } from './LocaleSwitcher.js';
 import { NavLinks } from './NavLinks.js';
+import { UserMenu } from './UserMenu.js';
 
 export interface ShellProps {
   children: ReactNode;
 }
 
 export function Shell({ children }: ShellProps) {
-  const user = useUser();
   return (
     <div className="flex min-h-full flex-col">
       <header className="border-border bg-surface-1 border-b px-4 py-3">
@@ -19,12 +16,9 @@ export function Shell({ children }: ShellProps) {
           {/* The brand name is intentionally not translated. */}
           <strong className="text-base">Junius</strong>
           <NavLinks />
-          <Stack direction="row" gap="sm" className="items-center">
-            <LocaleSwitcher />
-            <span className="text-fg-2 text-sm">
-              {user?.displayName ?? <Trans>Anonymous</Trans>}
-            </span>
-          </Stack>
+          {/* The LocaleSwitcher re-homes onto /me in slice #3; the header is now
+              brand + nav + user menu. */}
+          <UserMenu />
         </Stack>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 p-6">{children}</main>

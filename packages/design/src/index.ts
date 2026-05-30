@@ -11,6 +11,7 @@ export type { FormFieldProps, FormFieldRender } from './FormField.js';
 export { createFormField, FormField } from './FormField.js';
 export type { InputProps } from './Input.js';
 export { CONTROL_CLASS, Input } from './Input.js';
+export { Menu } from './Menu.js';
 export type { SelectOption, SelectProps } from './Select.js';
 export { Select } from './Select.js';
 export type { StackDirection, StackGap, StackProps } from './Stack.js';

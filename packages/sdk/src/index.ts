@@ -5,6 +5,7 @@ export {
   goToLogin,
   goToLoginUnlessPublic,
   isPublicPath,
+  signOut,
   useAuth,
 } from './auth/AuthProvider.js';
 export { useIsAuthenticated } from './auth/useIsAuthenticated.js';
