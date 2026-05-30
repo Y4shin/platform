@@ -18,6 +18,11 @@ schema + `docs/prd/<slug>/` layout + lifecycle):
 
 ## Step 1 — Load context
 
+**Receipt guard:** if a `prd.md` already exists at the target slug, check its `receipts:` for a
+prior `create-feature-prd` entry (see **Run receipts** in the injected reference). If present, the
+PRD was already drafted — report "`create-feature-prd` already ran on `<date>`" and confirm an
+intentional re-run before overwriting.
+
 Read `docs/plugin-authoring-guide.md`, `docs/design/04-frontend.md`, the target plugin
 under `plugins/<name>/` (or `docs/design/06-plugin-shape.md` if it's a new plugin), and any
 related `docs/impl/` milestone. Explore the codebase to answer your own questions before
@@ -61,6 +66,9 @@ with epic context** (e.g. handed off from `/epic-to-prds` with an `epic: <epic-s
 ```
 
 Leave `prd_issue:` / `slices:` empty — `/feature-prd-to-issues` fills them.
+
+**Leave your run receipt:** add a `create-feature-prd` entry to the frontmatter `receipts:` list
+(`skill: create-feature-prd`, `on: <today>`) per **Run receipts** in the injected reference.
 
 ## Step 4 — Hand off
 

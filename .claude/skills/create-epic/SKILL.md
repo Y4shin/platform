@@ -18,6 +18,11 @@ frontmatter schema, `docs/prd/<slug>/` layout, tracker shape, lifecycle):
 
 ## Step 1 — Load context
 
+**Receipt guard:** if an `epic.md` already exists at the target slug, check its `receipts:` for a
+prior `create-epic` entry (see **Run receipts** in the injected reference). If present, this epic
+was already drafted — report "`create-epic` already ran on `<date>`" and confirm an intentional
+re-run before overwriting.
+
 Read `docs/design/02-architecture.md`, `docs/design/06-plugin-shape.md`,
 `docs/design/08-cross-plugin-composition.md`, the `plugins/` trees that already exist, and any
 related `docs/impl/` milestones. An epic almost always spans plugin boundaries and shared host
@@ -61,6 +66,9 @@ Write to `docs/prd/epics/<slug>/epic.md` (`<slug>` = 3–5 word kebab of the tit
 ```
 
 Leave `epic_issue:` / `prds:` empty — `/epic-to-prds` fills them.
+
+**Leave your run receipt:** add a `create-epic` entry to the frontmatter `receipts:` list
+(`skill: create-epic`, `on: <today>`) per **Run receipts** in the injected reference.
 
 ## Step 4 — Hand off
 

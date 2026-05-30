@@ -18,6 +18,11 @@ schema + `docs/prd/<slug>/` layout + lifecycle):
 
 ## Step 1 — Load context
 
+**Receipt guard:** if a `prd.md` already exists at the target slug, check its `receipts:` for a
+prior `create-capability-prd` entry (see **Run receipts** in the injected reference). If present,
+the PRD was already drafted — report "`create-capability-prd` already ran on `<date>`" and confirm
+an intentional re-run before overwriting.
+
 Read `docs/design/11-backend-plugin-interface.md`, `docs/design/12-frontend-plugin-interface.md`,
 `docs/design/08-cross-plugin-composition.md`, `crates/junius-sdk/` (and `crates/junius-sdk-macros/`
 for macro work), and `clippy.toml`. Explore the codebase to answer your own questions
@@ -64,6 +69,10 @@ with epic context** (e.g. handed off from `/epic-to-prds` with an `epic: <epic-s
 ```
 
 Leave `prd_issue:` / `slices:` empty — `/capability-prd-to-issues` fills them.
+
+**Leave your run receipt:** add a `create-capability-prd` entry to the frontmatter `receipts:`
+list (`skill: create-capability-prd`, `on: <today>`) per **Run receipts** in the injected
+reference.
 
 ## Step 4 — Hand off
 

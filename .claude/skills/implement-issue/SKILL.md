@@ -16,6 +16,12 @@ uses them. The artifact-lifecycle reference is injected below.
 
 ## Step 1 — Set state
 
+**Receipt guard:** the slice doc `docs/prd/<slug>/slices/<n>-<slug>.md` must exist and carry a
+`## Test plan` (the `analyse-issue` receipt). If the slice doc is **absent**, this slice was
+already implemented (the doc is GC'd on completion — see **Run receipts** in the injected
+reference) — stop and confirm before re-running. If it exists but has no `## Test plan`, run
+`/analyse-issue <n>` first.
+
 Swap the issue's label `status:todo` → `status:in-progress` and add a starting comment
 ("Starting implementation. Branch: `feature/<n>-<slug>`."). Label-edit + comment form:
 
@@ -100,11 +106,13 @@ Report the PR URL.
 
 ## Step 7 — Artifact GC + PRD note
 
-1. Append a 2–4 line decision/deviation note to the PRD's `## Implementation notes` in
-   `docs/prd/<slug>/prd.md` (what shipped, any divergence from the spec, follow-ups) — this
-   is what `/finalize-prd` harvests.
+1. Append a dated **run-receipt note** to the PRD's `## Implementation notes` in
+   `docs/prd/<slug>/prd.md` — lead the line with `- <YYYY-MM-DD> · #<n> <slug> —` then 2–4
+   lines on what shipped, any divergence from the spec, follow-ups, and the PR link. This is
+   both the `implement-issue` receipt (see **Run receipts**) and what `/finalize-prd` harvests.
 2. **Delete the slice doc** `docs/prd/<slug>/slices/<n>-<slug>.md` and commit (with the PRD
-   note). A surviving slice doc now reliably signals unfinished work.
+   note). A surviving slice doc now reliably signals unfinished work; the dated Implementation
+   notes line is the surviving positive receipt.
 
 ## Constraints
 

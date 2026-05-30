@@ -26,6 +26,12 @@ the committed slice doc (`docs/prd/<slug>/slices/<n>-<slug>.md`); read both in f
 conventions: `docs/design/`, `docs/impl/README.md`, `docs/plugin-authoring-guide.md`,
 `clippy.toml`.
 
+**Receipt guard:** if the slice doc already contains a `## Test plan` section carrying an
+`<!-- receipt: analyse-issue · <date> -->` stamp (see **Run receipts** in the injected
+reference), it was already analysed — report "`analyse-issue` already ran on `<date>`" and confirm
+an intentional re-run before re-grilling (on re-run, **replace** the existing section rather than
+appending a second one).
+
 Present:
 
 ```
@@ -78,6 +84,7 @@ Once confirmed, **append** a `## Test plan` section to
 
 ```markdown
 ## Test plan
+<!-- receipt: analyse-issue · <YYYY-MM-DD> -->
 
 **Test type:** [e2e | rust-integration | consumer-integration | rust-unit/doctest | macro compile-test | frontend-unit | none]
 **Reasoning:** <one sentence>
@@ -94,7 +101,9 @@ Once confirmed, **append** a `## Test plan` section to
 `task test:rust` | `task test:rust:unit` | `task test:js` | `task test:e2e`
 ```
 
-Commit the slice doc. Confirm the path to the developer.
+Fill the `<!-- receipt: analyse-issue · <YYYY-MM-DD> -->` stamp under the `## Test plan` heading
+with today's date — this is the slice doc's run receipt (see **Run receipts**). Commit the slice
+doc. Confirm the path to the developer.
 
 ## Hand-off
 

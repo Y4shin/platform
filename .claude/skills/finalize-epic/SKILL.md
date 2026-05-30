@@ -18,8 +18,11 @@ reference is injected below.
 ## Step 1 — Preconditions (hard gate)
 
 Resolve `docs/prd/epics/<slug>/epic.md` (from the slug or by mapping the epic issue # via
-`epic_issue:`). Confirm **every** child in `prds:` is finalized:
-- each child's `docs/prd/<child-slug>/` directory is **gone** (deleted by `/finalize-prd`);
+`epic_issue:`). **Receipt guard:** if `docs/prd/epics/<slug>/` is already **gone**, this epic was
+already finalized (the dir is deleted on finalize — see **Run receipts** in the injected
+reference) — report it and stop. Else confirm **every** child in `prds:` is finalized:
+- each child's `docs/prd/<child-slug>/` directory is **gone** (deleted by `/finalize-prd`) — its
+  `prds[]` entry should carry a `finalized:` receipt date;
 - each child PRD issue is **closed** (the epic issue's sub-issue progress reads complete).
 
 If any child is outstanding, list it and **stop** — finalize the remaining child PRDs first
@@ -52,6 +55,10 @@ finalized docs.
   Close form for the detected provider:
 
   !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_close_issue`
+
+- **Leave the finalize receipt** (see **Run receipts**): append a dated entry to
+  `docs/design/14-decision-log.md` recording the epic's retirement (the epic dir is about to be
+  deleted, so this is its surviving positive receipt).
 
 - **Confirm with the user**, then delete the entire `docs/prd/epics/<epic-slug>/` and commit
   alongside the doc updates.

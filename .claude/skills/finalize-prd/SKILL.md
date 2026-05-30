@@ -17,7 +17,10 @@ reference is injected below.
 ## Step 1 — Preconditions
 
 Resolve `docs/prd/<slug>/` (from the slug or by mapping the PRD issue # via `prd.md`
-`prd_issue:`). Confirm:
+`prd_issue:`). **Receipt guard:** if `docs/prd/<slug>/` is already **gone**, this PRD was already
+finalized (the dir is deleted on finalize — see **Run receipts** in the injected reference; look
+for the `finalized:` key on its `prds[]` entry in the epic, if any) — report it and stop. Else
+confirm:
 - `docs/prd/<slug>/slices/` is **empty** (every slice implemented + its doc GC'd by
   `/implement-issue`);
 - the slice issues are **closed** — equivalently, the PRD issue's native `blocked_by`
@@ -58,9 +61,14 @@ narrative.
 
   !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" cmd_close_issue`
 
+- **Leave the finalize receipt** (see **Run receipts**): append a dated entry to
+  `docs/design/14-decision-log.md` recording the PRD's retirement (the PRD dir is about to be
+  deleted, so this is its surviving positive receipt).
+
 - **If `prd.md` carries `epic: <epic-slug>`:** in `docs/prd/epics/<epic-slug>/epic.md`, mark this
-  PRD's `prds[]` entry done and tick its checklist item on the epic issue. (When it's the last
-  child, the user can then `/finalize-epic <epic-slug>`.)
+  PRD's `prds[]` entry done — add `finalized: <YYYY-MM-DD>` (today) to that entry as the epic-side
+  receipt — and tick its checklist item on the epic issue. (When it's the last child, the user can
+  then `/finalize-epic <epic-slug>`.)
 
 - **Confirm with the user**, then delete the entire `docs/prd/<slug>/` and commit alongside
   the doc updates (the PRD has served its purpose and would only drift from here).

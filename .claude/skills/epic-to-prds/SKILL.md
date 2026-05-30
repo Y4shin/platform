@@ -26,6 +26,11 @@ it's `feature`/`capability`, stop and point at `/feature-prd-to-issues` /
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" auth_check`
 
+**Receipt guard:** check `epic.md` `receipts:` for a prior `epic-to-prds` entry (see **Run
+receipts** in the injected reference). If present (or `status:` is already `prds-planned`/later),
+the epic was already decomposed — report "`epic-to-prds` already ran on `<date>`" and confirm an
+intentional re-run before re-creating the epic issue.
+
 Ensure the label scheme exists (idempotent — provisions the `epic` label too):
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" ensure_labels`
@@ -62,7 +67,9 @@ Create-issue form for the detected provider:
    `epic.md`.
 2. Fill `prds:` in `epic.md` with the ordered plan (`slug`, `kind`, `issue: null`, `blocked_by`)
    and write the `## Decomposition` section (the same list, with rationale).
-3. Set `status: prds-planned`. Commit the `docs/prd/epics/<slug>/` changes.
+3. Set `status: prds-planned` and add an `epic-to-prds` entry to `epic.md` `receipts:`
+   (`on: <today>`, `note:` the epic issue #) per **Run receipts**. Commit the
+   `docs/prd/epics/<slug>/` changes.
 
 The child PRD issues do **not** exist yet — they're created by the per-child `/create-*-prd` →
 `/*-prd-to-issues` runs, which attach themselves under this epic (see those skills).

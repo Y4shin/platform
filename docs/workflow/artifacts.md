@@ -50,7 +50,9 @@ prds:                      # filled by epic-to-prds: the ordered decomposition
     kind: feature | capability
     issue: <#n>            # the child PRD's issue once created (null until then)
     blocked_by: [<prd-slug>, ...]
+    finalized: <YYYY-MM-DD> # added by finalize-prd when this child is retired (receipt)
 status: draft              # draft | prds-planned | in-progress | done
+receipts: []               # run receipts, appended by each skill that runs — see "Run receipts"
 ---
 ```
 
@@ -66,6 +68,7 @@ milestone: M<NN>     # optional; links to a docs/impl/ milestone
 prd_issue: <#n>      # filled by *-prd-to-issues: this PRD's own issue (label: prd)
 slices: [<#a>, <#b>] # filled by *-prd-to-issues: child (slice) issue numbers
 status: draft        # draft | issues-created | in-progress | done
+receipts: []         # run receipts, appended by each skill that runs — see "Run receipts"
 ---
 ```
 
@@ -93,7 +96,8 @@ PRD↔slice membership is recoverable from the committed `slices/<n>-<slug>.md` 
 
 ## Lifecycle / garbage collection
 
-Artifacts are **deleted as their work lands**, so the presence of a file is itself state:
+Artifacts are **deleted as their work lands**, so the presence of a file is itself state. Each
+step below also leaves an explicit **run receipt** at its artifact (see **Run receipts**):
 
 1. *(optional)* `create-epic` → writes `epic.md` (status `draft`).
 2. *(optional)* `epic-to-prds` → creates the epic issue, writes the ordered `prds:` plan +
@@ -131,5 +135,44 @@ Artifacts are **deleted as their work lands**, so the presence of a file is itse
 <!-- also realised as a native `blocked_by` dependency in the tracker -->
 
 ## Test plan          ← appended by analyse-issue
+<!-- receipt: analyse-issue · <YYYY-MM-DD> -->
 …
 ```
+
+## Run receipts
+
+Every workflow skill leaves a **run receipt** at the artifact it produces or advances, so a
+later run — or a downstream skill — can tell what has already happened, and re-running is a
+deliberate choice rather than a silent duplicate. Receipts make the *positive* record explicit
+and machine-checkable; the presence-based signals still hold alongside them (a missing slice doc
+⇒ implemented; a missing PRD dir ⇒ finalized).
+
+**Receipt entry** — a list item under `receipts:` in `epic.md` / `prd.md` frontmatter:
+
+```yaml
+receipts:
+  - skill: <skill-name>        # e.g. create-epic, capability-prd-to-issues
+    on: <YYYY-MM-DD>           # today's date (use the date from session context)
+    note: <one phrase>         # optional: issue/PR numbers or a short outcome
+```
+
+**Where each skill writes its receipt:**
+
+- `create-epic`, `epic-to-prds` → `epic.md` `receipts:`.
+- `create-(feature|capability)-prd`, `(feature|capability)-prd-to-issues` → `prd.md` `receipts:`.
+- `analyse-issue` → the slice doc has no frontmatter, so it stamps the appended `## Test plan`
+  section with a `<!-- receipt: analyse-issue · <YYYY-MM-DD> -->` line.
+- `implement-issue` → the slice doc is deleted on completion, so the receipt is the dated entry
+  it appends to `prd.md` `## Implementation notes` (plus the deletion itself).
+- `finalize-prd` → the PRD dir is deleted, so the receipt is the dated `docs/design/14-decision-log.md`
+  entry **and**, if under an epic, the `finalized: <YYYY-MM-DD>` key added to that child's `prds[]`
+  entry in `epic.md` (plus the closed PRD issue).
+- `finalize-epic` → the epic dir is deleted, so the receipt is the dated `docs/design/14-decision-log.md`
+  entry (plus the closed epic issue).
+
+**Idempotency rule (every skill).** Before doing its work, a skill checks the target artifact for
+its **own** prior receipt. If found, it does **not** silently repeat — it reports
+"`<skill>` already ran on `<date>`" and asks the user to confirm an intentional re-run; on a
+confirmed re-run it **updates the existing entry's `on:` date** rather than appending a duplicate.
+A skill may also read an **upstream** skill's receipt as a precondition signal (e.g. a
+`*-prd-to-issues` run expects a `create-*-prd` receipt on the same `prd.md`).

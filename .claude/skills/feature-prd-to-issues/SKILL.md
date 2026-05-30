@@ -25,6 +25,12 @@ Verify auth, then locate the PRD at `docs/prd/<slug>/prd.md` and **assert `kind:
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" auth_check`
 
+**Receipt guard:** expect a `create-feature-prd` receipt on this `prd.md` (its upstream); then
+check `receipts:` for a prior `feature-prd-to-issues` entry (see **Run receipts** in the injected
+reference). If present (or `status:` is already `issues-created`/later), the PRD was already
+sliced — report "`feature-prd-to-issues` already ran on `<date>`" and confirm an intentional
+re-run before re-creating issues.
+
 Ensure the label scheme exists (idempotent):
 
 !`"$(git rev-parse --show-toplevel)/scripts/forge_detect.sh" ensure_labels`
@@ -91,8 +97,9 @@ Attach a child as a sub-issue of the **epic** (only used when `epic:` is set):
    PRD** edges the epic's `prds[].blocked_by` calls for. Then in `epic.md`: set this PRD's
    `prds[].issue` to `<prd#>`, tick its checklist item on the epic issue, and set the epic
    `status: in-progress`.
-4. Set `slices: [...]` and `status: issues-created` in `prd.md`. Commit the `docs/prd/` changes
-   (PRD dir, and the epic dir if touched).
+4. Set `slices: [...]` and `status: issues-created` in `prd.md`, and add a
+   `feature-prd-to-issues` entry to its `receipts:` (`on: <today>`, `note:` the PRD issue #) per
+   **Run receipts**. Commit the `docs/prd/` changes (PRD dir, and the epic dir if touched).
 
 <issue-template>
 ## Part of
