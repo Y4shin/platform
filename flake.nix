@@ -240,7 +240,7 @@
               # `fetcherVersion = 3` is the current nixpkgs-recommended
               # one (the 2 → 3 deprecation lands in 26.11).
               fetcherVersion = 3;
-              hash = "sha256-gbALDqmSIHDcjkQYjYwbTlg5u3yEsyh9mEa58g8i2gA=";
+              hash = "sha256-mQLxdqdgq3qSg4oIHoiELHycwCXcEoNKGkejOgibvww=";
             };
 
             # Built SPA assets, baked into the `full` juniusd binary via
