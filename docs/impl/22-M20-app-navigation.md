@@ -1,5 +1,11 @@
 # 22. M20 — Plugin apps + left-rail picker with sub-nav
 
+> **📦 Migrated to a PRD.** Planning of this (still-unbuilt) milestone moved to the PRD
+> workflow — see [`docs/prd/m20-app-navigation/prd.md`](../prd/m20-app-navigation/prd.md) and
+> the [MIGRATION.md](../../MIGRATION.md) rollout. This doc stays as the **full design
+> reference**; track active work via the PRD's tracking issue
+> ([#10](https://github.com/Y4shin/platform/issues/10)), not this doc.
+
 > **Status:** 🚧 planned. Sequenced **after [M19](21-M19-platform-ui.md)** —
 > M20 reshapes the nav surface M19 deliberately left as a stepping stone (the
 > hand-edited `NavLinks` from M04) and changes the dashboard's tile source
