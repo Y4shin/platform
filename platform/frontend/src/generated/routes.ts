@@ -4,6 +4,7 @@
 import { createRoute } from '@tanstack/react-router';
 
 import { authedLayoutRoute, rootRoute } from '../router/root.js';
+import { MePage } from '../pages/MePage.js';
 import { buildRoutes as buildEvents, buildPublicRoutes as buildEventsPublic } from '@junius/plugin-events';
 import { buildRoutes as buildAdmin } from '@junius/plugin-admin';
 
@@ -11,6 +12,12 @@ const indexRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/',
   component: () => null,
+});
+
+const meRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/me',
+  component: MePage,
 });
 
 const eventsParent = createRoute({
@@ -34,6 +41,7 @@ eventsPublicParent.addChildren(buildEventsPublic(eventsPublicParent));
 export const routeTree = rootRoute.addChildren([
   authedLayoutRoute.addChildren([
     indexRoute,
+    meRoute,
     eventsParent,
     adminParent,
   ]),
