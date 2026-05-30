@@ -17,8 +17,8 @@ package user.v1;
 // carried, and how many `managed_by='oidc'` memberships were added / reaped.
 message ReconcileResult {
   uint32 oidc_groups_claimed = 1;
-  uint32 memberships_added   = 2;
-  uint32 memberships_reaped  = 3;
+  uint32 memberships_added = 2;
+  uint32 memberships_reaped = 3;
 }
 
 message RefreshOidcGroupsRequest {}
@@ -35,9 +35,9 @@ message ResyncOidcGroupsRequest {
 // reason (e.g. "no active session") otherwise.
 message UserReconcileResult {
   string user_id = 1;
-  string email   = 2;
-  optional ReconcileResult result  = 3;
-  optional string          skipped = 4;
+  string email = 2;
+  optional ReconcileResult result = 3;
+  optional string skipped = 4;
 }
 
 message ResyncOidcGroupsResponse {
