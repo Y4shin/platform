@@ -1,6 +1,13 @@
-# Slice #22 — RustFS probe + license/image evaluation
+---
+kind: capability
+title: "RustFS probe + license/image evaluation"
+slug: rustfs-probe-evaluation
+issue: 22
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** hitl
+# Slice #22 — RustFS probe + license/image evaluation
 
 Full design: [`24-M22-rustfs-storage.md` §Stage 1](../../../impl/24-M22-rustfs-storage.md#stage-1--spike-does-our-existing-surface-work-against-rustfs).
 

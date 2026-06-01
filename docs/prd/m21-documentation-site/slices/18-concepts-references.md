@@ -1,6 +1,13 @@
-# Slice #18 — Concepts + `plugin.toml` + HTTP-API reference
+---
+kind: feature
+title: "Concepts + `plugin.toml` + HTTP-API reference"
+slug: concepts-references
+issue: 18
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** afk
+# Slice #18 — Concepts + `plugin.toml` + HTTP-API reference
 
 Full design: [`23-M21-documentation.md` §C/Stage 3](../../../impl/23-M21-documentation.md#concepts).
 

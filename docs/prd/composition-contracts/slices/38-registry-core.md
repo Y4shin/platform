@@ -1,6 +1,13 @@
-# Slice #38 — Registration surface + immutable registry core
+---
+kind: capability
+title: "Registration surface + immutable registry core"
+slug: registry-core
+issue: 38
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #38 — Registration surface + immutable registry core
 
 ## What to build
 The registration surface + immutable registry core in `junius-sdk`:

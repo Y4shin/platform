@@ -1,6 +1,13 @@
-# Slice #27 — `junius doctor` (bundle/config diff CLI)
+---
+kind: capability
+title: "`junius doctor` (bundle/config diff CLI)"
+slug: junius-doctor
+issue: 27
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #27 — `junius doctor` (bundle/config diff CLI)
 
 Full design: [`27-M25-precompiled-followups.md` §1](../../../impl/27-M25-precompiled-followups.md#1-junius-doctor-bundleconfig-diff-cli).
 

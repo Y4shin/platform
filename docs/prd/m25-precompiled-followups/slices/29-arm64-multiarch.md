@@ -1,6 +1,13 @@
-# Slice #29 — linux/arm64 multi-arch images
+---
+kind: capability
+title: "linux/arm64 multi-arch images"
+slug: arm64-multiarch
+issue: 29
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #29 — linux/arm64 multi-arch images
 
 Full design: [`27-M25-precompiled-followups.md` §3](../../../impl/27-M25-precompiled-followups.md#3-linuxarm64-multi-arch).
 

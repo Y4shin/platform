@@ -1,6 +1,13 @@
-# Slice #40 — 1:N slots (register_slot / slot!)
+---
+kind: capability
+title: "1:N slots (register_slot / slot!)"
+slug: slots
+issue: 40
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #40 — 1:N slots (register_slot / slot!)
 
 ## What to build
 The 1:N slot mechanism:

@@ -1,6 +1,13 @@
-# Slice #24 — Swap E2E orchestrator to RustFS
+---
+kind: capability
+title: "Swap E2E orchestrator to RustFS"
+slug: swap-e2e-orchestrator
+issue: 24
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #24 — Swap E2E orchestrator to RustFS
 
 Full design: [`24-M22-rustfs-storage.md` §Stage 2b](../../../impl/24-M22-rustfs-storage.md#stage-2-only-if-stage-1-says-adopt--swap-dev--e2e--example).
 

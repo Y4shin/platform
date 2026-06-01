@@ -1,6 +1,13 @@
-# Slice #25 — Swap example deployment + ops copy
+---
+kind: capability
+title: "Swap example deployment + ops copy"
+slug: swap-example-ops
+issue: 25
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #25 — Swap example deployment + ops copy
 
 Full design: [`24-M22-rustfs-storage.md` §Stage 2c](../../../impl/24-M22-rustfs-storage.md#stage-2-only-if-stage-1-says-adopt--swap-dev--e2e--example).
 

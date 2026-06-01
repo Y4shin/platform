@@ -1,6 +1,13 @@
-# Slice #16 — Tooling + scaffold + existing-content wrap
+---
+kind: feature
+title: "Tooling + scaffold + existing-content wrap"
+slug: tooling-scaffold-wrap
+issue: 16
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #16 — Tooling + scaffold + existing-content wrap
 
 Full design: [`23-M21-documentation.md` §A–B + Stage 1](../../../impl/23-M21-documentation.md#a--tooling).
 

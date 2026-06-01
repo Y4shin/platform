@@ -1,6 +1,13 @@
-# Slice #11 — Manifest schema + `plugin-apps.ts` codegen + `junius check` validation
+---
+kind: feature
+title: "Manifest schema + `plugin-apps.ts` codegen + `junius check` validation"
+slug: manifest-schema-codegen
+issue: 11
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #11 — Manifest schema + `plugin-apps.ts` codegen + `junius check` validation
 
 Full design: [`22-M20-app-navigation.md` §A–B](../../../impl/22-M20-app-navigation.md#a--manifest-schema).
 

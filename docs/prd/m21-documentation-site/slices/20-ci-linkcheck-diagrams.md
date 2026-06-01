@@ -1,6 +1,13 @@
-# Slice #20 — CI integration + link-check + diagrams
+---
+kind: feature
+title: "CI integration + link-check + diagrams"
+slug: ci-linkcheck-diagrams
+issue: 20
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** afk
+# Slice #20 — CI integration + link-check + diagrams
 
 Full design: [`23-M21-documentation.md` §D + Stage 5](../../../impl/23-M21-documentation.md#d--task-targets--ci).
 

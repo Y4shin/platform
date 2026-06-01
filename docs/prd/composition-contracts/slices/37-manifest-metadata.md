@@ -1,6 +1,13 @@
-# Slice #37 — Manifest + metadata for contracts/slots
+---
+kind: capability
+title: "Manifest + metadata for contracts/slots"
+slug: manifest-metadata
+issue: 37
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #37 — Manifest + metadata for contracts/slots
 
 ## What to build
 - `junius-manifest`: `[exposes.contracts.<Name>]` (`iface`, `description`), `[exposes.slots.<Name>]`, and `contracts`/`slots` arrays on `[dependencies.<dep>]`.

@@ -1,6 +1,13 @@
-# Slice #8 — Plugin inventory
+---
+kind: feature
+title: "Plugin inventory"
+slug: plugin-inventory
+issue: 8
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #8 — Plugin inventory
 
 Full design: [`21-M19-platform-ui.md` §Tier 2.C](../../../impl/21-M19-platform-ui.md#tier-2c--plugin-inventory-padminplugins).
 
