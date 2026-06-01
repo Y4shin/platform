@@ -42,6 +42,9 @@ pub struct AuthState {
     pub(crate) admin_api_token: Option<String>,
     pub(crate) cookie_secure: bool,
     pub(crate) session_ttl_secs: i64,
+    /// Optional deployment contact address, surfaced on `/api/me` so the
+    /// dashboard's zero-permissions empty state can name who to ask for access.
+    pub(crate) admin_contact_email: Option<String>,
 }
 
 impl AuthState {
@@ -77,6 +80,7 @@ impl AuthState {
             admin_api_token: cfg.admin_api_token.clone(),
             cookie_secure,
             session_ttl_secs: SESSION_TTL_SECS,
+            admin_contact_email: cfg.admin_contact_email.clone(),
             pool,
         }
     }
@@ -92,8 +96,18 @@ impl AuthState {
             admin_api_token: None,
             cookie_secure: false,
             session_ttl_secs: SESSION_TTL_SECS,
+            admin_contact_email: None,
             pool,
         }
+    }
+
+    /// Override the deployment contact address. Threaded through `from_config`
+    /// in production; this builder lets tests (and any caller assembling state
+    /// by hand) set it without a full config round-trip.
+    #[must_use]
+    pub fn with_admin_contact_email(mut self, email: Option<String>) -> Self {
+        self.admin_contact_email = email;
+        self
     }
 
     /// Test constructor variant that also sets the admin API token, so

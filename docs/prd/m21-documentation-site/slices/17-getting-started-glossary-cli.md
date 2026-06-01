@@ -1,6 +1,13 @@
-# Slice #17 — Getting-started + glossary + CLI reference
+---
+kind: feature
+title: "Getting-started + glossary + CLI reference"
+slug: getting-started-glossary-cli
+issue: 17
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #17 — Getting-started + glossary + CLI reference
 
 Full design: [`23-M21-documentation.md` §C/E + Stage 2](../../../impl/23-M21-documentation.md#getting-started).
 

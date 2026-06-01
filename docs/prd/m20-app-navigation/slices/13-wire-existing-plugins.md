@@ -1,6 +1,13 @@
-# Slice #13 — Wire existing plugins' `[[plugin.apps]]`
+---
+kind: feature
+title: "Wire existing plugins' `[[plugin.apps]]`"
+slug: wire-existing-plugins
+issue: 13
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #13 — Wire existing plugins' `[[plugin.apps]]`
 
 Full design: [`22-M20-app-navigation.md` §A + Stage 3](../../../impl/22-M20-app-navigation.md#stages).
 

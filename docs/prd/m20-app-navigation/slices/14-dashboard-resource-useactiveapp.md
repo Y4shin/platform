@@ -1,6 +1,13 @@
-# Slice #14 — Dashboard re-source to `APPS` + `useActiveApp`
+---
+kind: feature
+title: "Dashboard re-source to `APPS` + `useActiveApp`"
+slug: dashboard-resource-useactiveapp
+issue: 14
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** afk
+# Slice #14 — Dashboard re-source to `APPS` + `useActiveApp`
 
 Full design: [`22-M20-app-navigation.md` §D–E](../../../impl/22-M20-app-navigation.md#d--dashboard-re-source).
 

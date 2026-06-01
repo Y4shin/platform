@@ -1,6 +1,13 @@
-# Slice #36 — Contract/SlotItem markers + ContractError
+---
+kind: capability
+title: "Contract/SlotItem markers + ContractError"
+slug: markers
+issue: 36
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #36 — Contract/SlotItem markers + ContractError
 
 ## What to build
 The SDK safety foundation in `junius-sdk`:

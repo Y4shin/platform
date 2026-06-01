@@ -112,6 +112,10 @@ pub struct ResolvedConfig {
     /// stored preference nor `Accept-Language` yields a known locale. Defaults
     /// to `"en"` when absent.
     pub default_locale: Option<String>,
+    /// Optional contact address surfaced to users with no access yet — the
+    /// dashboard's zero-permissions empty state and the 403 page name it as
+    /// "who to ask". Absent ⇒ the surfaces degrade to generic copy.
+    pub admin_contact_email: Option<String>,
 
     // --- M10 infra sections (all optional; absent = capability unconfigured) ---
     /// `[config.jobs]` — message-broker connection for the job queue.
@@ -180,6 +184,7 @@ pub fn resolve_config(
         oidc_redirect_url: optional(raw, "oidc_redirect_url", lookup)?,
         admin_api_token: optional(raw, "admin_api_token", lookup)?,
         default_locale: optional(raw, "default_locale", lookup)?,
+        admin_contact_email: optional(raw, "admin_contact_email", lookup)?,
         jobs: parse_jobs(&cfg, dyn_lookup)?,
         job_workers: parse_job_workers(&cfg),
         email: parse_email(&cfg, dyn_lookup)?,
@@ -285,6 +290,26 @@ mod tests {
         assert_eq!(cfg.bind_addr, None);
         assert_eq!(cfg.oidc_redirect_url, None);
         assert_eq!(cfg.default_locale, None);
+        assert_eq!(cfg.admin_contact_email, None);
+    }
+
+    #[test]
+    fn resolve_config_reads_admin_contact_email() {
+        let env = |_: &str| None;
+        let mut raw = BTreeMap::new();
+        for (k, v) in [
+            ("database_url", "postgres://x"),
+            ("oidc_issuer", "http://localhost:9000/"),
+            ("oidc_client_id", "platform"),
+            ("oidc_client_secret", "shh"),
+            ("session_encryption_key", "literalkey"),
+            ("role_password_secret", "rolesecret"),
+            ("admin_contact_email", "ops@example.org"),
+        ] {
+            raw.insert(k.into(), toml::Value::from(v));
+        }
+        let cfg = resolve_config(&raw, &env).unwrap();
+        assert_eq!(cfg.admin_contact_email.as_deref(), Some("ops@example.org"));
     }
 
     #[test]

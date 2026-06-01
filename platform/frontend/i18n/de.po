@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: m.permissions.length
-#: platform/frontend/src/pages/MePage.tsx:190
+#: platform/frontend/src/pages/MePage.tsx:155
 msgid "{0} permissions"
 msgstr "{0} Berechtigungen"
 
@@ -22,23 +22,31 @@ msgstr "{0} Berechtigungen"
 #~ msgid "Anonymous"
 #~ msgstr "Anonym"
 
-#: platform/frontend/src/pages/MePage.tsx:252
+#: platform/frontend/src/pages/MePage.tsx:217
 msgid "Browser"
 msgstr "Browser"
 
-#: platform/frontend/src/pages/MePage.tsx:152
+#: platform/frontend/src/pages/MePage.tsx:117
 msgid "Config"
 msgstr "Konfiguration"
 
-#: platform/frontend/src/pages/MePage.tsx:82
+#: platform/frontend/src/pages/DashboardPage.tsx:73
+msgid "Contact your administrator:"
+msgstr "Wenden Sie sich an Ihre Administration:"
+
+#: platform/frontend/src/pages/DashboardPage.tsx:25
+msgid "Could not load your dashboard."
+msgstr "Dashboard konnte nicht geladen werden."
+
+#: platform/frontend/src/pages/MePage.tsx:47
 msgid "Could not load your profile."
 msgstr "Profil konnte nicht geladen werden."
 
-#: platform/frontend/src/pages/MePage.tsx:129
+#: platform/frontend/src/pages/MePage.tsx:94
 msgid "Display name"
 msgstr "Anzeigename"
 
-#: platform/frontend/src/pages/MePage.tsx:130
+#: platform/frontend/src/pages/MePage.tsx:95
 msgid "Email"
 msgstr "E-Mail"
 
@@ -50,27 +58,28 @@ msgstr "Englisch"
 msgid "German"
 msgstr "Deutsch"
 
-#: platform/frontend/src/pages/MePage.tsx:172
+#: platform/frontend/src/pages/MePage.tsx:137
 msgid "Group"
 msgstr "Gruppe"
 
-#: platform/frontend/src/pages/MePage.tsx:162
+#: platform/frontend/src/pages/MePage.tsx:127
 msgid "Group memberships"
 msgstr "Gruppenmitgliedschaften"
 
-#: platform/frontend/src/pages/MePage.tsx:128
+#: platform/frontend/src/pages/MePage.tsx:93
 msgid "Identity"
 msgstr "Identität"
 
-#: platform/frontend/src/pages/MePage.tsx:142
+#: platform/frontend/src/pages/MePage.tsx:107
 msgid "Language"
 msgstr "Sprache"
 
-#: platform/frontend/src/pages/MePage.tsx:255
+#: platform/frontend/src/pages/MePage.tsx:220
 msgid "Last seen"
 msgstr "Zuletzt gesehen"
 
-#: platform/frontend/src/pages/MePage.tsx:75
+#: platform/frontend/src/pages/DashboardPage.tsx:18
+#: platform/frontend/src/pages/MePage.tsx:40
 msgid "Loading…"
 msgstr "Wird geladen…"
 
@@ -78,33 +87,33 @@ msgstr "Wird geladen…"
 msgid "Locale"
 msgstr "Sprache"
 
-#: platform/frontend/src/pages/MePage.tsx:181
+#: platform/frontend/src/pages/MePage.tsx:146
 msgid "Managed by"
 msgstr "Verwaltet von"
 
-#: platform/frontend/src/pages/MePage.tsx:154
+#: platform/frontend/src/pages/MePage.tsx:119
 msgid "Manual"
 msgstr "Manuell"
 
-#: platform/frontend/src/pages/MePage.tsx:150
+#: platform/frontend/src/pages/MePage.tsx:115
 msgid "OIDC"
 msgstr "OIDC"
 
-#: platform/frontend/src/pages/MePage.tsx:132
+#: platform/frontend/src/pages/MePage.tsx:97
 msgid "OIDC subject"
 msgstr "OIDC-Subjekt"
 
-#: platform/frontend/src/pages/MePage.tsx:178
-#: platform/frontend/src/pages/MePage.tsx:218
+#: platform/frontend/src/pages/MePage.tsx:143
+#: platform/frontend/src/pages/MePage.tsx:183
 msgid "Permissions"
 msgstr "Berechtigungen"
 
-#: platform/frontend/src/pages/MePage.tsx:141
+#: platform/frontend/src/pages/MePage.tsx:106
 msgid "Preferences"
 msgstr "Einstellungen"
 
 #: platform/frontend/src/layout/UserMenu.tsx:37
-#: platform/frontend/src/pages/MePage.tsx:90
+#: platform/frontend/src/pages/MePage.tsx:55
 msgid "Profile"
 msgstr "Profil"
 
@@ -112,16 +121,16 @@ msgstr "Profil"
 msgid "Pseudo"
 msgstr "Pseudo"
 
-#: platform/frontend/src/pages/MePage.tsx:280
+#: platform/frontend/src/pages/MePage.tsx:245
 msgid "Revoke"
 msgstr "Widerrufen"
 
-#: platform/frontend/src/pages/MePage.tsx:175
-#: platform/frontend/src/pages/MePage.tsx:215
+#: platform/frontend/src/pages/MePage.tsx:140
+#: platform/frontend/src/pages/MePage.tsx:180
 msgid "Role"
 msgstr "Rolle"
 
-#: platform/frontend/src/pages/MePage.tsx:247
+#: platform/frontend/src/pages/MePage.tsx:212
 msgid "Sessions"
 msgstr "Sitzungen"
 
@@ -129,11 +138,11 @@ msgstr "Sitzungen"
 msgid "Sign out"
 msgstr "Abmelden"
 
-#: platform/frontend/src/pages/MePage.tsx:267
+#: platform/frontend/src/pages/MePage.tsx:232
 msgid "This device"
 msgstr "Dieses Gerät"
 
-#: platform/frontend/src/pages/MePage.tsx:264
+#: platform/frontend/src/pages/MePage.tsx:229
 msgid "Unknown device"
 msgstr "Unbekanntes Gerät"
 
@@ -141,14 +150,26 @@ msgstr "Unbekanntes Gerät"
 msgid "User menu"
 msgstr "Benutzermenü"
 
-#: platform/frontend/src/pages/MePage.tsx:205
+#: platform/frontend/src/pages/MePage.tsx:170
 msgid "User-roles"
 msgstr "Benutzerrollen"
 
-#: platform/frontend/src/pages/MePage.tsx:165
+#: platform/frontend/src/pages/DashboardPage.tsx:48
+msgid "Welcome back, {name}"
+msgstr "Willkommen zurück, {name}"
+
+#: platform/frontend/src/pages/MePage.tsx:130
 msgid "You are not a member of any group."
 msgstr "Sie sind in keiner Gruppe Mitglied."
 
-#: platform/frontend/src/pages/MePage.tsx:208
+#: platform/frontend/src/pages/DashboardPage.tsx:61
+msgid "You don't have access yet"
+msgstr "Sie haben noch keinen Zugriff"
+
+#: platform/frontend/src/pages/MePage.tsx:173
 msgid "You hold no user-roles."
 msgstr "Sie haben keine Benutzerrollen."
+
+#: platform/frontend/src/pages/DashboardPage.tsx:66
+msgid "Your account doesn't have access to anything yet. Ask your administrator to add you to a group."
+msgstr "Ihr Konto hat noch keinen Zugriff. Bitten Sie Ihre Administration, Sie einer Gruppe hinzuzufügen."

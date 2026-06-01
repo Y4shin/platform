@@ -601,6 +601,7 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
          import { createRoute } from '@tanstack/react-router';\n\
          \n\
          import { authedLayoutRoute, rootRoute } from '../router/root.js';\n\
+         import { DashboardPage } from '../pages/DashboardPage.js';\n\
          import { MePage } from '../pages/MePage.js';\n",
     );
 
@@ -623,9 +624,9 @@ fn render_routes_ts(plugins: &[ResolvedPlugin]) -> String {
 
     // Authed app: the index, the host `/me` profile page, and every plugin's
     // `/p/<name>` routes, wrapped by the Shell via the pathless
-    // `authedLayoutRoute`. `/me` is a host-owned route (no plugin), so it is
-    // emitted unconditionally alongside the index.
-    buf.push_str("\nconst indexRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/',\n  component: () => null,\n});\n\n");
+    // `authedLayoutRoute`. The index (`<DashboardPage>`) and `/me` are
+    // host-owned routes (no plugin), so both are emitted unconditionally.
+    buf.push_str("\nconst indexRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/',\n  component: DashboardPage,\n});\n\n");
     buf.push_str("const meRoute = createRoute({\n  getParentRoute: () => authedLayoutRoute,\n  path: '/me',\n  component: MePage,\n});\n\n");
 
     for p in &fe {

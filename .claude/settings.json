@@ -1,4 +1,7 @@
 {
+  "enabledPlugins": {
+    "prd-workflow@platform-workflows": true
+  },
   "extraKnownMarketplaces": {
     "platform-workflows": {
       "source": {
@@ -6,8 +9,5 @@
         "url": "https://codeberg.org/Yashin/skills.git"
       }
     }
-  },
-  "enabledPlugins": {
-    "prd-workflow@platform-workflows": true
   }
 }

@@ -1,6 +1,13 @@
-# Slice #9 — System health
+---
+kind: feature
+title: "System health"
+slug: system-health
+issue: 9
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #9 — System health
 
 Full design: [`21-M19-platform-ui.md` §Tier 2.D](../../../impl/21-M19-platform-ui.md#tier-2d--system-health-padminhealth).
 

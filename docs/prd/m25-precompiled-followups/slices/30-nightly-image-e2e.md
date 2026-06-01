@@ -1,6 +1,13 @@
-# Slice #30 — Nightly precompiled-image E2E run
+---
+kind: capability
+title: "Nightly precompiled-image E2E run"
+slug: nightly-image-e2e
+issue: 30
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #30 — Nightly precompiled-image E2E run
 
 Full design: [`27-M25-precompiled-followups.md` §4](../../../impl/27-M25-precompiled-followups.md#4-nightly-precompiled-image-e2e).
 

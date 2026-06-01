@@ -1,6 +1,13 @@
-# Slice #41 — junius sync codegen
+---
+kind: capability
+title: "junius sync codegen"
+slug: sync-codegen
+issue: 41
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** hitl
+# Slice #41 — junius sync codegen
 
 ## What to build
 `junius sync` codegen for the contract layer:

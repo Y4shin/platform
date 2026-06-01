@@ -178,3 +178,69 @@ async fn api_me_round_trip_and_logout() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// `/api/me` carries the deployment's `admin_contact_email` so the dashboard's
+/// zero-permissions empty state can name who to contact. When the config field
+/// is unset the response surfaces `null`, giving the frontend a real source for
+/// its graceful-degrade path (slice #4).
+#[tokio::test]
+async fn api_me_surfaces_admin_contact_email() {
+    let node = match Postgres::default().with_tag("17-alpine").start().await {
+        Ok(n) => n,
+        Err(e) => {
+            eprintln!("skipping auth_pg: Docker unavailable ({e})");
+            return;
+        }
+    };
+    let port = node.get_host_port_ipv4(5432).await.unwrap();
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
+
+    let db = DbBootstrap::connect(&url).await.unwrap();
+    let pool = db.platform_pool().clone();
+    apply_migrations(&pool).await;
+    let session_id = seed_session(&pool).await;
+    let localizer = junius_sdk::LocalizerBuilder::new(junius_sdk::Locale::En).build();
+
+    let me_json = |auth_state: AuthState| {
+        let pool = pool.clone();
+        let localizer = localizer.clone();
+        async move {
+            let app = server::build_app_with_services(
+                &[],
+                &PluginPools::empty(),
+                &pool,
+                &std::collections::BTreeMap::new(),
+                auth_state,
+                &platform::infra::HostInfra::default(),
+                &localizer,
+            );
+            let resp = app
+                .oneshot(
+                    Request::get("/api/me")
+                        .header(header::COOKIE, format!("session={session_id}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::OK);
+            let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+        }
+    };
+
+    // Configured → the email is surfaced verbatim.
+    let with_email = AuthState::for_test(pool.clone(), "test-session-key")
+        .with_admin_contact_email(Some("ops@example.org".to_string()));
+    let me = me_json(with_email).await;
+    assert_eq!(me["adminContactEmail"], "ops@example.org");
+
+    // Unset → null, so the frontend can degrade gracefully.
+    let without_email = AuthState::for_test(pool.clone(), "test-session-key");
+    let me = me_json(without_email).await;
+    assert!(
+        me["adminContactEmail"].is_null(),
+        "adminContactEmail should be null when unconfigured, got {:?}",
+        me["adminContactEmail"]
+    );
+}

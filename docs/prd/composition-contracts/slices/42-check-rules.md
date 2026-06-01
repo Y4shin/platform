@@ -1,6 +1,13 @@
-# Slice #42 — junius check rules
+---
+kind: capability
+title: "junius check rules"
+slug: check-rules
+issue: 42
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** afk
+# Slice #42 — junius check rules
 
 ## What to build
 `junius check` validation rules for the contract layer:

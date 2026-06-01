@@ -1,6 +1,13 @@
-# Slice #19 — Troubleshooting + ops + contributing + changelog
+---
+kind: feature
+title: "Troubleshooting + ops + contributing + changelog"
+slug: troubleshooting-ops-contributing-changelog
+issue: 19
+prd: ../prd.md
+mode: afk
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** afk
+# Slice #19 — Troubleshooting + ops + contributing + changelog
 
 Full design: [`23-M21-documentation.md` §C/Stage 4](../../../impl/23-M21-documentation.md#troubleshooting).
 

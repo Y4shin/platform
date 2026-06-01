@@ -1,6 +1,13 @@
-# Slice #28 — cosign keyless image signing
+---
+kind: capability
+title: "cosign keyless image signing"
+slug: cosign-signing
+issue: 28
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** hitl
+# Slice #28 — cosign keyless image signing
 
 Full design: [`27-M25-precompiled-followups.md` §2](../../../impl/27-M25-precompiled-followups.md#2-cosign-keyless-signing).
 

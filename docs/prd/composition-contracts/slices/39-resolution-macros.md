@@ -1,6 +1,13 @@
-# Slice #39 — 1:1 resolution macros (contract! / with_contract!)
+---
+kind: capability
+title: "1:1 resolution macros (contract! / with_contract!)"
+slug: resolution-macros
+issue: 39
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** capability · **mode:** hitl
+# Slice #39 — 1:1 resolution macros (contract! / with_contract!)
 
 ## What to build
 The 1:1 consumer resolution macros in `junius-sdk-macros`:

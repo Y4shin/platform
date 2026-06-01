@@ -1,6 +1,13 @@
-# Slice #12 — Left rail + app picker chrome
+---
+kind: feature
+title: "Left rail + app picker chrome"
+slug: left-rail-picker-chrome
+issue: 12
+prd: ../prd.md
+mode: hitl
+---
 
-**PRD:** ../prd.md · **kind:** feature · **mode:** hitl
+# Slice #12 — Left rail + app picker chrome
 
 Full design: [`22-M20-app-navigation.md` §C](../../../impl/22-M20-app-navigation.md#c--layout--components).
 
