@@ -33,6 +33,9 @@ oidc_redirect_url      = "http://localhost:5173/api/auth/callback"
 # Bearer token gating the admin OIDC-resync RPC (`junius oidc resync`, M18).
 # Optional — omit to disable the admin sweep. `file:`/`env:` secret refs apply.
 admin_api_token        = "dev-only-admin-token"
+# Contact address shown to users with no access yet (dashboard empty state,
+# 403 page). Optional — omit to degrade to generic copy.
+admin_contact_email    = "ops@junius.local"
 # Job worker concurrency (M10).
 job_workers            = 4
 

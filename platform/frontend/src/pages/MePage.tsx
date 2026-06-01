@@ -3,54 +3,19 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
+import {
+  fetchMe,
+  ME_QUERY_KEY,
+  type MembershipRow,
+  type MeResponse,
+  type SessionRow,
+  type UserRoleRow,
+} from '../api/me.js';
 import { LocaleSwitcher } from '../layout/LocaleSwitcher.js';
 
-// The /me payload is the host's `MeResponse` (see platform/src/auth/me.rs):
-// the authenticated user flattened, plus the bound OIDC subject and the
-// caller's live sessions. The page fetches it directly (not via the cached
-// AuthProvider user) so the sessions list reflects revokes immediately.
-interface MembershipRow {
-  groupId: string;
-  groupName: string;
-  role: { id: string; name: string };
-  permissions: string[];
-  managedBy: string;
-}
-
-interface UserRoleRow {
-  roleId: string;
-  roleName: string;
-  permissions: string[];
-}
-
-interface SessionRow {
-  id: string;
-  userAgent: string | null;
-  lastSeen: string;
-  current: boolean;
-}
-
-interface MeResponse {
-  id: string;
-  email: string;
-  displayName: string;
-  locale: string | null;
-  oidcSub: string;
-  memberships: MembershipRow[];
-  userRoles: UserRoleRow[];
-  sessions: SessionRow[];
-}
-
-const ME_QUERY_KEY = ['me'] as const;
-
-async function fetchMe(): Promise<MeResponse> {
-  const res = await fetch('/api/me', { credentials: 'include' });
-  if (!res.ok) {
-    throw new Error(`GET /api/me failed: ${res.status}`);
-  }
-  return (await res.json()) as MeResponse;
-}
-
+// The `/me` page reads the same `/api/me` payload as the dashboard (shared in
+// `../api/me`); it fetches directly (not via the cached AuthProvider user) so
+// the sessions list reflects revokes immediately.
 async function revokeSession(id: string): Promise<void> {
   const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE', credentials: 'include' });
   if (!res.ok) {
