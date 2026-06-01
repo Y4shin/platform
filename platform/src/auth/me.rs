@@ -29,6 +29,9 @@ struct MeResponse {
     user: User,
     oidc_sub: String,
     sessions: Vec<SessionInfo>,
+    /// Deployment contact address (`[config] admin_contact_email`), or `null`
+    /// when unset. The dashboard names it in its zero-permissions empty state.
+    admin_contact_email: Option<String>,
 }
 
 /// One live session in the `/me` sessions list. `current` flags the session the
@@ -54,7 +57,14 @@ pub async fn handler(
     let current_session = cookies
         .get(SESSION_COOKIE)
         .and_then(|c| Uuid::parse_str(c.value()).ok());
-    match build_me(&state.pool, user, current_session).await {
+    match build_me(
+        &state.pool,
+        user,
+        current_session,
+        state.admin_contact_email.clone(),
+    )
+    .await
+    {
         Ok(me) => Json(me).into_response(),
         Err(e) => {
             tracing::error!(error = %e, "failed to build /api/me response");
@@ -70,6 +80,7 @@ async fn build_me(
     pool: &PgPool,
     user: User,
     current_session: Option<Uuid>,
+    admin_contact_email: Option<String>,
 ) -> Result<MeResponse, sqlx::Error> {
     let oidc_sub: String = sqlx::query_scalar("SELECT oidc_sub FROM platform.user WHERE id = $1")
         .bind(user.id.0)
@@ -102,6 +113,7 @@ async fn build_me(
         user,
         oidc_sub,
         sessions,
+        admin_contact_email,
     })
 }
 

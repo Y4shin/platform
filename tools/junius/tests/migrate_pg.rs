@@ -82,6 +82,7 @@ fn config(database_url: String) -> ResolvedConfig {
         oidc_redirect_url: None,
         admin_api_token: None,
         default_locale: None,
+        admin_contact_email: None,
         jobs: None,
         job_workers: 4,
         email: None,
