@@ -210,3 +210,18 @@ No open blockers for slicing. The library-choice confirmations above are the onl
   Playwright spec follows the repo convention for `e2e/cross/**` browser specs —
   `JUNIUS_E2E`-gated (skipped in the automated `run-suite`, like `user-menu`/`locale`);
   the CI-enforced behavioural coverage for the auth gates is `platform/tests/sessions_pg.rs`.
+- **Slice #4 (dashboard skeleton + zero-permissions empty state)** — `/` now renders
+  `<DashboardPage>` (was `null`): a greeting for users holding any membership/user-role,
+  else `<NoAccessEmptyState>` naming the new optional `[config] admin_contact_email`
+  (degrades to generic copy when unset). Decision: the email reaches the SPA via
+  **`/api/me`** (`adminContactEmail`, null when unset) rather than a new config endpoint —
+  `AuthState` carries it from `ResolvedConfig`, and the page already fetches `/api/me`. The
+  `/api/me` payload type + `fetchMe` were extracted to `platform/frontend/src/api/me.ts`
+  and shared with `MePage`. The index route is wired by the `junius sync` generator
+  (host-owned, emitted unconditionally like `/me`). Added the **first vitest harness to
+  `@junius/shell`** (`vitest.config.ts` mirroring the app's Lingui macro transform + a
+  `test` script); its new devDeps reuse versions already in the lockfile, so the flake
+  `pnpmDeps` FOD hash is unchanged. No tile grid — that stays in M20. CI-deterministic
+  coverage is `DashboardPage.test.tsx` (greeting/empty-state branch + graceful degrade)
+  and the `auth_pg.rs` config-surfacing assertions; `e2e/cross/dashboard.spec.ts` is the
+  `JUNIUS_E2E`-gated end-to-end path with `admin_contact_email` set in `dev/platform.toml`.
