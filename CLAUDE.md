@@ -62,7 +62,9 @@ only when you touch matching files.
 
 ## Planning workflow
 
-Substantial work is specced before it's built. The PRD/epic/slice lifecycle lives in
-`.claude/skills/` (invoke as `/create-feature-prd`, `/create-capability-prd`, `/analyse-issue`,
-`/implement-issue`, …). Committed artifacts live under `docs/prd/<slug>/`; see
-`.claude/skills/*/SKILL.md` for the flow.
+Substantial work is specced before it's built. The PRD/epic/slice lifecycle is provided by the
+**`prd-workflow` plugin** (marketplace `platform-workflows`, from
+`https://codeberg.org/Yashin/skills.git`; install with `/plugin install prd-workflow@platform-workflows`).
+Invoke its skills as namespaced slash commands: `/prd-workflow:create-feature-prd`,
+`/prd-workflow:create-capability-prd`, `/prd-workflow:analyse-issue`, `/prd-workflow:implement-issue`, ….
+Committed artifacts live under `docs/prd/<slug>/`; see [docs/prd/README.md](docs/prd/README.md) for the flow.

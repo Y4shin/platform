@@ -1,104 +1,114 @@
-# Migration: `docs/impl/` milestones → PRD workflow
+# Migration: local `.claude/skills/` → `prd-workflow` plugin
 
-Objective and strategy for moving the legacy linear milestone plan into the
-feature/capability PRD workflow under [`.claude/skills/`](.claude/skills/). This is the
-plan of record; nothing has been migrated yet (see **Status** below).
+Plan of record for replacing this repo's locally-installed skills with the shareable
+**`prd-workflow`** plugin, so the same PRD/epic/slice workflow can be reused across repos
+instead of copy-pasted into each one. Nothing has been migrated yet.
 
-## Objective
+## What the plugin is
 
-Move planning of **unbuilt** work out of the sequential `docs/impl/` milestone format and
-into the PRD workflow, so new work flows:
+The plugin lives in a marketplace repo published at `https://codeberg.org/Yashin/skills.git`:
 
-```
-create-(feature|capability)-prd → (feature|capability)-prd-to-issues
-  → analyse-issue → implement-issue (per slice) → finalize-prd
-```
+- `.claude-plugin/marketplace.json` → marketplace **`platform-workflows`**, exposing one
+  plugin **`prd-workflow`** (v0.2.0).
+- `plugins/prd-workflow/` contains:
+  - `skills/` — **11 skills, full parity** with our local set (analyse-issue, create-epic,
+    epic-to-prds, create-feature-prd, create-capability-prd, feature-prd-to-issues,
+    capability-prd-to-issues, implement-issue, finalize-prd, finalize-epic, grill-me).
+    Nothing is missing or stubbed.
+  - `references/artifacts.md` — the shared three-tier / lifecycle reference.
+  - `scripts/forge_detect.sh` — GitHub/Forgejo abstraction (byte-identical to our copy).
+  - `scripts/prd_tool.pyz` — a bundled Python zipapp (built from `src/prd_tool/` via the
+    flake + `uv run prd-tool-build`).
 
-`finalize-prd` folds the durable knowledge back into [`docs/design/`](docs/design/) and
-[`docs/impl/`](docs/impl/) and retires the transient PRD. See
-[`docs/prd/README.md`](docs/prd/README.md), [`docs/workflow/forge.md`](docs/workflow/forge.md),
-and [`docs/workflow/artifacts.md`](docs/workflow/artifacts.md).
+## What's improved vs. our in-repo `.claude/skills`
 
-## Framing: `docs/impl/` is the *destination*, not the source
+| Area | Local skills (now) | Plugin (`prd-workflow`) |
+|---|---|---|
+| **Distribution** | Copied into `.claude/skills/` per repo | Installable plugin + marketplace; shareable across repos; skills namespaced `/prd-workflow:analyse-issue` |
+| **Machinery location** | Skills call `$(git rev-parse --show-toplevel)/scripts/forge_detect.sh` and `cat docs/workflow/artifacts.md` — must exist in *every* consuming repo | Calls `${CLAUDE_PLUGIN_ROOT}/scripts/...` and `${CLAUDE_PLUGIN_ROOT}/references/artifacts.md` — ships *with the plugin*, nothing duplicated into the repo |
+| **State handling** | Prose-driven frontmatter reads/edits | New `prd_tool.pyz`: deterministic `resolve / assert-kind / set-slices / slices / prd-finalizable / epic prds·tick·finalizable / list`, declared via `allowed-tools` — makes the lifecycle gates programmatic |
+| **Context** | Static | Dynamic injection via `` !`…` `` — live forge type, the artifacts reference, and a current `prd_tool list` inventory injected at load |
+| **Versioning** | None | Versioned (0.2.0), reproducibly buildable (flake/uv/pyproject) |
 
-In the new pipeline `finalize-prd` **writes** shipped records into `docs/impl/`. So the
-existing milestone docs split in two, and only one half migrates:
+Net: same workflow, but **portable and self-contained**, with a real helper tool replacing
+hand-waved frontmatter edits.
 
-- **Shipped (✅): M00–M18, M23, M24** — already in finalized-record form (each opens with
-  `> Status: ✅ Implemented` plus deviation notes — exactly what `finalize-prd` produces).
-  These **stay** as the permanent record. They are **not** migrated (turning shipped work
-  into transient PRDs would be backwards).
-- **Planned (🚧): M19, M20, M21, M22, M25** — forward-looking plans, i.e. PRDs written in
-  the old milestone format. **These migrate.**
+## Migration steps
 
-## How a milestone maps to a PRD
+1. **Fix the prerequisite first — `python3`.** This is the one real blocker. `prd_tool.pyz`
+   (and the `` !`…` `` injections that call it) need `python3` on PATH. Today on the base
+   shell `python3` is **missing** — it only exists inside `nix develop` (`git`/`gh`/`task`
+   are on PATH; `python3`/`uv` are not). Add `python3` to [flake.nix](flake.nix)'s devshell
+   (or otherwise guarantee Claude Code launches with it), then sanity-check it parses the
+   live tree:
 
-The old milestone template maps almost 1:1 onto the PRD + slices model:
+   ```
+   python3 .../prd_tool.pyz list   # should list m19/m20/m21/m22/m25/composition-contracts + epics
+   ```
 
-| Milestone doc | PRD artifact |
-|---|---|
-| Stages (1..N) | slices (one issue each) |
-| per-stage **Verify** | slice acceptance criteria / test plan |
-| **Scope (out)** | PRD "out of scope" |
-| **Library choices** | PRD decisions |
-| **Goal / Why now** | PRD problem / why |
+2. **Remove the now-duplicated local copies.**
+   - Delete [.claude/skills/](.claude/skills/) (all 11) — otherwise `/analyse-issue` and
+     `/prd-workflow:analyse-issue` both exist and compete.
+   - The plugin bundles its own `forge_detect.sh` + `artifacts.md`, so these become orphaned:
+     [scripts/forge_detect.sh](scripts/forge_detect.sh) and
+     [docs/workflow/artifacts.md](docs/workflow/artifacts.md). **Check before deleting** —
+     also tracked are [scripts/migrate_tracker_native.sh](scripts/migrate_tracker_native.sh)
+     and [docs/workflow/forge.md](docs/workflow/forge.md), which may be one-off/docs the
+     skills don't reference; confirm no other consumer.
 
-- `kind: feature` for user-facing milestones (M19, M20, M21); `kind: capability` for
-  foundational ones (M22, M25).
-- A trailing **"tests + docs" wrap-up stage is absorbed**, not turned into a slice:
-  per-slice tests live in each slice's acceptance (via `analyse-issue`/`implement-issue`),
-  and the doc/decision-log updates become `finalize-prd`'s output.
+3. **Install the plugin** (HTTPS remote):
 
-## Plan: pilot, then roll out
+   ```
+   /plugin marketplace add https://codeberg.org/Yashin/skills.git
+   /plugin install prd-workflow@platform-workflows
+   ```
 
-1. **Pilot — M19 (Core platform UIs).** Transcribe
-   [`docs/impl/21-M19-platform-ui.md`](docs/impl/21-M19-platform-ui.md) into
-   `docs/prd/m19-core-platform-ui/prd.md` (`kind: feature`, `milestone: M19`), linking back
-   to the milestone doc for the full design rather than duplicating it. Run
-   `/feature-prd-to-issues` to create the PRD tracking issue + the slice issues (M19 Stages
-   1–6, with Stage 6 split into jobs/plugins/health) as its sub-issues, and write the slice
-   docs. Add a migration banner to the M19 doc and point the `docs/impl/README.md` row at
-   the PRD.
-2. **Review the shape**, then repeat for **M20** / **M21** (`feature`) and **M22** / **M25**
-   (`capability`).
+   To share with the team via the repo (rather than just one machine), commit
+   `extraKnownMarketplaces` + `enabledPlugins` into a new `.claude/settings.json` — there's
+   none today, so nothing conflicts.
 
-## End state
+4. **Verify against the live `docs/prd/` tree.** The plugin operates on exactly our layout
+   (`docs/prd/<slug>/prd.md`, `slices/<n>-<slug>.md`, `docs/prd/epics/...`), and our existing
+   artifacts (e.g. `composition-contracts`, `m19-core-platform-ui`) match the schema. Do one
+   read-only `/prd-workflow:analyse-issue` dry run to confirm the namespaced skills resolve.
 
-- `docs/impl/` = shipped records + the `finalize-prd` destination; shipped milestones
-  untouched.
-- New planned work starts as a PRD via `/create-(feature|capability)-prd` — not a new
-  `docs/impl/` doc.
-- [`docs/impl/00-approach.md`](docs/impl/00-approach.md) §0.5 library-defaults table is kept
-  as a living reference; its §0.2 "milestone doc template" is superseded by
-  [`docs/workflow/artifacts.md`](docs/workflow/artifacts.md); the "defaults are not silent"
-  rule is now carried by the grill/PRD interview.
-- [`docs/impl/15-open-questions-resolution.md`](docs/impl/15-open-questions-resolution.md)
-  stays as a design-level gating index that PRDs reference as blockers.
+5. **Update [CLAUDE.md](CLAUDE.md).** The "Planning workflow" section invokes
+   `/create-feature-prd`, `/analyse-issue`, … and points at `.claude/skills/*/SKILL.md`. After
+   migration those become `/prd-workflow:*` and the SKILL files live in the plugin — re-point
+   the wording.
+
+## Two things to decide (not blockers)
+
+- **`artifacts.md` has drifted.** Our [docs/workflow/artifacts.md](docs/workflow/artifacts.md)
+  (8.9 KB) is **newer/larger** than the plugin's bundled `references/artifacts.md` (7.1 KB) —
+  `forge_detect.sh` is identical, but the reference is not. After migration the plugin's copy
+  wins, so upstream our local edits into the plugin repo first if we want to keep them.
+- **The "shared" plugin is still Junius-flavored.** `implement-issue` hardcodes `task ci`,
+  `junius-sdk`, `clippy.toml`, `unsafe_code = "forbid"`, `cargo sqlx`;
+  `create-capability-prd`/`capability-prd-to-issues` reference `crates/junius-sdk`;
+  `analyse-issue` references `task test:*`. Fine for this repo (it *is* Junius) and for sibling
+  Junius repos. For genuinely different repos those gate/convention lines should be read from
+  each repo's `CLAUDE.md` instead of baked into the skill — a follow-up for the plugin, not
+  this migration.
 
 ## Status
 
-Pilot (M19) **executed — awaiting review.** Step 1 above is done:
-[`docs/prd/m19-core-platform-ui/prd.md`](docs/prd/m19-core-platform-ui/prd.md) transcribes the
-milestone (`kind: feature`, `milestone: M19`) and links back to the milestone doc for the full
-design; `/feature-prd-to-issues` created the PRD tracking issue
-([#1](https://github.com/Y4shin/platform/issues/1)) owning eight slice sub-issues (#2–#9 —
-M19 Stages 1–6 with Stage 6 split into jobs/plugins/health, and Stage 7 "tests + docs"
-absorbed); each slice has a committed `slices/<n>-*.md` spec; the M19 milestone doc carries a
-migration banner and the `docs/impl/README.md` row points at the PRD.
+In progress (uncommitted working tree):
 
-The pilot was reviewed (LGTM) and the **rollout is complete** — every planned milestone is now
-a PRD:
-
-| Milestone | Kind | PRD | Tracking issue | Slice issues |
-|---|---|---|---|---|
-| M19 | feature | `docs/prd/m19-core-platform-ui/` | [#1](https://github.com/Y4shin/platform/issues/1) | #2–#9 |
-| M20 | feature | `docs/prd/m20-app-navigation/` | [#10](https://github.com/Y4shin/platform/issues/10) | #11–#14 |
-| M21 | feature | `docs/prd/m21-documentation-site/` | [#15](https://github.com/Y4shin/platform/issues/15) | #16–#20 |
-| M22 | capability | `docs/prd/m22-rustfs-evaluation/` | [#21](https://github.com/Y4shin/platform/issues/21) | #22–#25 |
-| M25 | capability | `docs/prd/m25-precompiled-followups/` | [#26](https://github.com/Y4shin/platform/issues/26) | #27–#30 |
-
-Each milestone doc carries a migration banner pointing at its PRD, and the
-[`docs/impl/README.md`](docs/impl/README.md) rows link the PRDs + tracking issues. The shipped
-milestones (M00–M18, M23, M24) stay as permanent records — they are **not** migrated. New
-planned work now starts as a PRD via `/create-(feature|capability)-prd`, not a new `docs/impl/`
-doc. The migration objective is met; this document is retained as the rationale of record.
+- **Step 1 — done.** `python3` 3.15.0a7 is on PATH (nix-profile).
+- **Step 2 — done.** Removed `.claude/skills/` (all 11), `scripts/forge_detect.sh`,
+  `docs/workflow/artifacts.md`, and the now-orphaned forge cluster
+  (`scripts/migrate_tracker_native.sh`, `docs/workflow/forge.md`). Re-pointed the dead links in
+  `docs/prd/README.md` at the plugin's bundled `references/artifacts.md` + `scripts/forge_detect.sh`.
+- **Step 3 — done.** Marketplace `platform-workflows` is registered and `prd-workflow@0.2.0` is
+  installed (cached at `~/.claude/plugins/cache/platform-workflows/prd-workflow/0.2.0`, 11/11
+  skills present); the `/prd-workflow:*` skills resolve. The committed config lives in
+  **`.claude/settings.json`** (new file): `extraKnownMarketplaces` points at the codeberg HTTPS
+  remote `https://codeberg.org/Yashin/skills.git` and `enabledPlugins` enables
+  `prd-workflow@platform-workflows` — so a fresh clone gets the plugin without manual `/plugin`
+  steps. (The local install resolved the marketplace to the directory `/home/patric/Projects/skills`
+  for this machine; the committed file deliberately uses the shareable HTTPS source instead.)
+- **Step 4 — done.** `prd_tool.pyz`, run from the **installed** path against the live `docs/prd/`
+  tree, lists all 4 epics + 6 PRDs (`rc=0`); `forge_detect.sh git_type` → `github` (`rc=0`).
+- **Step 5 — done.** `CLAUDE.md` and `docs/prd/README.md` now reference the plugin and its
+  namespaced commands instead of `.claude/skills/`.
