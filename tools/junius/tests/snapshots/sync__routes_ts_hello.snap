@@ -8,13 +8,14 @@ expression: routes_ts
 import { createRoute } from '@tanstack/react-router';
 
 import { authedLayoutRoute, rootRoute } from '../router/root.js';
+import { DashboardPage } from '../pages/DashboardPage.js';
 import { MePage } from '../pages/MePage.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
 
 const indexRoute = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/',
-  component: () => null,
+  component: DashboardPage,
 });
 
 const meRoute = createRoute({
