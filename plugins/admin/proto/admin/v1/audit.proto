@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "platform/v1/annotations.proto";
+
+service AuditService {
+  rpc List(AuditServiceListRequest) returns (AuditServiceListResponse) {
+    option (platform.v1.requires) = "admin:audit_read";
+  }
+}
+
+message AuditEvent {
+  string id = 1;
+  string event_kind = 2;
+  string actor_user_id = 3;
+  string actor_email = 4;
+  string actor_display_name = 5;
+  string resource_kind = 6;
+  string resource_id = 7;
+  string details = 8;
+  string occurred_at = 9;
+}
+
+message AuditServiceListRequest {
+  optional string actor_user_id = 1;
+  optional string resource_kind = 2;
+  optional string event_kind = 3;
+  optional string starts_at = 4;
+  optional string ends_at = 5;
+  optional string cursor = 6;
+  int32 limit = 7;
+}
+
+message AuditServiceListResponse {
+  repeated AuditEvent events = 1;
+  optional string next_cursor = 2;
+}

@@ -16,6 +16,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -714,6 +715,96 @@ impl PlatformAdminApi {
         self.plugin_name
     }
 
+    // ---- Audit log (M19 Slice 6) ---------------------------------------------
+
+    /// List audit events with cursor-based keyset pagination and optional
+    /// filters. Results are newest-first by `(occurred_at DESC, id DESC)`.
+    pub async fn list_audit_events(
+        &self,
+        filter: &AuditFilter<'_>,
+        cursor: Option<&AuditCursor>,
+        limit: i32,
+    ) -> Result<AuditPage, PluginError> {
+        self.check()?;
+
+        let limit = limit.clamp(1, 200);
+        let fetch_limit = i64::from(limit) + 1;
+
+        let rows = sqlx::query_as::<
+            _,
+            (
+                Uuid,
+                String,
+                Option<Uuid>,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                Option<Uuid>,
+                serde_json::Value,
+                DateTime<Utc>,
+            ),
+        >(
+            "SELECT ae.id, ae.event_kind, ae.actor_user_id, \
+                    u.email, u.display_name, \
+                    ae.resource_kind, ae.resource_id, ae.details, ae.occurred_at \
+             FROM platform.audit_event ae \
+             LEFT JOIN platform.\"user\" u ON u.id = ae.actor_user_id \
+             WHERE ($1::uuid IS NULL OR ae.actor_user_id = $1) \
+               AND ($2::text IS NULL OR ae.resource_kind = $2) \
+               AND ($3::text IS NULL OR ae.event_kind = $3) \
+               AND ($4::timestamptz IS NULL OR ae.occurred_at >= $4) \
+               AND ($5::timestamptz IS NULL OR ae.occurred_at <= $5) \
+               AND (($6::timestamptz IS NULL AND $7::uuid IS NULL) \
+                    OR (ae.occurred_at, ae.id) < ($6, $7)) \
+             ORDER BY ae.occurred_at DESC, ae.id DESC \
+             LIMIT $8",
+        )
+        .bind(filter.actor_user_id)
+        .bind(filter.resource_kind)
+        .bind(filter.event_kind)
+        .bind(filter.starts_at)
+        .bind(filter.ends_at)
+        .bind(cursor.map(|c| c.occurred_at))
+        .bind(cursor.map(|c| c.id))
+        .bind(fetch_limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let limit_usize = usize::try_from(limit).unwrap_or(0);
+        let has_more = rows.len() > limit_usize;
+        let events: Vec<AdminAuditEvent> = rows
+            .into_iter()
+            .take(limit_usize)
+            .map(
+                |(id, event_kind, actor_uid, email, dname, rk, rid, details, occurred_at)| {
+                    AdminAuditEvent {
+                        id,
+                        event_kind,
+                        actor_user_id: actor_uid.map(UserId),
+                        actor_email: email,
+                        actor_display_name: dname,
+                        resource_kind: rk,
+                        resource_id: rid,
+                        details,
+                        occurred_at,
+                    }
+                },
+            )
+            .collect();
+        let next_cursor = if has_more {
+            events.last().map(|e| AuditCursor {
+                occurred_at: e.occurred_at,
+                id: e.id,
+            })
+        } else {
+            None
+        };
+        Ok(AuditPage {
+            events,
+            next_cursor,
+        })
+    }
+
     // ---- OIDC group mappings (M18 Stage C) ----------------------------------
 
     pub async fn list_oidc_mappings(&self) -> Result<Vec<AdminOidcMapping>, PluginError> {
@@ -800,4 +891,42 @@ pub struct AdminOidcMapping {
     pub group_name: String,
     pub role_id: RoleId,
     pub role_name: String,
+}
+
+/// A row from `platform.audit_event`, joined with actor user info.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminAuditEvent {
+    pub id: Uuid,
+    pub event_kind: String,
+    pub actor_user_id: Option<UserId>,
+    pub actor_email: Option<String>,
+    pub actor_display_name: Option<String>,
+    pub resource_kind: Option<String>,
+    pub resource_id: Option<Uuid>,
+    pub details: serde_json::Value,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Filter parameters for listing audit events.
+pub struct AuditFilter<'a> {
+    pub actor_user_id: Option<Uuid>,
+    pub resource_kind: Option<&'a str>,
+    pub event_kind: Option<&'a str>,
+    pub starts_at: Option<DateTime<Utc>>,
+    pub ends_at: Option<DateTime<Utc>>,
+}
+
+/// Opaque cursor for keyset pagination over audit events.
+#[derive(Clone, Debug)]
+pub struct AuditCursor {
+    pub occurred_at: DateTime<Utc>,
+    pub id: Uuid,
+}
+
+/// A page of audit events with an optional next-page cursor.
+#[derive(Clone, Debug)]
+pub struct AuditPage {
+    pub events: Vec<AdminAuditEvent>,
+    pub next_cursor: Option<AuditCursor>,
 }

@@ -6,8 +6,12 @@
 // An undeclared method is not a key here → a type error on use.
 
 import { GroupAdminService, OidcMappingAdminService, PermissionCatalogService, UserAdminService, UserRoleAdminService } from '../../proto/admin/v1/admin_pb.js';
+import { AuditService } from '../../proto/admin/v1/audit_pb.js';
 
 export const rpc = {
+  AuditService: {
+    list: AuditService.method.list,
+  },
   GroupAdminService: {
     addGroupMember: GroupAdminService.method.addGroupMember,
     createGroup: GroupAdminService.method.createGroup,
