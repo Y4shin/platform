@@ -225,3 +225,27 @@ No open blockers for slicing. The library-choice confirmations above are the onl
   coverage is `DashboardPage.test.tsx` (greeting/empty-state branch + graceful degrade)
   and the `auth_pg.rs` config-surfacing assertions; `e2e/cross/dashboard.spec.ts` is the
   `JUNIUS_E2E`-gated end-to-end path with `admin_contact_email` set in `dev/platform.toml`.
+- **Slice #5 (403 / 500 / error boundary)** — PR #47. `requirePermissions` is now a real
+  `beforeLoad` guard (was the M04 no-op; closes M13 friction #36): it redirects to the new
+  host `/403` route (`<ForbiddenPage>`, emitted by `junius sync` like `/me`) carrying the
+  missing permission names in history state. To make the guard see the viewer, the root
+  route became `createRootRouteWithContext<RouterContext>()` and AppShell injects the live
+  user via `<RouterProvider context={{ user }}>` once `/api/me` resolves (seeded `null` in
+  `main.tsx` + both SSR entries). First consumer: the **events** create/edit routes
+  (`/p/events/new`, `/$eventId/edit`) gate on `events:write`. `queryClient.onError` gained a
+  `PermissionDenied` → `/403` branch alongside `Unauthenticated` → login. A
+  `<RouteErrorBoundary>` on the authed layout shows the stack in dev and a friendly card +
+  correlation id in prod. **Decision (correlation id):** rather than modifying every proto
+  message, the id rides **out-of-band on the Connect error response header**
+  `x-correlation-id` (SPA reads it via `ConnectError.metadata`); it is the **OTel trace id**
+  from the per-request span stamped by a new host `correlation` middleware, which also emits
+  a `tracing::error!` with the same id on 5xx so "the card's id matches the juniusd log" is
+  literally one trace id. Degrades to no id when telemetry is off (→ generic copy, no white
+  screen). **Test-plan deviation:** the correlation behaviour is pure HTTP middleware (no
+  DB), so its deterministic proof is a **DB-less host unit test** in
+  `platform/src/correlation.rs` (`task test:rust:unit`) — it asserts the response header
+  equals the captured log `correlation_id` — rather than the planned testcontainers
+  `*_pg.rs`. Guard matching + redirect: `requirePermissions.test.ts`; boundary id
+  extraction: `RouteErrorBoundary.test.tsx`. `e2e/cross/error-pages.spec.ts` is
+  `JUNIUS_E2E`-gated (AC1 active; the RPC-denial + throw-route browser flows are `fixme`
+  stubs pending a fault-injection fixture, their logic covered by the unit tests).
