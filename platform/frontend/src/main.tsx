@@ -7,7 +7,10 @@ import { routeTree } from './generated/routes.js';
 
 import './styles.css';
 
-const router = createRouter({ routeTree });
+// Seed the router context with a null viewer; AppShell re-injects the live user
+// via `<RouterProvider context={{ user }}>` once `/api/me` resolves, so
+// `requirePermissions` guards in `beforeLoad` see the real permissions.
+const router = createRouter({ routeTree, context: { user: null } });
 
 // Single Connect-Web transport for the whole app. Backend RPC routes are
 // mounted under /rpc (see platform/src/server.rs); Connect-Web computes

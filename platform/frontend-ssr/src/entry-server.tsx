@@ -62,7 +62,9 @@ export interface RenderResult {
 
 export function render(url: string, opts: RenderOpts = {}): RenderResult {
   const history = createMemoryHistory({ initialEntries: [url] });
-  const router = createRouter({ routeTree, history });
+  // Seed the router context with a null viewer; AppShell injects the live user
+  // once `/api/me` resolves (see platform/frontend/src/AppShell.tsx).
+  const router = createRouter({ routeTree, history, context: { user: null } });
   const transport = ssrTransport();
   const stream = renderToPipeableStream(<AppShell router={router} transport={transport} />, {
     onShellError: opts.onShellError,

@@ -5,11 +5,13 @@ import {
   type CatalogLoader,
   ComponentRegistryProvider,
   type ComponentRegistryValue,
+  type ForbiddenState,
   goToLoginUnlessPublic,
   I18nProvider,
+  useAuth,
 } from '@junius/sdk';
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type AnyRouter, RouterProvider } from '@tanstack/react-router';
+import { type AnyRouter, type HistoryState, RouterProvider } from '@tanstack/react-router';
 import { type ReactElement, StrictMode } from 'react';
 
 import { componentRegistry } from './generated/component-registry.js';
@@ -48,8 +50,17 @@ export function AppShell({ router, transport }: AppShellProps): ReactElement {
   const queryClient = new QueryClient({
     queryCache: new QueryCache({
       onError: (error) => {
-        if (ConnectError.from(error).code === Code.Unauthenticated) {
+        const connectError = ConnectError.from(error);
+        if (connectError.code === Code.Unauthenticated) {
+          // No session → hand off to the host login (full redirect).
           goToLoginUnlessPublic(PUBLIC_ROUTE_PREFIXES);
+        } else if (connectError.code === Code.PermissionDenied) {
+          // Authenticated but under-permissioned → the real 403, naming the
+          // missing permission when the denial message carries it.
+          const state = {
+            missing: missingPermissionsFromError(connectError),
+          } satisfies ForbiddenState as HistoryState;
+          void router.navigate({ to: '/403', state });
         }
       },
     }),
@@ -61,7 +72,7 @@ export function AppShell({ router, transport }: AppShellProps): ReactElement {
           <QueryClientProvider client={queryClient}>
             <TransportProvider transport={transport}>
               <ComponentRegistryProvider registry={componentRegistry}>
-                <RouterProvider router={router} />
+                <RouterWithUser router={router} />
               </ComponentRegistryProvider>
             </TransportProvider>
           </QueryClientProvider>
@@ -69,4 +80,19 @@ export function AppShell({ router, transport }: AppShellProps): ReactElement {
       </AuthProvider>
     </StrictMode>
   );
+}
+
+// Injects the live viewer into the router context once `<AuthProvider>` has
+// resolved `/api/me`, so `requirePermissions` guards in `beforeLoad` enforce
+// against the real permission set rather than the `null` seed from `main.tsx`.
+function RouterWithUser({ router }: { router: AnyRouter }): ReactElement {
+  const { user } = useAuth();
+  return <RouterProvider router={router} context={{ user }} />;
+}
+
+// The host's `permission_denied` errors carry "missing permission: <perm>"
+// (see ApiError::forbidden); surface that name on `/403` when present.
+function missingPermissionsFromError(error: ConnectError): string[] {
+  const match = /missing permission:\s*(.+)/i.exec(error.rawMessage);
+  return match?.[1] ? [match[1].trim()] : [];
 }
