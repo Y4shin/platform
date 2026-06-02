@@ -11,6 +11,7 @@ manifest_schema = 1
 "admin:user_roles_write" = "Create / edit / delete user-roles, set their permissions, assign / revoke them."
 "admin:oidc_read"        = "List OIDC group → group/role mappings."
 "admin:oidc_write"       = "Create / edit / delete OIDC group → group/role mappings."
+"admin:audit_read"       = "Browse the platform audit log."
 
 [requires]
 capabilities = ["platform.admin"]

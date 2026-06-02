@@ -4,6 +4,7 @@
 /// `(service_fqn, method)` -> permission names required, read from each
 /// method's `option (platform.requires)`. The host RPC guard enforces these.
 pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
+    ("admin.v1.AuditService", "List", &["admin:audit_read"]),
     (
         "admin.v1.GroupAdminService",
         "AddGroupMember",
@@ -182,6 +183,7 @@ pub static RPC_REQUIRES: &[(&str, &str, &[&str])] = &[
 /// exists — `inject_ctx` injects nothing and the self-contained host
 /// handler reads only the caller from request extensions.
 pub static RPC_SERVICES: &[(&str, &str)] = &[
+    ("admin.v1.AuditService", "admin"),
     ("admin.v1.GroupAdminService", "admin"),
     ("admin.v1.OidcMappingAdminService", "admin"),
     ("admin.v1.PermissionCatalogService", "admin"),

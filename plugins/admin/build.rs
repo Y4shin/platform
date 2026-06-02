@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-const PROTO_FILES: &[&str] = &["proto/admin/v1/admin.proto"];
+const PROTO_FILES: &[&str] = &["proto/admin/v1/admin.proto", "proto/admin/v1/audit.proto"];
 
 fn main() {
     for proto in PROTO_FILES {

@@ -249,3 +249,14 @@ No open blockers for slicing. The library-choice confirmations above are the onl
   extraction: `RouteErrorBoundary.test.tsx`. `e2e/cross/error-pages.spec.ts` is
   `JUNIUS_E2E`-gated (AC1 active; the RPC-denial + throw-route browser flows are `fixme`
   stubs pending a fault-injection fixture, their logic covered by the unit tests).
+- **Slice #6 (audit log viewer)** — `PlatformAdminApi::list_audit_events` added to
+  the SDK (keyset cursor pagination over `platform.audit_event`, `(occurred_at, id)`
+  composite cursor, all filters AND-combined as `WHERE ($N IS NULL OR col = $N)`).
+  New `AuditService.List` RPC in `plugins/admin/proto/admin/v1/audit.proto` with
+  `admin:audit_read` permission. Opaque cursor encoded as base64 of
+  `rfc3339|uuid`. Frontend `AuditPage` with filter bar, table, JSON details
+  drawer, cursor-based pagination; first Lingui setup for the admin plugin
+  (catalogs, `loadI18n`, `lingui.config.cjs` entry). Test file reconciled to
+  `platform/tests/audit_pg.rs` (not `plugins/admin/tests/`) since the query
+  goes through `PlatformAdminApi` on the host pool. E2E spec at
+  `plugins/admin/frontend/e2e/audit.spec.ts`.

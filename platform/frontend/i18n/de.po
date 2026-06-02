@@ -26,10 +26,6 @@ msgstr "Zugriff verweigert"
 msgid "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
 msgstr "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut; wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Administrator."
 
-#: platform/frontend/src/layout/Shell.tsx:25
-#~ msgid "Anonymous"
-#~ msgstr "Anonym"
-
 #: platform/frontend/src/pages/MePage.tsx:217
 msgid "Browser"
 msgstr "Browser"

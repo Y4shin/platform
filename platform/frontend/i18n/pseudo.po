@@ -26,10 +26,6 @@ msgstr ""
 msgid "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
 msgstr ""
 
-#: platform/frontend/src/layout/Shell.tsx:25
-#~ msgid "Anonymous"
-#~ msgstr ""
-
 #: platform/frontend/src/pages/MePage.tsx:217
 msgid "Browser"
 msgstr ""

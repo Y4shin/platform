@@ -45,8 +45,9 @@ include!(concat!(env!("OUT_DIR"), "/_rpc_requires.rs"));
 
 use proto::admin::v1 as pb;
 use proto::admin::v1::{
-    GroupAdminService, GroupAdminServiceExt, OidcMappingAdminService, OidcMappingAdminServiceExt,
-    OwnedAddGroupMemberRequestView, OwnedAssignUserRoleRequestView, OwnedCreateGroupRequestView,
+    AuditService, AuditServiceExt, GroupAdminService, GroupAdminServiceExt,
+    OidcMappingAdminService, OidcMappingAdminServiceExt, OwnedAddGroupMemberRequestView,
+    OwnedAssignUserRoleRequestView, OwnedAuditServiceListRequestView, OwnedCreateGroupRequestView,
     OwnedCreateGroupRoleRequestView, OwnedCreateOidcMappingRequestView,
     OwnedCreateUserRoleRequestView, OwnedDeleteGroupRequestView, OwnedDeleteGroupRoleRequestView,
     OwnedDeleteOidcMappingRequestView, OwnedDeleteUserRoleRequestView,
@@ -118,7 +119,8 @@ impl Plugin for AdminPlugin {
         let router = Arc::new(UserRoleAdminRpc).register(router);
         let router = Arc::new(UserAdminRpc).register(router);
         let router = Arc::new(OidcMappingAdminRpc).register(router);
-        Arc::new(PermissionCatalogRpc).register(router)
+        let router = Arc::new(PermissionCatalogRpc).register(router);
+        Arc::new(AuditRpc).register(router)
     }
 }
 
@@ -573,6 +575,113 @@ impl OidcMappingAdminRpc {
         admin(&actx).delete_oidc_mapping(id).await?;
         Ok(Response::new(pb::DeleteOidcMappingResponse::default()))
     }
+}
+
+// =============================================================================
+// AuditService
+// =============================================================================
+
+struct AuditRpc;
+
+#[junius_sdk::rpc_service(AuditService)]
+impl AuditRpc {
+    async fn list(
+        &self,
+        actx: AdminCtx<crate::__rpc_requires::audit_service::List>,
+        request: OwnedAuditServiceListRequestView,
+    ) -> ServiceResult<impl Encodable<pb::AuditServiceListResponse>> {
+        let actor_user_id = parse_optional_uuid(request.actor_user_id.unwrap_or_default())?;
+        let resource_kind: Option<&str> = request.resource_kind.and_then(|s| non_empty_str(s));
+        let event_kind: Option<&str> = request.event_kind.and_then(|s| non_empty_str(s));
+        let starts_at = parse_optional_rfc3339(request.starts_at.unwrap_or_default())?;
+        let ends_at = parse_optional_rfc3339(request.ends_at.unwrap_or_default())?;
+        let cursor = decode_cursor(request.cursor.unwrap_or_default())?;
+        let limit = if request.limit == 0 {
+            50
+        } else {
+            request.limit
+        };
+
+        let filter = junius_sdk::AuditFilter {
+            actor_user_id,
+            resource_kind,
+            event_kind,
+            starts_at,
+            ends_at,
+        };
+
+        let page = admin(&actx)
+            .list_audit_events(&filter, cursor.as_ref(), limit)
+            .await?;
+
+        Ok(Response::new(pb::AuditServiceListResponse {
+            events: page
+                .events
+                .into_iter()
+                .map(|e| pb::AuditEvent {
+                    id: e.id.to_string(),
+                    event_kind: e.event_kind,
+                    actor_user_id: e.actor_user_id.map_or_else(String::new, |u| u.to_string()),
+                    actor_email: e.actor_email.unwrap_or_default(),
+                    actor_display_name: e.actor_display_name.unwrap_or_default(),
+                    resource_kind: e.resource_kind.unwrap_or_default(),
+                    resource_id: e.resource_id.map_or_else(String::new, |u| u.to_string()),
+                    details: serde_json::to_string(&e.details).unwrap_or_default(),
+                    occurred_at: e.occurred_at.to_rfc3339(),
+                    ..Default::default()
+                })
+                .collect(),
+            next_cursor: page.next_cursor.map(|c| encode_cursor(&c)),
+            ..Default::default()
+        }))
+    }
+}
+
+fn parse_optional_uuid(s: &str) -> Result<Option<Uuid>, ConnectError> {
+    if s.is_empty() {
+        return Ok(None);
+    }
+    Uuid::parse_str(s)
+        .map(Some)
+        .map_err(|_| invalid_field("actor_user_id"))
+}
+
+fn parse_optional_rfc3339(s: &str) -> Result<Option<chrono::DateTime<chrono::Utc>>, ConnectError> {
+    if s.is_empty() {
+        return Ok(None);
+    }
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| Some(dt.with_timezone(&chrono::Utc)))
+        .map_err(|_| invalid_field("date (RFC3339)"))
+}
+
+fn encode_cursor(c: &junius_sdk::AuditCursor) -> String {
+    use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let raw = format!("{}|{}", c.occurred_at.to_rfc3339(), c.id);
+    URL_SAFE_NO_PAD.encode(raw.as_bytes())
+}
+
+fn decode_cursor(s: &str) -> Result<Option<junius_sdk::AuditCursor>, ConnectError> {
+    use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    if s.is_empty() {
+        return Ok(None);
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(s)
+        .map_err(|_| ConnectError::invalid_argument("admin.error.invalid_cursor"))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| ConnectError::invalid_argument("admin.error.invalid_cursor"))?;
+    let (ts_str, id_str) = text
+        .split_once('|')
+        .ok_or_else(|| ConnectError::invalid_argument("admin.error.invalid_cursor"))?;
+    let occurred_at = chrono::DateTime::parse_from_rfc3339(ts_str)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|_| ConnectError::invalid_argument("admin.error.invalid_cursor"))?;
+    let id = Uuid::parse_str(id_str)
+        .map_err(|_| ConnectError::invalid_argument("admin.error.invalid_cursor"))?;
+    Ok(Some(junius_sdk::AuditCursor { occurred_at, id }))
 }
 
 // =============================================================================
