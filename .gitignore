@@ -43,6 +43,7 @@ Thumbs.db
 # log. Regenerated on every `task test:e2e`. Playwright's trace/screenshot
 # output also lands at the repo root.
 e2e/.playwright-state/
+e2e/.playwright-state-split/
 /test-results/
 /playwright-report/
 
