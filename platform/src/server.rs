@@ -24,6 +24,7 @@ pub fn build_app(plugins: &[Box<dyn Plugin>]) -> Router {
     base_app()
         .merge(http)
         .nest("/rpc", build_rpc(plugins, None))
+        .layer(axum::middleware::from_fn(crate::correlation::stamp))
 }
 
 /// Compose the full host: per-plugin resource context, the `/api/auth/*` public
@@ -100,6 +101,9 @@ pub fn build_app_with_services(
         .merge(auth::public_router(auth_state))
         .merge(protected)
         .layer(tower_cookies::CookieManagerLayer::new())
+        // Outermost: wrap every request in a span and stamp the trace id onto
+        // responses (incl. errors from inner layers) as `x-correlation-id`.
+        .layer(axum::middleware::from_fn(crate::correlation::stamp))
 }
 
 /// Tuple of host services needed to assemble a plugin's request context.

@@ -6,6 +6,7 @@
 pub mod auth;
 pub mod boot;
 pub mod config;
+pub mod correlation;
 pub mod db;
 pub mod email;
 pub mod generated;
