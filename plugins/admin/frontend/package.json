@@ -16,15 +16,19 @@
     "@connectrpc/connect-query": "^2.0.0",
     "@junius/design": "workspace:*",
     "@junius/generated": "workspace:*",
-    "@junius/sdk": "workspace:*"
+    "@junius/sdk": "workspace:*",
+    "@lingui/core": "^5.9.5",
+    "@lingui/react": "^5.9.5"
   },
   "peerDependencies": {
     "@tanstack/react-router": "^1.95.0",
     "react": "^19.0.0"
   },
   "devDependencies": {
+    "@lingui/macro": "^5.9.5",
     "@tanstack/react-router": "^1.95.0",
     "@types/react": "^19.0.0",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "vite": "^6.0.0"
   }
 }

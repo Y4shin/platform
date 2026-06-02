@@ -38,5 +38,5 @@ module.exports = {
   pseudoLocale: 'pseudo',
   format: 'po',
   rootDir: ROOT,
-  catalogs: [pkg('platform/frontend'), pkg('plugins/events/frontend')],
+  catalogs: [pkg('platform/frontend'), pkg('plugins/admin/frontend'), pkg('plugins/events/frontend')],
 };

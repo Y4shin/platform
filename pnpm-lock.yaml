@@ -312,7 +312,16 @@ importers:
       '@junius/sdk':
         specifier: workspace:*
         version: link:../../../packages/sdk
+      '@lingui/core':
+        specifier: ^5.9.5
+        version: 5.9.5(@lingui/babel-plugin-lingui-macro@5.9.5(babel-plugin-macros@3.1.0)(typescript@5.6.3))(babel-plugin-macros@3.1.0)
+      '@lingui/react':
+        specifier: ^5.9.5
+        version: 5.9.5(@lingui/babel-plugin-lingui-macro@5.9.5(babel-plugin-macros@3.1.0)(typescript@5.6.3))(babel-plugin-macros@3.1.0)(react@19.2.6)
     devDependencies:
+      '@lingui/macro':
+        specifier: ^5.9.5
+        version: 5.9.5(@lingui/babel-plugin-lingui-macro@5.9.5(babel-plugin-macros@3.1.0)(typescript@5.6.3))(babel-plugin-macros@3.1.0)(react@19.2.6)
       '@tanstack/react-router':
         specifier: ^1.95.0
         version: 1.170.5(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -322,6 +331,9 @@ importers:
       react:
         specifier: ^19.0.0
         version: 19.2.6
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@25.9.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0)
 
   plugins/events/frontend:
     dependencies:

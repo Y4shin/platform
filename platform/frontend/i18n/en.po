@@ -26,10 +26,6 @@ msgstr "Access denied"
 msgid "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
 msgstr "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
 
-#: platform/frontend/src/layout/Shell.tsx:25
-#~ msgid "Anonymous"
-#~ msgstr "Anonymous"
-
 #: platform/frontend/src/pages/MePage.tsx:217
 msgid "Browser"
 msgstr "Browser"

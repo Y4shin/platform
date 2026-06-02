@@ -3,6 +3,7 @@
 
 import type { CatalogLoader } from '@junius/sdk';
 import { loadI18n as loadEventsI18n } from '@junius/plugin-events';
+import { loadI18n as loadAdminI18n } from '@junius/plugin-admin';
 
 /**
  * Per-plugin Lingui catalog loaders, in deployment-declared order. The host
@@ -11,4 +12,5 @@ import { loadI18n as loadEventsI18n } from '@junius/plugin-events';
  */
 export const PLUGIN_I18N_CATALOGS: readonly CatalogLoader[] = [
   loadEventsI18n,
+  loadAdminI18n,
 ];
