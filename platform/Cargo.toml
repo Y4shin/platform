@@ -86,6 +86,8 @@ junius-rpc-meta  = { workspace = true }
 
 [dev-dependencies]
 http = { workspace = true }
+# `ServiceExt::oneshot` for driving the router in the correlation-middleware test.
+tower = { workspace = true, features = ["util"] }
 
 # Ephemeral Postgres for the auth integration tests (M06).
 testcontainers         = { workspace = true }

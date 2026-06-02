@@ -18,6 +18,14 @@ msgstr ""
 msgid "{0} permissions"
 msgstr "{0} Berechtigungen"
 
+#: platform/frontend/src/pages/ForbiddenPage.tsx:38
+msgid "Access denied"
+msgstr "Zugriff verweigert"
+
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:44
+msgid "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
+msgstr "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut; wenn das Problem weiterhin besteht, wenden Sie sich an Ihren Administrator."
+
 #: platform/frontend/src/layout/Shell.tsx:25
 #~ msgid "Anonymous"
 #~ msgstr "Anonym"
@@ -31,6 +39,7 @@ msgid "Config"
 msgstr "Konfiguration"
 
 #: platform/frontend/src/pages/DashboardPage.tsx:73
+#: platform/frontend/src/pages/ForbiddenPage.tsx:54
 msgid "Contact your administrator:"
 msgstr "Wenden Sie sich an Ihre Administration:"
 
@@ -121,6 +130,10 @@ msgstr "Profil"
 msgid "Pseudo"
 msgstr "Pseudo"
 
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:51
+msgid "Reference id:"
+msgstr "Referenz-ID:"
+
 #: platform/frontend/src/pages/MePage.tsx:245
 msgid "Revoke"
 msgstr "Widerrufen"
@@ -137,6 +150,11 @@ msgstr "Sitzungen"
 #: platform/frontend/src/layout/UserMenu.tsx:43
 msgid "Sign out"
 msgstr "Abmelden"
+
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:27
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:41
+msgid "Something went wrong"
+msgstr "Etwas ist schiefgelaufen"
 
 #: platform/frontend/src/pages/MePage.tsx:232
 msgid "This device"
@@ -166,9 +184,17 @@ msgstr "Sie sind in keiner Gruppe Mitglied."
 msgid "You don't have access yet"
 msgstr "Sie haben noch keinen Zugriff"
 
+#: platform/frontend/src/pages/ForbiddenPage.tsx:49
+msgid "You don't have permission to view this page."
+msgstr "Sie haben keine Berechtigung, diese Seite anzusehen."
+
 #: platform/frontend/src/pages/MePage.tsx:173
 msgid "You hold no user-roles."
 msgstr "Sie haben keine Benutzerrollen."
+
+#: platform/frontend/src/pages/ForbiddenPage.tsx:44
+msgid "You're missing the permission(s) needed for this page:"
+msgstr "Ihnen fehlen die für diese Seite erforderlichen Berechtigungen:"
 
 #: platform/frontend/src/pages/DashboardPage.tsx:66
 msgid "Your account doesn't have access to anything yet. Ask your administrator to add you to a group."

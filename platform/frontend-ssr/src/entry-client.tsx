@@ -16,7 +16,9 @@ import { hydrateRoot } from 'react-dom/client';
 
 import '@junius/shell/styles.css';
 
-const router = createRouter({ routeTree });
+// Seed the router context with a null viewer; AppShell injects the live user
+// once `/api/me` resolves (see platform/frontend/src/AppShell.tsx).
+const router = createRouter({ routeTree, context: { user: null } });
 
 declare module '@tanstack/react-router' {
   interface Register {

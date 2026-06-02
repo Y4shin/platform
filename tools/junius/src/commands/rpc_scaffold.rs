@@ -495,16 +495,11 @@ mod tests {
         std::fs::write(path, body).unwrap();
     }
 
-    // CWD is process-global; serialize tests that touch it so cargo's parallel
-    // runner doesn't race them.
-    fn cwd_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        LOCK.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    }
-
     fn run_in(root: &Path, plugin: &str, check: bool) -> i32 {
-        let _guard = cwd_lock();
+        // CWD is process-global; hold the crate-wide lock so cargo's parallel
+        // runner doesn't race this against other CWD-sensitive tests in the
+        // binary (e.g. source.rs' git clone test). See crate::cwd_lock.
+        let _guard = crate::cwd_lock();
         let prev = std::env::current_dir().unwrap();
         std::env::set_current_dir(root).unwrap();
         let code = run(&RpcScaffoldArgs {

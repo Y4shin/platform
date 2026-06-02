@@ -56,3 +56,13 @@ export interface User {
 export interface RouterContext {
   user: User | null;
 }
+
+/**
+ * Router history-state carried to `/403`: the permission names the viewer is
+ * missing. Set by `requirePermissions` (route guard) and the `PermissionDenied`
+ * query-error branch; read by `<ForbiddenPage>`. TanStack's `HistoryState` is an
+ * empty interface by default, so this is the shared shape both ends agree on.
+ */
+export interface ForbiddenState {
+  missing?: string[];
+}

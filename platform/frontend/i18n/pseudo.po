@@ -18,6 +18,14 @@ msgstr ""
 msgid "{0} permissions"
 msgstr ""
 
+#: platform/frontend/src/pages/ForbiddenPage.tsx:38
+msgid "Access denied"
+msgstr ""
+
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:44
+msgid "An unexpected error occurred. Please try again; if it keeps happening, contact your administrator."
+msgstr ""
+
 #: platform/frontend/src/layout/Shell.tsx:25
 #~ msgid "Anonymous"
 #~ msgstr ""
@@ -31,6 +39,7 @@ msgid "Config"
 msgstr ""
 
 #: platform/frontend/src/pages/DashboardPage.tsx:73
+#: platform/frontend/src/pages/ForbiddenPage.tsx:54
 msgid "Contact your administrator:"
 msgstr ""
 
@@ -121,6 +130,10 @@ msgstr ""
 msgid "Pseudo"
 msgstr ""
 
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:51
+msgid "Reference id:"
+msgstr ""
+
 #: platform/frontend/src/pages/MePage.tsx:245
 msgid "Revoke"
 msgstr ""
@@ -136,6 +149,11 @@ msgstr ""
 
 #: platform/frontend/src/layout/UserMenu.tsx:43
 msgid "Sign out"
+msgstr ""
+
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:27
+#: platform/frontend/src/router/RouteErrorBoundary.tsx:41
+msgid "Something went wrong"
 msgstr ""
 
 #: platform/frontend/src/pages/MePage.tsx:232
@@ -166,8 +184,16 @@ msgstr ""
 msgid "You don't have access yet"
 msgstr ""
 
+#: platform/frontend/src/pages/ForbiddenPage.tsx:49
+msgid "You don't have permission to view this page."
+msgstr ""
+
 #: platform/frontend/src/pages/MePage.tsx:173
 msgid "You hold no user-roles."
+msgstr ""
+
+#: platform/frontend/src/pages/ForbiddenPage.tsx:44
+msgid "You're missing the permission(s) needed for this page:"
 msgstr ""
 
 #: platform/frontend/src/pages/DashboardPage.tsx:66

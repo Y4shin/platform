@@ -20,7 +20,11 @@ export {
 } from './i18n/index.js';
 export type { PluginLinkProps } from './navigation/PluginNavigate.js';
 export { PluginLink, usePluginNavigate } from './navigation/PluginNavigate.js';
-export { requirePermissions } from './permissions/requirePermissions.js';
+export {
+  missingPermissions,
+  requirePermissions,
+  userHasPermission,
+} from './permissions/requirePermissions.js';
 export {
   useHasAllPermissions,
   useHasAnyPermission,
@@ -36,6 +40,7 @@ export {
 } from './registry/ComponentRegistryProvider.js';
 export { useComponent } from './registry/getComponent.js';
 export type {
+  ForbiddenState,
   GroupId,
   Membership,
   Role,

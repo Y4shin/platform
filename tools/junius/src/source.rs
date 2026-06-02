@@ -146,6 +146,10 @@ mod tests {
 
     #[test]
     fn git_source_clones_then_fetches_from_a_file_url() {
+        // `git` here inherits the process CWD; hold the crate-wide CWD lock for
+        // the whole test so a sibling test's `set_current_dir` (e.g.
+        // rpc_scaffold) can't remove our CWD mid-clone. See crate::cwd_lock.
+        let _cwd = crate::cwd_lock();
         // Network-free: a local origin repo over the git `file://` transport.
         let tmp = tempfile::tempdir().unwrap();
         let origin = tmp.path().join("origin");
