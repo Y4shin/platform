@@ -656,15 +656,15 @@ fn parse_optional_rfc3339(s: &str) -> Result<Option<chrono::DateTime<chrono::Utc
 }
 
 fn encode_cursor(c: &junius_sdk::AuditCursor) -> String {
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     let raw = format!("{}|{}", c.occurred_at.to_rfc3339(), c.id);
     URL_SAFE_NO_PAD.encode(raw.as_bytes())
 }
 
 fn decode_cursor(s: &str) -> Result<Option<junius_sdk::AuditCursor>, ConnectError> {
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine as _;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     if s.is_empty() {
         return Ok(None);
     }
