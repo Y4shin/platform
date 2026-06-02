@@ -9,6 +9,7 @@ import { createRoute } from '@tanstack/react-router';
 
 import { authedLayoutRoute, rootRoute } from '../router/root.js';
 import { DashboardPage } from '../pages/DashboardPage.js';
+import { ForbiddenPage } from '../pages/ForbiddenPage.js';
 import { MePage } from '../pages/MePage.js';
 import { buildRoutes as buildHello } from '@junius/plugin-hello';
 
@@ -24,6 +25,12 @@ const meRoute = createRoute({
   component: MePage,
 });
 
+const forbiddenRoute = createRoute({
+  getParentRoute: () => authedLayoutRoute,
+  path: '/403',
+  component: ForbiddenPage,
+});
+
 const helloParent = createRoute({
   getParentRoute: () => authedLayoutRoute,
   path: '/p/hello',
@@ -34,6 +41,7 @@ export const routeTree = rootRoute.addChildren([
   authedLayoutRoute.addChildren([
     indexRoute,
     meRoute,
+    forbiddenRoute,
     helloParent,
   ]),
 ]);
