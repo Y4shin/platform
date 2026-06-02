@@ -1,0 +1,32 @@
+[book]
+title = "Junius Plugin Development Guide"
+authors = ["Junius contributors"]
+description = "A step-by-step guide to building plugins for the Junius platform."
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://codeberg.org/Yashin/platform"
+edit-url-template = "https://codeberg.org/Yashin/platform/_edit/main/docs/plugin-guide/{path}"
+additional-css = []
+
+[output.html.fold]
+enable = true
+level = 1
+
+# NOTE: This book is intentionally buildable with a vanilla `mdbook build` — it
+# declares no preprocessors that aren't in the toolchain yet. When the M21
+# documentation site lands `mdbook-mermaid`/`mdbook-toc`/`mdbook-linkcheck` in
+# the flake, enable them here:
+#
+# [preprocessor.mermaid]
+# command = "mdbook-mermaid"
+#
+# [preprocessor.toc]
+# command = "mdbook-toc"
+#
+# [output.linkcheck]
+# follow-web-links = false
+# warning-policy   = "error"
