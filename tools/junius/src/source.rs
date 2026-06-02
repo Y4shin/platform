@@ -92,14 +92,7 @@ fn path_str(p: &Path) -> anyhow::Result<&str> {
 
 /// Run `git` with `args`, returning stdout; errors include stderr.
 pub(crate) fn git(args: &[&str]) -> anyhow::Result<String> {
-    // Run from a stable directory rather than the inherited process CWD: every
-    // call passes absolute paths / `-C`, so the working directory is irrelevant
-    // to correctness, but `git` aborts ("Unable to read current working
-    // directory") if its CWD has been removed. That happens in the test binary
-    // when a parallel test mutates the process CWD into a since-deleted tempdir;
-    // pinning to `temp_dir()` makes git robust to it.
     let out = Command::new("git")
-        .current_dir(std::env::temp_dir())
         .args(args)
         .output()
         .context("spawning git (is it installed?)")?;
@@ -153,6 +146,10 @@ mod tests {
 
     #[test]
     fn git_source_clones_then_fetches_from_a_file_url() {
+        // `git` here inherits the process CWD; hold the crate-wide CWD lock for
+        // the whole test so a sibling test's `set_current_dir` (e.g.
+        // rpc_scaffold) can't remove our CWD mid-clone. See crate::cwd_lock.
+        let _cwd = crate::cwd_lock();
         // Network-free: a local origin repo over the git `file://` transport.
         let tmp = tempfile::tempdir().unwrap();
         let origin = tmp.path().join("origin");

@@ -17,6 +17,19 @@ mod output;
 // diffs, which `junius check` (always available) needs.
 mod source;
 
+/// Shared guard for tests that mutate the process-global current directory
+/// (`std::env::set_current_dir`) or spawn subprocesses that inherit it. The CWD
+/// is process-wide, so without serialisation a `set_current_dir` in one test
+/// races a sibling test running concurrently in the same binary — the sibling's
+/// `git`/subprocess can find the CWD removed mid-run ("Unable to read current
+/// working directory"). Every such test holds this one lock for its full CWD-
+/// sensitive window.
+#[cfg(test)]
+pub(crate) fn cwd_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
